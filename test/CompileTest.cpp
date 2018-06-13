@@ -19,7 +19,8 @@ using namespace std::literals;
 using namespace pushmi::aliases;
 
 #if __cpp_deduction_guides >= 201703
-#define MAKE(x) x
+#define MAKE(x) x MAKE_
+#define MAKE_(...) {__VA_ARGS__}
 #else
 #define MAKE(x) make_ ## x
 #endif

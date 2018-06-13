@@ -146,7 +146,7 @@ template <class Wrapped>
 any_time_executor(Wrapped) ->
     any_time_executor<
         std::exception_ptr, 
-        td::chrono::system_clock::time_point>;
+        std::chrono::system_clock::time_point>;
 #endif
 
 } // namespace pushmi

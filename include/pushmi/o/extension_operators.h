@@ -10,6 +10,7 @@
 #include "../piping.h"
 #include "../boosters.h"
 #include "../single.h"
+#include "../detail/if_constexpr.h"
 
 namespace pushmi {
 
@@ -75,58 +76,70 @@ struct out_from_fn {
 
 template<Sender In, class FN>
 auto submit_transform_out(FN fn){
-  if constexpr ((bool)TimeSender<In>) {
+  PUSHMI_IF_CONSTEXPR_RETURN( ((bool)TimeSender<In>) (
     return on_submit(
       [fn = std::move(fn)]<class TP, class Out>(In& in, TP tp, Out out) {
         ::pushmi::submit(in, tp, fn(std::move(out)));
       }
     );
-  } else {
+  ) else (
     return on_submit(
       [fn = std::move(fn)]<class Out>(In& in, Out out) {
         ::pushmi::submit(in, fn(std::move(out)));
       }
     );
-  }
+  ))
 }
 
 template<Sender In, class SDSF, class TSDSF>
 auto submit_transform_out(SDSF sdsf, TSDSF tsdsf){
-  if constexpr ((bool)TimeSender<In>) {
+  PUSHMI_IF_CONSTEXPR_RETURN( ((bool)TimeSender<In>) (
     return on_submit(
       [tsdsf = std::move(tsdsf)]<class TP, class Out>(In& in, TP tp, Out out) {
         tsdsf(in, tp, std::move(out));
       }
     );
-  } else {
+  ) else (
     return on_submit(
       [sdsf = std::move(sdsf)]<class Out>(In& in, Out out) {
         sdsf(in, std::move(out));
       }
     );
-  }
+  ))
 }
 
 template<Sender In, Receiver Out, class... FN>
 auto deferred_from(FN&&... fn) {
-  if constexpr ((bool)TimeSenderTo<In, Out, single_tag>) {
+  PUSHMI_IF_CONSTEXPR_RETURN( ((bool)TimeSenderTo<In, Out, single_tag>) (
     return make_time_single_deferred((FN&&) fn...);
-  } else if constexpr ((bool)SenderTo<In, Out, single_tag>) {
-    return make_single_deferred((FN&&) fn...);
-  } else if constexpr ((bool)SenderTo<In, Out>) {
-    return make_deferred((FN&&) fn...);
-  }
+  ) else (
+    PUSHMI_IF_CONSTEXPR_RETURN( ((bool)SenderTo<In, Out, single_tag>) (
+      return make_single_deferred((FN&&) fn...);
+    ) else (
+      PUSHMI_IF_CONSTEXPR_RETURN( ((bool)SenderTo<In, Out>) (
+        return make_deferred((FN&&) fn...);
+      ) else (
+        //return void();
+      ))
+    ))
+  ))
 }
 
 template<Sender In, Receiver Out, class... FN>
 auto deferred_from(In in, FN&&... fn) {
-  if constexpr ((bool)TimeSenderTo<In, Out, single_tag>) {
-    return make_time_single_deferred(std::move(in), (FN&&) fn...);
-  } else if constexpr ((bool)SenderTo<In, Out, single_tag>) {
-    return make_single_deferred(std::move(in), (FN&&) fn...);
-  } else if constexpr ((bool)SenderTo<In, Out>) {
-    return make_deferred(std::move(in), (FN&&) fn...);
-  }
+  PUSHMI_IF_CONSTEXPR_RETURN( ((bool)TimeSenderTo<In, Out, single_tag>) (
+    return make_time_single_deferred(id(std::move(in)), (FN&&) fn...);
+  ) else (
+    PUSHMI_IF_CONSTEXPR_RETURN( ((bool)SenderTo<In, Out, single_tag>) (
+      return make_single_deferred(id(std::move(in)), (FN&&) fn...);
+    ) else (
+      PUSHMI_IF_CONSTEXPR_RETURN( ((bool)SenderTo<In, Out>) (
+        return make_deferred(id(std::move(in)), (FN&&) fn...);
+      ) else (
+        //return void();
+      ))
+    ))
+  ))
 }
 
 template<
@@ -136,13 +149,19 @@ template<
     bool SingleSenderRequires,
     bool TimeSingleSenderRequires>
 constexpr bool deferred_requires_from() {
-  if constexpr ((bool)TimeSenderTo<In, Out, single_tag>) {
+  PUSHMI_IF_CONSTEXPR_RETURN( ((bool)TimeSenderTo<In, Out, single_tag>) (
     return TimeSingleSenderRequires;
-  } else if constexpr ((bool)SenderTo<In, Out, single_tag>) {
-    return SingleSenderRequires;
-  } else if constexpr ((bool)SenderTo<In, Out>) {
-    return SenderRequires;
-  }
+  ) else (
+    PUSHMI_IF_CONSTEXPR_RETURN( ((bool)SenderTo<In, Out, single_tag>) (
+      return SingleSenderRequires;
+    ) else (
+      PUSHMI_IF_CONSTEXPR_RETURN( ((bool)SenderTo<In, Out>) (
+        return SenderRequires;
+      ) else (
+        //return void();
+      ))
+    ))
+  ))
 }
 
 } // namespace detail

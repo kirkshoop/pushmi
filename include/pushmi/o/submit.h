@@ -11,11 +11,11 @@
 #include "../boosters.h"
 #include "extension_operators.h"
 #include "../trampoline.h"
+#include "../detail/opt.h"
+#include "../detail/if_constexpr.h"
 
 namespace pushmi {
-
 namespace operators {
-
 namespace detail {
 
 template <Sender In, class ...AN>
@@ -118,15 +118,15 @@ private:
       auto out{::pushmi::detail::out_from_fn<In>()(
         std::move(args_),
         on_value([&]<class Out, class V>(Out out, V&& v){
-          if constexpr ((bool)TimeSender<remove_cvref_t<V>>) {
+          PUSHMI_IF_CONSTEXPR( ((bool)TimeSender<remove_cvref_t<V>>) (
             // to keep the blocking semantics, make sure that the
             // nested submits block here to prevent a spurious
             // completion signal
             auto nest = ::pushmi::nested_trampoline();
             ::pushmi::submit(nest, ::pushmi::now(nest), std::move(out));
-          } else {
-            ::pushmi::set_value(out, (V&&) v);
-          }
+          ) else (
+            ::pushmi::set_value(out, id((V&&) v));
+          ))
           done = true;
           signaled.notify_all();
         }),
@@ -141,11 +141,11 @@ private:
           signaled.notify_all();
         })
       )};
-      if constexpr (IsTimeSender) {
-        ::pushmi::submit(in, ::pushmi::now(in), std::move(out));
-      } else {
-        ::pushmi::submit(in, std::move(out));
-      }
+      PUSHMI_IF_CONSTEXPR( (IsTimeSender) (
+        id(::pushmi::submit)(in, id(::pushmi::now)(in), std::move(out));
+      ) else (
+        id(::pushmi::submit)(in, std::move(out));
+      ))
       std::mutex lock;
       std::unique_lock<std::mutex> guard{lock};
       signaled.wait(guard, [&](){
@@ -170,111 +170,12 @@ public:
   }
 };
 
-#if __cpp_lib_optional >= 201606
-template <class T>
-struct opt : private std::optional<T> {
-   opt() = default;
-   opt& operator=(T&& t) {
-     this->std::optional<T>::operator=(std::move(t));
-     return *this;
-   }
-   using std::optional<T>::operator*;
-   using std::optional<T>::operator bool;
-};
-#else
-template <class T>
-struct opt {
-private:
-  bool empty_ = true;
-  std::aligned_union_t<0, T> data_;
-  T* ptr() { return static_cast<T*>((void*)&data_); }
-  const T* ptr() const { return static_cast<const T*>((const void*)&data_); }
-  void reset() {
-    if (!empty_) {
-      ptr()->~T();
-      empty_ = true;
-    }
-  }
-public:
-  opt() = default;
-  opt(T&& t) noexcept(std::is_nothrow_move_constructible<T>::value) {
-    ::new(ptr()) T(std::move(t));
-    empty_ = false;
-  }
-  opt(const T& t) {
-    ::new(ptr()) T(t);
-    empty_ = false;
-  }
-  opt(opt&& that) noexcept(std::is_nothrow_move_constructible<T>::value) {
-    if (that) {
-      ::new(ptr()) T(std::move(*that));
-      empty_ = false;
-      that.reset();
-    }
-  }
-  opt(const opt& that) {
-    if (that) {
-      ::new(ptr()) T(*that);
-      empty_ = false;
-    }
-  }
-  ~opt() { reset(); }
-  opt& operator=(opt&& that)
-    noexcept(std::is_nothrow_move_constructible<T>::value &&
-             std::is_nothrow_move_assignable<T>::value) {
-    if (*this && that) {
-      **this = std::move(*that);
-      that.reset();
-    } else if (*this) {
-      reset();
-    } else if (that) {
-      ::new(ptr()) T(std::move(*that));
-      empty_ = false;
-    }
-    return *this;
-  }
-  opt& operator=(const opt& that) {
-    if (*this && that) {
-      **this = *that;
-    } else if (*this) {
-      reset();
-    } else if (that) {
-      ::new(ptr()) T(*that);
-      empty_ = false;
-    }
-    return *this;
-  }
-  opt& operator=(T&& t) noexcept(std::is_nothrow_move_constructible<T>::value &&
-                                 std::is_nothrow_move_assignable<T>::value) {
-    if (*this)
-      **this = std::move(t);
-    else {
-      ::new(ptr()) T(std::move(t));
-      empty_ = false;
-    }
-    return *this;
-  }
-  opt& operator=(const T& t) {
-    if (*this)
-      **this = t;
-    else {
-      ::new(ptr()) T(t);
-      empty_ = false;
-    }
-    return *this;
-  }
-  explicit operator bool() const noexcept { return !empty_; }
-  T& operator*() noexcept { return *ptr(); }
-  const T& operator*() const noexcept { return *ptr(); }
-};
-#endif
-
 template <class T>
 struct get_fn {
   // TODO constrain this better
   template <Sender In>
   T operator()(In in) const {
-    opt<T> result_;
+    pushmi::detail::opt<T> result_;
     std::exception_ptr ep_;
     auto out = make_single(
       on_value([&](T t){ result_ = std::move(t); }),

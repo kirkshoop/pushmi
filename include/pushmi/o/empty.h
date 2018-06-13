@@ -10,7 +10,6 @@
 #include "../single_deferred.h"
 
 namespace pushmi {
-
 namespace operators {
 
 template <class V>
@@ -30,5 +29,4 @@ inline auto empty() {
 }
 
 } // namespace operators
-
 } // namespace pushmi

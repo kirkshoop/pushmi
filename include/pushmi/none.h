@@ -235,11 +235,11 @@ none(EF) -> none<EF, ignoreDF>;
 
 template <class DF>
   requires Invocable<DF&>
-none(DF) -<abortEF, DF>;
+none(DF) -> none<abortEF, DF>;
 
 template <class EF, class DF>
   requires Invocable<DF&>
-none(EF, DF) -<EF, DF>;
+none(EF, DF) -> none<EF, DF>;
 
 template <Receiver<none_tag> Data>
   requires !Receiver<Data, single_tag>

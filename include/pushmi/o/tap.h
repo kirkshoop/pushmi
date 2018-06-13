@@ -6,6 +6,7 @@
 // This source code is licensed under the MIT license found in the
 // LICENSE file in the root directory of this source tree.
 
+#include <cassert>
 #include "extension_operators.h"
 #include "../deferred.h"
 #include "../single_deferred.h"
@@ -60,13 +61,22 @@ struct tap_fn {
   auto operator()(AN... an) const;
 };
 
+#if __cpp_if_constexpr >= 201606
+#define PUSHMI_STATIC_ASSERT static_assert
+#else
+#define PUSHMI_STATIC_ASSERT detail::do_assert
+inline void do_assert(bool condition, char const*) {
+  assert(condition);
+}
+#endif
+
 template <class... AN>
 auto tap_fn::operator()(AN... an) const {
   return [args = std::tuple<AN...>{std::move(an)...}]<class In>(In in) mutable {
       auto sideEffects{::pushmi::detail::out_from_fn<In>()(std::move(args))};
       using SideEffects = decltype(sideEffects);
 
-      static_assert(
+      PUSHMI_STATIC_ASSERT(
         ::pushmi::detail::deferred_requires_from<In, SideEffects,
           SenderTo<In, SideEffects, none_tag>,
           SenderTo<In, SideEffects, single_tag>,
@@ -77,7 +87,7 @@ auto tap_fn::operator()(AN... an) const {
         std::move(in),
         ::pushmi::detail::submit_transform_out<In>(
           [sideEffects = std::move(sideEffects)]<class Out>(Out out) {
-            static_assert(
+            PUSHMI_STATIC_ASSERT(
               ::pushmi::detail::deferred_requires_from<In, SideEffects,
                 SenderTo<In, Out, none_tag>,
                 SenderTo<In, Out, single_tag>,
@@ -86,7 +96,7 @@ auto tap_fn::operator()(AN... an) const {
             auto gang{::pushmi::detail::out_from_fn<In>()(
                 detail::make_tap(sideEffects, std::move(out)))};
             using Gang = decltype(gang);
-            static_assert(
+            PUSHMI_STATIC_ASSERT(
               ::pushmi::detail::deferred_requires_from<In, SideEffects,
                 SenderTo<In, Gang>,
                 SenderTo<In, Gang, single_tag>,
