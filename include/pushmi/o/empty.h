@@ -15,18 +15,18 @@ namespace operators {
 
 template <class V>
 auto empty() {
-  return single_deferred{
+  return make_single_deferred(
       []<class Out>(Out out) mutable PUSHMI_VOID_LAMBDA_REQUIRES(
           SingleReceiver<Out, V>){
           ::pushmi::set_done(out);
-  }};
+  });
 }
 
 inline auto empty() {
-  return deferred{[]<class Out>(Out out) mutable PUSHMI_VOID_LAMBDA_REQUIRES(
+  return make_deferred([]<class Out>(Out out) mutable PUSHMI_VOID_LAMBDA_REQUIRES(
       NoneReceiver<Out>){
       ::pushmi::set_done(out);
-  }};
+  });
 }
 
 } // namespace operators

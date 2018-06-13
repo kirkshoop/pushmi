@@ -15,9 +15,9 @@ target_include_directories(pushmi INTERFACE
     $<INSTALL_INTERFACE:$<INSTALL_PREFIX>/include/net>
     $<INSTALL_INTERFACE:$<INSTALL_PREFIX>/include/meta>
     $<INSTALL_INTERFACE:$<INSTALL_PREFIX>/include/Catch2>)
-#target_compile_features(pushmi INTERFACE cxx_std_17)
+target_compile_features(pushmi INTERFACE cxx_std_14)
 target_compile_options(pushmi INTERFACE
-    $<$<CXX_COMPILER_ID:GNU>:-std=c++2a>
+    #$<$<CXX_COMPILER_ID:GNU>:-std=c++2a>
     $<$<CXX_COMPILER_ID:GNU>:-fconcepts>)
 
 install(

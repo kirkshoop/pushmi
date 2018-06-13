@@ -6,11 +6,40 @@
 // This source code is licensed under the MIT license found in the
 // LICENSE file in the root directory of this source tree.
 
+#include <tuple>
 #include "../piping.h"
 #include "../boosters.h"
 #include "../single.h"
 
 namespace pushmi {
+
+#if __cpp_lib_apply	>= 201603
+using std::apply;
+#else
+namespace detail {
+  template <class F, class Tuple, std::size_t... Is>
+    requires requires (F&& f, Tuple&& t) {
+      pushmi::invoke((F&&) f, std::get<Is>((Tuple&&) t)...);
+    }
+  constexpr decltype(auto) apply_impl(F&& f, Tuple&& t, std::index_sequence<Is...>) {
+    return pushmi::invoke((F&&) f, std::get<Is>((Tuple&&) t)...);
+  }
+} // namespace detail
+
+template <class F, class Tuple>
+  requires requires (F&& f, Tuple&& t) {
+    detail::apply_impl(
+      (F&&) f,
+      (Tuple&&) t,
+      std::make_index_sequence<std::tuple_size<std::remove_reference_t<Tuple>>::value>{});
+  }
+constexpr decltype(auto) apply(F&& f, Tuple&& t) {
+    return detail::apply_impl(
+        (F&&) f,
+        (Tuple&&) t,
+        std::make_index_sequence<std::tuple_size<std::remove_reference_t<Tuple>>::value>{});
+}
+#endif
 
 namespace detail{
 
@@ -27,13 +56,13 @@ struct out_from_fn {
   template <class... Ts>
    requires Invocable<Make, Ts...>
   auto operator()(std::tuple<Ts...> args) const {
-    return std::apply(Make(), std::move(args));
+    return pushmi::apply(Make(), std::move(args));
   }
   template <class... Ts, class... Fns,
     class This = std::enable_if_t<sizeof...(Fns) != 0, out_from_fn>>
     requires (SemiMovable<Fns> &&...) &&
       Invocable<Make, std::tuple<Ts...>> &&
-      Invocable<This, std::invoke_result_t<Make, std::tuple<Ts...>>, Fns...>
+      Invocable<This, pushmi::invoke_result_t<Make, std::tuple<Ts...>>, Fns...>
   auto operator()(std::tuple<Ts...> args, Fns...fns) const {
     return This()(This()(std::move(args)), std::move(fns)...);
   }
@@ -47,56 +76,56 @@ struct out_from_fn {
 template<Sender In, class FN>
 auto submit_transform_out(FN fn){
   if constexpr ((bool)TimeSender<In>) {
-    return on_submit{
+    return on_submit(
       [fn = std::move(fn)]<class TP, class Out>(In& in, TP tp, Out out) {
         ::pushmi::submit(in, tp, fn(std::move(out)));
       }
-    };
+    );
   } else {
-    return on_submit{
+    return on_submit(
       [fn = std::move(fn)]<class Out>(In& in, Out out) {
         ::pushmi::submit(in, fn(std::move(out)));
       }
-    };
+    );
   }
 }
 
 template<Sender In, class SDSF, class TSDSF>
 auto submit_transform_out(SDSF sdsf, TSDSF tsdsf){
   if constexpr ((bool)TimeSender<In>) {
-    return on_submit{
+    return on_submit(
       [tsdsf = std::move(tsdsf)]<class TP, class Out>(In& in, TP tp, Out out) {
         tsdsf(in, tp, std::move(out));
       }
-    };
+    );
   } else {
-    return on_submit{
+    return on_submit(
       [sdsf = std::move(sdsf)]<class Out>(In& in, Out out) {
         sdsf(in, std::move(out));
       }
-    };
+    );
   }
 }
 
 template<Sender In, Receiver Out, class... FN>
 auto deferred_from(FN&&... fn) {
   if constexpr ((bool)TimeSenderTo<In, Out, single_tag>) {
-    return time_single_deferred{(FN&&) fn...};
+    return make_time_single_deferred((FN&&) fn...);
   } else if constexpr ((bool)SenderTo<In, Out, single_tag>) {
-    return single_deferred{(FN&&) fn...};
+    return make_single_deferred((FN&&) fn...);
   } else if constexpr ((bool)SenderTo<In, Out>) {
-    return deferred{(FN&&) fn...};
+    return make_deferred((FN&&) fn...);
   }
 }
 
 template<Sender In, Receiver Out, class... FN>
 auto deferred_from(In in, FN&&... fn) {
   if constexpr ((bool)TimeSenderTo<In, Out, single_tag>) {
-    return time_single_deferred{std::move(in), (FN&&) fn...};
+    return make_time_single_deferred(std::move(in), (FN&&) fn...);
   } else if constexpr ((bool)SenderTo<In, Out, single_tag>) {
-    return single_deferred{std::move(in), (FN&&) fn...};
+    return make_single_deferred(std::move(in), (FN&&) fn...);
   } else if constexpr ((bool)SenderTo<In, Out>) {
-    return deferred{std::move(in), (FN&&) fn...};
+    return make_deferred(std::move(in), (FN&&) fn...);
   }
 }
 
@@ -192,14 +221,14 @@ struct now_fn {
 
 } // namespace detail
 
-inline constexpr detail::set_done_fn set_done{};
-inline constexpr detail::set_error_fn set_error{};
-inline constexpr detail::set_value_fn set_value{};
-inline constexpr detail::set_stopping_fn set_stopping{};
-inline constexpr detail::set_starting_fn set_starting{};
-inline constexpr detail::submit_fn submit{};
-inline constexpr detail::now_fn now{};
-inline constexpr detail::now_fn top{};
+PUSHMI_INLINE_VAR constexpr detail::set_done_fn set_done{};
+PUSHMI_INLINE_VAR constexpr detail::set_error_fn set_error{};
+PUSHMI_INLINE_VAR constexpr detail::set_value_fn set_value{};
+PUSHMI_INLINE_VAR constexpr detail::set_stopping_fn set_stopping{};
+PUSHMI_INLINE_VAR constexpr detail::set_starting_fn set_starting{};
+PUSHMI_INLINE_VAR constexpr detail::submit_fn submit{};
+PUSHMI_INLINE_VAR constexpr detail::now_fn now{};
+PUSHMI_INLINE_VAR constexpr detail::now_fn top{};
 
 } // namespace extension_operators
 

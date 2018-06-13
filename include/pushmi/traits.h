@@ -6,8 +6,12 @@
 
 #include <functional>
 #include <type_traits>
+#include <meta/meta.hpp>
 
 namespace pushmi {
+
+template <class T>
+using remove_cvref_t = std::remove_cv_t<std::remove_reference_t<T>>;
 
 template <class T, template <class> class C>
 concept bool Valid = requires { typename C<T>; };
@@ -29,7 +33,7 @@ concept bool MoveConstructible = Constructible<T, T>;
 
 template <class From, class To>
 concept bool ConvertibleTo =
-    std::is_convertible_v<From, To>&& requires(From (&f)()) {
+    std::is_convertible<From, To>::value&& requires(From (&f)()) {
   static_cast<To>(f());
 };
 
@@ -48,7 +52,7 @@ concept bool Assignable = Same<T, T&>&& requires(T t, U&& u) {
 };
 
 template <class T>
-concept bool EqualityComparable = requires(std::remove_cvref_t<T> const & t) {
+concept bool EqualityComparable = requires(remove_cvref_t<T> const & t) {
   { t == t } -> bool;
   { t != t } -> bool;
 };
@@ -71,15 +75,39 @@ concept bool Semiregular = Copyable<T>&& Constructible<T>;
 template <class T>
 concept bool Regular = Semiregular<T>&& EqualityComparable<T>;
 
+#if __cpp_lib_invoke >= 201411
+using std::invoke;
+using std::invoke_result;
+using std::invoke_result_t;
+#else
+template <class F, class...As>
+  requires requires (F&& f, As&&...as) { ((F&&) f)((As&&) as...); }
+decltype(auto) invoke(F&& f, As&&...as)
+    noexcept(noexcept(((F&&) f)((As&&) as...))) {
+  return ((F&&) f)((As&&) as...);
+}
+template <Satisfies<std::is_member_pointer> F, class...As>
+  requires requires (F f, As&&...as) { std::mem_fn(f)((As&&) as...); }
+decltype(auto) invoke(F f, As&&...as)
+    noexcept(noexcept(std::mem_fn(f)((As&&) as...))) {
+  return std::mem_fn(f)((As&&) as...);
+}
+template <class F, class...As>
+using invoke_result_t =
+  decltype(pushmi::invoke(std::declval<F>(), std::declval<As>()...));
+template <class F, class...As>
+struct invoke_result : meta::defer<invoke_result_t, F, As...> {};
+#endif
+
 template <class F, class... Args>
 concept bool Invocable = requires(F&& f, Args&&... args) {
-  std::invoke((F &&) f, (Args &&) args...);
+  pushmi::invoke((F &&) f, (Args &&) args...);
 };
 
 template <class F, class... Args>
 concept bool NothrowInvocable =
     Invocable<F, Args...> && requires(F&& f, Args&&... args) {
-  { std::invoke((F &&) f, (Args &&) args...) } noexcept;
+  { pushmi::invoke((F &&) f, (Args &&) args...) } noexcept;
 };
 
 namespace detail {

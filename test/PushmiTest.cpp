@@ -46,7 +46,7 @@ SCENARIO( "empty can be used with tap and submit", "[empty][deferred]" ) {
         v::future_from(e).get();
 
         THEN( "future_from(e) returns std::future<void>" ) {
-          REQUIRE( std::is_same_v<std::future<void>, decltype(v::future_from(e))> );
+          REQUIRE( std::is_same<std::future<void>, decltype(v::future_from(e))>::value );
         }
       }
     }
@@ -110,7 +110,7 @@ SCENARIO( "just() can be used with transform and submit", "[just][deferred]" ) {
 
       THEN( "the value signal is recorded once and the result is correct" ) {
         REQUIRE( twenty == 20 );
-        REQUIRE( std::is_same_v<std::future<int>, decltype(v::future_from<int>(j))> );
+        REQUIRE( std::is_same<std::future<int>, decltype(v::future_from<int>(j))>::value );
       }
     }
   }

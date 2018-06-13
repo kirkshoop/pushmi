@@ -28,7 +28,7 @@ void __new_thread_submit::operator()(TP at, Out out) const {
 }
 
 inline auto new_thread() {
-  return time_single_deferred{__new_thread_submit{}};
+  return make_time_single_deferred(__new_thread_submit{});
 }
 
 }

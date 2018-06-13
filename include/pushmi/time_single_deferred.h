@@ -17,31 +17,20 @@ class time_single_deferred<V, E, TP> {
   template <class Wrapped>
   static constexpr bool insitu() {
     return sizeof(Wrapped) <= sizeof(data::buffer_) &&
-        std::is_nothrow_move_constructible_v<Wrapped>;
+        std::is_nothrow_move_constructible<Wrapped>::value;
   }
-  enum struct op { destroy, move };
   struct vtable {
-    void (*op_)(op, data&, data*) = +[](op, data&, data*) {};
-    TP (*now_)(data&) = +[](data&) { return TP{}; };
-    void (*submit_)(data&, TP, single<V, E>) = +[](data&, TP, single<V, E>) {};
+    static void s_op(data&, data*) {}
+    static TP s_now(data&) { return TP{}; }
+    static void s_submit(data&, TP, single<V, E>) {}
+    void (*op_)(data&, data*) = s_op;
+    TP (*now_)(data&) = s_now;
+    void (*submit_)(data&, TP, single<V, E>) = s_submit;
     static constexpr vtable const noop_ = {};
   } const* vptr_ = &vtable::noop_;
-  template <class Wrapped, bool = insitu<Wrapped>()>
-  static constexpr vtable const vtable_v = {
-      +[](op o, data& src, data* dst) {
-        switch (o) {
-          case op::move:
-            dst->pobj_ = std::exchange(src.pobj_, nullptr);
-          case op::destroy:
-            delete static_cast<Wrapped const*>(src.pobj_);
-        }
-      },
-      +[](data& src) -> TP {
-        return ::pushmi::now(*static_cast<Wrapped*>(src.pobj_));
-      },
-      +[](data& src, TP at, single<V, E> out) {
-        ::pushmi::submit(*static_cast<Wrapped*>(src.pobj_), std::move(at), std::move(out));
-      }};
+  template <class T, class U = std::decay_t<T>>
+  using wrapped_t =
+    std::enable_if_t<!std::is_same<U, time_single_deferred>::value, U>;
 
  public:
   using sender_category = single_tag;
@@ -49,24 +38,58 @@ class time_single_deferred<V, E, TP> {
   time_single_deferred() = default;
   time_single_deferred(time_single_deferred&& that) noexcept
       : time_single_deferred() {
-    that.vptr_->op_(op::move, that.data_, &data_);
+    that.vptr_->op_(that.data_, &data_);
     std::swap(that.vptr_, vptr_);
   }
-  template <class T, class U = std::decay_t<T>>
-  using wrapped_t =
-    std::enable_if_t<!std::is_same_v<U, time_single_deferred>, U>;
   template <class Wrapped, Sender<single_tag> W = wrapped_t<Wrapped>>
     requires TimeSenderTo<W, single<V, E>>
-  explicit time_single_deferred(Wrapped obj)
-      : time_single_deferred() {
-    if constexpr (insitu<Wrapped>())
-      new (data_.buffer_) Wrapped(std::move(obj));
-    else
-      data_.pobj_ = new Wrapped(std::move(obj));
-    vptr_ = &vtable_v<Wrapped>;
+  explicit time_single_deferred(Wrapped obj) : time_single_deferred() {
+    struct s {
+      static void op(data& src, data* dst) {
+        if (dst)
+          dst->pobj_ = std::exchange(src.pobj_, nullptr);
+        delete static_cast<Wrapped const*>(src.pobj_);
+      }
+      static TP now(data& src) {
+        return ::pushmi::now(*static_cast<Wrapped*>(src.pobj_));
+      }
+      static void submit(data& src, TP at, single<V, E> out) {
+        ::pushmi::submit(
+            *static_cast<Wrapped*>(src.pobj_),
+            std::move(at),
+            std::move(out));
+      }
+    };
+    static const vtable vtbl{s::op, s::now, s::submit};
+    data_.pobj_ = new Wrapped(std::move(obj));
+    vptr_ = &vtbl;
+  }
+  template <class Wrapped, Sender<single_tag> W = wrapped_t<Wrapped>>
+    requires TimeSenderTo<W, single<V, E>> && insitu<Wrapped>()
+  explicit time_single_deferred(Wrapped obj) noexcept : time_single_deferred() {
+    struct s {
+      static void op(data& src, data* dst) {
+        if (dst)
+          new (dst->buffer_) Wrapped(
+              std::move(*static_cast<Wrapped*>((void*)src.buffer_)));
+        static_cast<Wrapped const*>((void*)src.buffer_)->~Wrapped();
+      }
+      static TP now(data& src) {
+        return ::pushmi::now(*static_cast<Wrapped*>((void*)src.buffer_));
+      }
+      static void submit(data& src, TP tp, single<V, E> out) {
+        ::pushmi::submit(
+            *static_cast<Wrapped*>((void*)src.buffer_),
+            std::move(tp),
+            std::move(out));
+      }
+    };
+    static const vtable vtbl{s::op, s::now, s::submit};
+    new (data_.buffer_) Wrapped(std::move(obj));
+    vptr_ = &vtbl;
   }
   ~time_single_deferred() {
-    vptr_->op_(op::destroy, data_, nullptr);
+    vptr_->op_(data_, nullptr);
   }
   time_single_deferred& operator=(time_single_deferred&& that) noexcept {
     this->~time_single_deferred();
@@ -85,33 +108,6 @@ class time_single_deferred<V, E, TP> {
 template <class V, class E, class TP>
 constexpr typename time_single_deferred<V, E, TP>::vtable const
     time_single_deferred<V, E, TP>::vtable::noop_;
-template <class V, class E, class TP>
-template <class Wrapped, bool Big>
-constexpr typename time_single_deferred<V, E, TP>::vtable const
-    time_single_deferred<V, E, TP>::vtable_v;
-template <class V, class E, class TP>
-template <class Wrapped>
-constexpr typename time_single_deferred<V, E, TP>::vtable const
-    time_single_deferred<V, E, TP>::vtable_v<Wrapped, true> = {
-        +[](op o, data& src, data* dst) {
-          switch (o) {
-            case op::move:
-              new (dst->buffer_) Wrapped(
-                  std::move(*static_cast<Wrapped*>((void*)src.buffer_)));
-            case op::destroy:
-              static_cast<Wrapped const*>((void*)src.buffer_)->~Wrapped();
-          }
-        },
-        +[](data& src) -> TP {
-          return ::pushmi::now(*static_cast<Wrapped*>((void*)src.buffer_));
-        },
-        +[](data& src, TP tp, single<V, E> out) {
-          ::pushmi::submit(
-              *static_cast<Wrapped*>((void*)src.buffer_),
-              std::move(tp),
-              std::move(out));
-        }
-    };
 
 template <class SF, Invocable NF>
 class time_single_deferred<SF, NF> {
@@ -161,19 +157,48 @@ class time_single_deferred<Data, DSF, DNF> {
   }
 };
 
-time_single_deferred()->time_single_deferred<ignoreSF, systemNowF>;
+////////////////////////////////////////////////////////////////////////////////
+// make_time_single_deferred
+inline auto make_time_single_deferred() ->
+    time_single_deferred<ignoreSF, systemNowF> {
+  return {};
+}
+template <class SF>
+auto make_time_single_deferred(SF sf) -> time_single_deferred<SF, systemNowF> {
+  return time_single_deferred<SF, systemNowF>{std::move(sf)};
+}
+template <class SF, Invocable NF>
+auto make_time_single_deferred(SF sf, NF nf) -> time_single_deferred<SF, NF> {
+  return {std::move(sf), std::move(nf)};
+}
+template <TimeSender<single_tag> Data, class DSF>
+auto make_time_single_deferred(Data d, DSF sf) ->
+    time_single_deferred<Data, DSF, passDNF> {
+  return {std::move(d), std::move(sf)};
+}
+template <TimeSender<single_tag> Data, class DSF, class DNF>
+auto make_time_single_deferred(Data d, DSF sf, DNF nf) ->
+    time_single_deferred<Data, DSF, DNF> {
+  return {std::move(d), std::move(sf), std::move(nf)};
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// deduction guides
+#if __cpp_deduction_guides >= 201703
+time_single_deferred() -> time_single_deferred<ignoreSF, systemNowF>;
 
 template <class SF>
-time_single_deferred(SF)->time_single_deferred<SF, systemNowF>;
+time_single_deferred(SF) -> time_single_deferred<SF, systemNowF>;
 
 template <class SF, Invocable NF>
-time_single_deferred(SF, NF)->time_single_deferred<SF, NF>;
+time_single_deferred(SF, NF) -> time_single_deferred<SF, NF>;
 
 template <TimeSender<single_tag> Data, class DSF>
-time_single_deferred(Data, DSF)->time_single_deferred<Data, DSF, passDNF>;
+time_single_deferred(Data, DSF) -> time_single_deferred<Data, DSF, passDNF>;
 
 template <TimeSender<single_tag> Data, class DSF, class DNF>
-time_single_deferred(Data, DSF, DNF)->time_single_deferred<Data, DSF, DNF>;
+time_single_deferred(Data, DSF, DNF) -> time_single_deferred<Data, DSF, DNF>;
+#endif
 
 template <
     class V,

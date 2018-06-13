@@ -244,14 +244,14 @@ struct get_now_fn {
 
 } // namespace __adl
 
-inline constexpr __adl::set_done_fn set_done{};
-inline constexpr __adl::set_error_fn set_error{};
-inline constexpr __adl::set_value_fn set_value{};
-inline constexpr __adl::set_stopping_fn set_stopping{};
-inline constexpr __adl::set_starting_fn set_starting{};
-inline constexpr __adl::do_submit_fn submit{};
-inline constexpr __adl::get_now_fn now{};
-inline constexpr __adl::get_now_fn top{};
+PUSHMI_INLINE_VAR constexpr __adl::set_done_fn set_done{};
+PUSHMI_INLINE_VAR constexpr __adl::set_error_fn set_error{};
+PUSHMI_INLINE_VAR constexpr __adl::set_value_fn set_value{};
+PUSHMI_INLINE_VAR constexpr __adl::set_stopping_fn set_stopping{};
+PUSHMI_INLINE_VAR constexpr __adl::set_starting_fn set_starting{};
+PUSHMI_INLINE_VAR constexpr __adl::do_submit_fn submit{};
+PUSHMI_INLINE_VAR constexpr __adl::get_now_fn now{};
+PUSHMI_INLINE_VAR constexpr __adl::get_now_fn top{};
 
 template <class T>
 struct receiver_traits<std::promise<T>> {

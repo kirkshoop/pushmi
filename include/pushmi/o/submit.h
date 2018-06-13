@@ -20,7 +20,7 @@ namespace detail {
 
 template <Sender In, class ...AN>
 using receiver_type_t =
-    std::invoke_result_t<
+    pushmi::invoke_result_t<
         pushmi::detail::make_receiver<sender_category_t<In>>,
         AN...>;
 
@@ -117,8 +117,8 @@ private:
       std::condition_variable signaled;
       auto out{::pushmi::detail::out_from_fn<In>()(
         std::move(args_),
-        on_value{[&]<class Out, class V>(Out out, V&& v){
-          if constexpr ((bool)TimeSender<std::remove_cvref_t<V>>) {
+        on_value([&]<class Out, class V>(Out out, V&& v){
+          if constexpr ((bool)TimeSender<remove_cvref_t<V>>) {
             // to keep the blocking semantics, make sure that the
             // nested submits block here to prevent a spurious
             // completion signal
@@ -129,17 +129,17 @@ private:
           }
           done = true;
           signaled.notify_all();
-        }},
-        on_error{[&](auto out, auto e) noexcept {
+        }),
+        on_error([&](auto out, auto e) noexcept {
           ::pushmi::set_error(out, std::move(e));
           done = true;
           signaled.notify_all();
-        }},
-        on_done{[&](auto out){
+        }),
+        on_done([&](auto out){
           ::pushmi::set_done(out);
           done = true;
           signaled.notify_all();
-        }}
+        })
       )};
       if constexpr (IsTimeSender) {
         ::pushmi::submit(in, ::pushmi::now(in), std::move(out));
@@ -170,19 +170,118 @@ public:
   }
 };
 
+#if __cpp_lib_optional >= 201606
+template <class T>
+struct opt : private std::optional<T> {
+   opt() = default;
+   opt& operator=(T&& t) {
+     this->std::optional<T>::operator=(std::move(t));
+     return *this;
+   }
+   using std::optional<T>::operator*;
+   using std::optional<T>::operator bool;
+};
+#else
+template <class T>
+struct opt {
+private:
+  bool empty_ = true;
+  std::aligned_union_t<0, T> data_;
+  T* ptr() { return static_cast<T*>((void*)&data_); }
+  const T* ptr() const { return static_cast<const T*>((const void*)&data_); }
+  void reset() {
+    if (!empty_) {
+      ptr()->~T();
+      empty_ = true;
+    }
+  }
+public:
+  opt() = default;
+  opt(T&& t) noexcept(std::is_nothrow_move_constructible<T>::value) {
+    ::new(ptr()) T(std::move(t));
+    empty_ = false;
+  }
+  opt(const T& t) {
+    ::new(ptr()) T(t);
+    empty_ = false;
+  }
+  opt(opt&& that) noexcept(std::is_nothrow_move_constructible<T>::value) {
+    if (that) {
+      ::new(ptr()) T(std::move(*that));
+      empty_ = false;
+      that.reset();
+    }
+  }
+  opt(const opt& that) {
+    if (that) {
+      ::new(ptr()) T(*that);
+      empty_ = false;
+    }
+  }
+  ~opt() { reset(); }
+  opt& operator=(opt&& that)
+    noexcept(std::is_nothrow_move_constructible<T>::value &&
+             std::is_nothrow_move_assignable<T>::value) {
+    if (*this && that) {
+      **this = std::move(*that);
+      that.reset();
+    } else if (*this) {
+      reset();
+    } else if (that) {
+      ::new(ptr()) T(std::move(*that));
+      empty_ = false;
+    }
+    return *this;
+  }
+  opt& operator=(const opt& that) {
+    if (*this && that) {
+      **this = *that;
+    } else if (*this) {
+      reset();
+    } else if (that) {
+      ::new(ptr()) T(*that);
+      empty_ = false;
+    }
+    return *this;
+  }
+  opt& operator=(T&& t) noexcept(std::is_nothrow_move_constructible<T>::value &&
+                                 std::is_nothrow_move_assignable<T>::value) {
+    if (*this)
+      **this = std::move(t);
+    else {
+      ::new(ptr()) T(std::move(t));
+      empty_ = false;
+    }
+    return *this;
+  }
+  opt& operator=(const T& t) {
+    if (*this)
+      **this = t;
+    else {
+      ::new(ptr()) T(t);
+      empty_ = false;
+    }
+    return *this;
+  }
+  explicit operator bool() const noexcept { return !empty_; }
+  T& operator*() noexcept { return *ptr(); }
+  const T& operator*() const noexcept { return *ptr(); }
+};
+#endif
+
 template <class T>
 struct get_fn {
   // TODO constrain this better
   template <Sender In>
   T operator()(In in) const {
-    std::optional<T> result_;
+    opt<T> result_;
     std::exception_ptr ep_;
-    auto out = single{
-      on_value{[&](T t){ result_ = std::move(t); }},
-      on_error{
+    auto out = make_single(
+      on_value([&](T t){ result_ = std::move(t); }),
+      on_error(
         [&](auto e) noexcept { ep_ = std::make_exception_ptr(e); },
-        [&](std::exception_ptr ep) noexcept { ep_ = ep; }}
-    };
+        [&](std::exception_ptr ep) noexcept { ep_ = ep; })
+    );
     using Out = decltype(out);
     static_assert(SenderTo<In, Out, single_tag> ||
         TimeSenderTo<In, Out, single_tag>,
@@ -195,12 +294,12 @@ struct get_fn {
 
 } // namespace detail
 
-inline constexpr detail::submit_fn submit{};
-inline constexpr detail::submit_at_fn submit_at{};
-inline constexpr detail::submit_after_fn submit_after{};
-inline constexpr detail::blocking_submit_fn blocking_submit{};
+PUSHMI_INLINE_VAR constexpr detail::submit_fn submit{};
+PUSHMI_INLINE_VAR constexpr detail::submit_at_fn submit_at{};
+PUSHMI_INLINE_VAR constexpr detail::submit_after_fn submit_after{};
+PUSHMI_INLINE_VAR constexpr detail::blocking_submit_fn blocking_submit{};
 template <class T>
-inline constexpr detail::get_fn<T> get{};
+PUSHMI_INLINE_VAR constexpr detail::get_fn<T> get{};
 
 } // namespace operators
 

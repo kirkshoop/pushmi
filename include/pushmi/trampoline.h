@@ -4,6 +4,7 @@
 // This source code is licensed under the MIT license found in the
 // LICENSE file in the root directory of this source tree.
 
+#include <algorithm>
 #include <chrono>
 #include <deque>
 #include <thread>
@@ -17,10 +18,8 @@ constexpr const recurse_t recurse{};
 
 namespace detail {
 
-struct ownordelegate_t {};
-constexpr const ownordelegate_t ownordelegate{};
-struct ownornest_t {};
-constexpr const ownornest_t ownornest{};
+PUSHMI_INLINE_VAR constexpr struct ownordelegate_t {} const ownordelegate {};
+PUSHMI_INLINE_VAR constexpr struct ownornest_t {} const ownornest {};
 
 class trampoline_id {
   std::thread::id threadid;
@@ -103,7 +102,7 @@ class delegator {
   }
 
   template <class SingleReceiver>
-    requires Receiver<std::remove_cvref_t<SingleReceiver>, single_tag>
+    requires Receiver<remove_cvref_t<SingleReceiver>, single_tag>
   void submit(time_point when, SingleReceiver&& what) {
     trampoline<E>::submit(
         ownordelegate, when, std::forward<SingleReceiver>(what));
@@ -152,7 +151,7 @@ void trampoline<E>::submit(
         // stack usage and value interleaving on the same thread.
         ::pushmi::set_value(awhat, that);
       }
-    } catch(...){
+    } catch(...) {
       --depth(*owner());
       throw;
     }

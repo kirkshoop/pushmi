@@ -14,10 +14,10 @@ namespace operators {
 
 template <class V>
 auto just(V v) {
-  return single_deferred{[v = std::move(v)]<class Out>(
+  return make_single_deferred([v = std::move(v)]<class Out>(
       Out out) mutable PUSHMI_VOID_LAMBDA_REQUIRES(SingleReceiver<Out, V>){
       ::pushmi::set_value(out, std::move(v));
-  }};
+  });
 }
 
 } // namespace operators

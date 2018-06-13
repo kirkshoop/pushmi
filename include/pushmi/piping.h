@@ -13,9 +13,22 @@ decltype(auto) operator|(In&& in, Op op) {
 
 namespace pushmi {
 
-template<class T, class... FN>
-auto pipe(T t, FN... fn) -> decltype((t | ... | fn)) {
-  return (t | ... | fn);
-}
+PUSHMI_INLINE_VAR constexpr struct pipe_fn {
+#if __cpp_fold_expressions >= 201603
+  template<class T, class... FN>
+  auto operator()(T t, FN... fn) const -> decltype((t | ... | fn)) {
+    return (t | ... | fn);
+  }
+#else
+  template<class T, class F>
+  auto operator()(T t, F f) const -> decltype(t | f) {
+    return t | f;
+  }
+  template<class T, class F, class... FN, class This = pipe_fn>
+  auto operator()(T t, F f, FN... fn) const -> decltype(This()((t | f), fn...)) {
+    return This()((t | f), fn...);
+  }
+#endif
+} const pipe {};
 
 } // namespace pushmi

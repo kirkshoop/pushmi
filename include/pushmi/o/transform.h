@@ -23,7 +23,7 @@ struct transform_fn {
 
 template <class... FN>
 auto transform_fn::operator()(FN... fn) const {
-  auto f = overload{std::move(fn)...};
+  auto f = overload(std::move(fn)...);
   return [f = std::move(f)]<class In>(In in) {
     // copy 'f' to allow multiple calls to connect to multiple 'in'
     return ::pushmi::detail::deferred_from<In, single<>>(
@@ -33,7 +33,7 @@ auto transform_fn::operator()(FN... fn) const {
           return ::pushmi::detail::out_from_fn<In>()(
             std::move(out),
             // copy 'f' to allow multiple calls to submit
-            on_value{
+            on_value(
               [f]<class V>(Out& out, V&& v) {
                 using Result = decltype(f((V&&) v));
                 static_assert(SemiMovable<Result>,
@@ -42,7 +42,7 @@ auto transform_fn::operator()(FN... fn) const {
                   "Result of value transform cannot be delivered to Out");
                 ::pushmi::set_value(out, f((V&&) v));
               }
-            }
+            )
           );
         }
       )
@@ -52,7 +52,7 @@ auto transform_fn::operator()(FN... fn) const {
 
 } // namespace detail
 
-inline constexpr detail::transform_fn transform{};
+PUSHMI_INLINE_VAR constexpr detail::transform_fn transform{};
 
 } // namespace operators
 

@@ -27,8 +27,10 @@ struct via_fn_data : public Out {
     Out(std::move(out)), exec(std::move(exec)) {}
 };
 
-template<class Executor, class Out>
-via_fn_data(Out, Executor) -> via_fn_data<Executor, Out>;
+template<class Out, class Executor>
+auto make_via_fn_data(Out out, Executor ex) -> via_fn_data<Executor, Out> {
+  return via_fn_data<Executor, Out>{std::move(out), std::move(ex)};
+}
 
 template <Invocable ExecutorFactory>
 auto via_fn::operator()(ExecutorFactory ef) const {
@@ -39,32 +41,32 @@ auto via_fn::operator()(ExecutorFactory ef) const {
         [ef]<class Out>(Out out) {
           auto exec = ef();
           return ::pushmi::detail::out_from_fn<In>()(
-            via_fn_data{std::move(out), std::move(exec)},
+            make_via_fn_data(std::move(out), std::move(exec)),
             // copy 'f' to allow multiple calls to submit
-            ::pushmi::on_value{[]<class V>(auto& data, V&& v){
+            ::pushmi::on_value([]<class V>(auto& data, V&& v){
               ::pushmi::submit(
                   data.exec,
                   ::pushmi::now(data.exec),
-                  ::pushmi::single([v = (V&&)v, out = std::move(static_cast<Out&>(data))](auto) mutable {
+                  ::pushmi::make_single([v = (V&&)v, out = std::move(static_cast<Out&>(data))](auto) mutable {
                     ::pushmi::set_value(out, std::move(v));
                   }));
-            }},
-            ::pushmi::on_error{[](auto& data, auto e) noexcept {
+            }),
+            ::pushmi::on_error([](auto& data, auto e) noexcept {
               ::pushmi::submit(
                   data.exec,
                   ::pushmi::now(data.exec),
-                  ::pushmi::single([e = std::move(e), out = std::move(static_cast<Out&>(data))](auto) mutable {
+                  ::pushmi::make_single([e = std::move(e), out = std::move(static_cast<Out&>(data))](auto) mutable {
                     ::pushmi::set_error(out, std::move(e));
                   }));
-            }},
-            ::pushmi::on_done{[](auto& data){
+            }),
+            ::pushmi::on_done([](auto& data){
               ::pushmi::submit(
                   data.exec,
                   ::pushmi::now(data.exec),
-                  ::pushmi::single([out = std::move(static_cast<Out&>(data))](auto) mutable {
+                  ::pushmi::make_single([out = std::move(static_cast<Out&>(data))](auto) mutable {
                     ::pushmi::set_done(out);
                   }));
-            }}
+            })
           );
         }
       )
@@ -74,7 +76,7 @@ auto via_fn::operator()(ExecutorFactory ef) const {
 
 } // namespace detail
 
-inline constexpr detail::via_fn via{};
+PUSHMI_INLINE_VAR constexpr detail::via_fn via{};
 
 } // namespace operators
 

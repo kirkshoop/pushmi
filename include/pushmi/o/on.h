@@ -27,15 +27,19 @@ auto on_fn::operator()(ExecutorFactory ef) const {
       ::pushmi::detail::submit_transform_out<In>(
         [ef]<class Out>(In& in, Out out) {
           auto exec = ef();
-          ::pushmi::submit(exec, ::pushmi::now(exec), ::pushmi::single{[in = in, out = std::move(out)](auto) mutable {
-            ::pushmi::submit(in, std::move(out));
-          }});
+          ::pushmi::submit(exec, ::pushmi::now(exec),
+            ::pushmi::make_single([in = in, out = std::move(out)](auto) mutable {
+              ::pushmi::submit(in, std::move(out));
+            })
+          );
         },
         [ef]<class TP, class Out>(In& in, TP at, Out out) {
           auto exec = ef();
-          ::pushmi::submit(exec, at, ::pushmi::on_value{[in = in, at, out = std::move(out)](auto) mutable {
-            ::pushmi::submit(in, at, std::move(out));
-          }});
+          ::pushmi::submit(exec, at,
+            ::pushmi::on_value([in = in, at, out = std::move(out)](auto) mutable {
+              ::pushmi::submit(in, at, std::move(out));
+            })
+          );
         }
       )
     );
@@ -44,7 +48,7 @@ auto on_fn::operator()(ExecutorFactory ef) const {
 
 } // namespace detail
 
-inline constexpr detail::on_fn on{};
+PUSHMI_INLINE_VAR constexpr detail::on_fn on{};
 
 } // namespace operators
 

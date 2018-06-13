@@ -15,6 +15,13 @@ namespace pushmi {
 
 namespace operators {
 namespace detail {
+PUSHMI_INLINE_VAR constexpr struct as_const_fn {
+  template <class T>
+  constexpr const T& operator()(T& t) const noexcept {
+    return t;
+  }
+} const as_const {};
+
 template <Receiver SideEffects, Receiver Out>
 struct tap_ {
   SideEffects sideEffects;
@@ -28,13 +35,13 @@ struct tap_ {
   template <class V, class UV = std::remove_reference_t<V>>
     requires SingleReceiver<SideEffects, const UV&> && SingleReceiver<Out, V>
   void value(V&& v) {
-    ::pushmi::set_value(sideEffects, std::as_const(v));
+    ::pushmi::set_value(sideEffects, as_const(v));
     ::pushmi::set_value(out, (V&&) v);
   }
   template <class E>
     requires NoneReceiver<SideEffects, const E&> && NoneReceiver<Out, E>
   void error(E e) noexcept {
-    ::pushmi::set_error(sideEffects, std::as_const(e));
+    ::pushmi::set_error(sideEffects, as_const(e));
     ::pushmi::set_error(out, std::move(e));
   }
   void done() {
@@ -44,7 +51,9 @@ struct tap_ {
 };
 
 template <Receiver SideEffects, Receiver Out>
-tap_(SideEffects, Out) -> tap_<SideEffects, Out>;
+auto make_tap(SideEffects se, Out out) -> tap_<SideEffects, Out> {
+  return {std::move(se), std::move(out)};
+}
 
 struct tap_fn {
   template <class... AN>
@@ -53,7 +62,7 @@ struct tap_fn {
 
 template <class... AN>
 auto tap_fn::operator()(AN... an) const {
-  return [args = std::tuple{std::move(an)...}]<class In>(In in) mutable {
+  return [args = std::tuple<AN...>{std::move(an)...}]<class In>(In in) mutable {
       auto sideEffects{::pushmi::detail::out_from_fn<In>()(std::move(args))};
       using SideEffects = decltype(sideEffects);
 
@@ -75,7 +84,7 @@ auto tap_fn::operator()(AN... an) const {
                 TimeSenderTo<In, Out, single_tag> >(),
                 "'In' is not deliverable to 'Out'");
             auto gang{::pushmi::detail::out_from_fn<In>()(
-                detail::tap_{sideEffects, std::move(out)})};
+                detail::make_tap(sideEffects, std::move(out)))};
             using Gang = decltype(gang);
             static_assert(
               ::pushmi::detail::deferred_requires_from<In, SideEffects,
@@ -92,7 +101,7 @@ auto tap_fn::operator()(AN... an) const {
 
 } // namespace detail
 
-inline constexpr detail::tap_fn tap{};
+PUSHMI_INLINE_VAR constexpr detail::tap_fn tap{};
 
 } // namespace operators
 
