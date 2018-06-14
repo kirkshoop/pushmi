@@ -40,7 +40,7 @@ struct is_silent<> { using property_category = cardinality_category; };
 template<class PS>
 struct is_silent<PS> : property_query<PS, is_silent<>> {};
 template<class PS>
-inline constexpr bool is_silent_v = is_silent<PS>::value;
+PUSHMI_INLINE_VAR constexpr bool is_silent_v = is_silent<PS>::value;
 template <class PS>
 concept bool Silent = is_silent_v<PS>;
 
@@ -54,7 +54,7 @@ struct is_none<> : is_silent<> {};
 template<class PS>
 struct is_none<PS> : property_query<PS, is_none<>> {};
 template<class PS>
-inline constexpr bool is_none_v = is_none<PS>::value;
+PUSHMI_INLINE_VAR constexpr bool is_none_v = is_none<PS>::value;
 template <class PS>
 concept bool None = is_none_v<PS>;
 
@@ -68,7 +68,7 @@ struct is_single<> : is_none<> {};
 template<class PS>
 struct is_single<PS> : property_query<PS, is_single<>> {};
 template<class PS>
-inline constexpr bool is_single_v = is_single<PS>::value;
+PUSHMI_INLINE_VAR constexpr bool is_single_v = is_single<PS>::value;
 template <class PS>
 concept bool Single = is_single_v<PS>;
 
@@ -82,7 +82,7 @@ struct is_many<> : is_none<> {}; // many::value() does not terminate, so it is n
 template<class PS>
 struct is_many<PS> : property_query<PS, is_many<>> {};
 template<class PS>
-inline constexpr bool is_many_v = is_many<PS>::value;
+PUSHMI_INLINE_VAR constexpr bool is_many_v = is_many<PS>::value;
 template <class PS>
 concept bool Many = is_many_v<PS>;
 
@@ -97,7 +97,7 @@ struct is_flow<> { using property_category = flow_category; };
 template<class PS>
 struct is_flow<PS> : property_query<PS, is_flow<>> {};
 template<class PS>
-inline constexpr bool is_flow_v = is_flow<PS>::value;
+PUSHMI_INLINE_VAR constexpr bool is_flow_v = is_flow<PS>::value;
 template <class PS>
 concept bool Flow = is_flow_v<PS>;
 
@@ -112,9 +112,9 @@ struct is_receiver<> { using property_category = receiver_category; };
 template<class PS>
 struct is_receiver<PS> : property_query<PS, is_receiver<>> {};
 template<class PS>
-inline constexpr bool is_receiver_v = is_receiver<PS>::value;
-template <class PS>
-concept bool Receiver = is_receiver_v<PS>;
+PUSHMI_INLINE_VAR constexpr bool is_receiver_v = is_receiver<PS>::value;
+// template <class PS>
+// concept bool Receiver = is_receiver_v<PS>;
 
 
 // Sender trait and tag
@@ -127,9 +127,9 @@ struct is_sender<> { using property_category = sender_category; };
 template<class PS>
 struct is_sender<PS> : property_query<PS, is_sender<>> {};
 template<class PS>
-inline constexpr bool is_sender_v = is_sender<PS>::value;
-template <class PS>
-concept bool Sender = is_sender_v<PS>;
+PUSHMI_INLINE_VAR constexpr bool is_sender_v = is_sender<PS>::value;
+// template <class PS>
+// concept bool Sender = is_sender_v<PS>;
 
 // Time trait and tag
 template<class... TN>
@@ -141,7 +141,7 @@ struct is_time<> : is_sender<> {};
 template<class PS>
 struct is_time<PS> : property_query<PS, is_time<>> {};
 template<class PS>
-inline constexpr bool is_time_v = is_time<PS>::value;
+PUSHMI_INLINE_VAR constexpr bool is_time_v = is_time<PS>::value;
 template <class PS>
 concept bool Time = is_time_v<PS>;
 
@@ -155,20 +155,21 @@ struct is_constrained<> : is_sender<> {};
 template<class PS>
 struct is_constrained<PS> : property_query<PS, is_constrained<>> {};
 template<class PS>
-inline constexpr bool is_constrained_v = is_constrained<PS>::value;
+PUSHMI_INLINE_VAR constexpr bool is_constrained_v = is_constrained<PS>::value;
 template <class PS>
 concept bool Constrained = is_constrained_v<PS>;
 
 
-template <class S>
-concept bool SilentReceiver = SemiMovable<S> && 
-  Receiver<S> &&
+template <class S, class... PropertyN>
+concept bool Receiver = SemiMovable<S> && 
+  property_query_v<S, PropertyN...> &&
+  is_receiver_v<S> &&
   requires (S& s) {
     ::pushmi::set_done(s);
   };
 
 template <class N, class E = std::exception_ptr>
-concept bool NoneReceiver = SilentReceiver<N> &&
+concept bool NoneReceiver = Receiver<N> &&
   None<N> &&
   SemiMovable<E> &&
   requires(N& n, E&& e) {
@@ -196,14 +197,16 @@ concept bool ManyReceiver = NoneReceiver<S, E> &&
 // silent does not really make sense, but cannot test for
 // None without the error type, use is_none<> to strengthen 
 // requirements
-template <class D>
-concept bool SilentSender = SemiMovable<D> &&
+template <class D, class... PropertyN>
+concept bool Sender = SemiMovable<D> &&
   None<D> && 
-  Sender<D>;
+  property_query_v<D, PropertyN...> &&
+  is_sender_v<D>;
 
-template <class D, class S>
-concept bool SenderTo = SilentSender<D> &&
-  SilentReceiver<S> &&
+template <class D, class S, class... PropertyN>
+concept bool SenderTo = Sender<D> &&
+  Receiver<S> &&
+  property_query_v<D, PropertyN...> &&
   requires(D& d, S&& s) {
     ::pushmi::submit(d, (S &&) s);
   };
@@ -212,8 +215,9 @@ concept bool SenderTo = SilentSender<D> &&
 // add concepts to support cancellation
 //
 
-template <class S>
-concept bool FlowSilentReceiver = SilentReceiver<S> &&
+template <class S, class... PropertyN>
+concept bool FlowReceiver = Receiver<S> &&
+  property_query_v<S, PropertyN...> &&
   Flow<S> &&
   requires(S& s) {
     ::pushmi::set_stopping(s);
@@ -224,8 +228,8 @@ template <
   class Up, 
   class PE = std::exception_ptr,
   class E = PE>
-concept bool FlowNoneReceiver = FlowSilentReceiver<N> && 
-  SilentReceiver<Up> &&
+concept bool FlowNoneReceiver = FlowReceiver<N> && 
+  Receiver<Up> &&
   SemiMovable<PE> &&
   SemiMovable<E> &&
   NoneReceiver<Up, PE> && 
@@ -254,34 +258,38 @@ concept bool FlowManyReceiver =
   ManyReceiver<S, T, E> && 
   FlowSingleReceiver<S, Up, T, PE, E>;
 
-template <class S>
-concept bool FlowSilentSender = SilentSender<S> &&
+template <class S, class... PropertyN>
+concept bool FlowSender = Sender<S> &&
+  property_query_v<S, PropertyN...> &&
   Flow<S>;
 
-template <class D, class S>
-concept bool FlowSenderTo = FlowSilentSender<D> &&
-  FlowSilentReceiver<S>;
+template <class D, class S, class... PropertyN>
+concept bool FlowSenderTo = FlowSender<D> &&
+  property_query_v<D, PropertyN...> &&
+  FlowReceiver<S>;
 
 // add concepts for constraints
 //
 
-template <class D>
-concept bool TimeSilentSender = SilentSender<D> && 
+template <class D, class... PropertyN>
+concept bool TimeSender = Sender<D> && 
+  property_query_v<D, PropertyN...> &&
   Time<D> && 
   None<D> &&
   requires(D& d) {
     { ::pushmi::now(d) } -> Regular
   };
 
-template <class D, class S>
-concept bool TimeSenderTo = TimeSilentSender<D> && 
-  SilentReceiver<S> &&
+template <class D, class S, class... PropertyN>
+concept bool TimeSenderTo = TimeSender<D> && 
+  property_query_v<D, PropertyN...> &&
+  Receiver<S> &&
   requires(D& d, S&& s) {
     ::pushmi::submit(d, ::pushmi::now(d), (S &&) s);
   };
 
 template <class D>
-  requires TimeSilentSender<D>
+  requires TimeSender<D>
 using time_point_t = decltype(::pushmi::now(std::declval<D&>()));
 
 
@@ -295,7 +303,7 @@ using time_point_t = decltype(::pushmi::now(std::declval<D&>()));
 // obscure too much.
 
 template <class D>
-concept bool ConstrainedSilentSender = SilentSender<D> &&
+concept bool ConstrainedSender = Sender<D> &&
   Constrained<D> &&
   None<D> && 
   requires(D& d) {
@@ -303,14 +311,14 @@ concept bool ConstrainedSilentSender = SilentSender<D> &&
   };
 
 template <class D, class S>
-concept bool ConstrainedSenderTo = ConstrainedSilentSender<D> && 
-  SilentReceiver<S> &&
+concept bool ConstrainedSenderTo = ConstrainedSender<D> && 
+  Receiver<S> &&
   requires(D& d, S&& s) {
     ::pushmi::submit(d, ::pushmi::top(d), (S &&) s);
   };
 
 template <class D>
-  requires ConstrainedSilentSender<D>
+  requires ConstrainedSender<D>
 using constraint_t = decltype(::pushmi::top(std::declval<D&>()));
 
 

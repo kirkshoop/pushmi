@@ -4,7 +4,7 @@
 // This source code is licensed under the MIT license found in the
 // LICENSE file in the root directory of this source tree.
 
-#include <type_traits>
+#include "traits.h"
 
 namespace pushmi {
 
@@ -19,11 +19,12 @@ using __property_category_t = typename T::property_category;
 template <class T>
 struct property_traits : property_traits<std::decay_t<T>> {
 };
-template <Decayed T>
+template <class T>
+  requires Decayed<T>
 struct property_traits<T> {
 };
-template <Decayed T>
-  requires Valid<T, __property_category_t>
+template <class T>
+  requires Decayed<T> && Valid<T, __property_category_t>
 struct property_traits<T> {
   using property_category = __property_category_t<T>;
 };
@@ -39,21 +40,21 @@ concept bool Property = Valid<T, property_category_t>;
 template<class T, class... Set>
 concept bool FoundExactlyOnce = 
   requires(T&, Set&...) {
-    ((std::is_same<T, Set>::value ? 1 : 0) + ... + 0) == 1;
+    sum_v<(std::is_same<T, Set>::value ? 1 : 0)...> == 1;
   };
 
 template<class... PropertyN>
 concept bool UniqueCategory = 
-  (Property<PropertyN> && ... && true) &&
+  And<Property<PropertyN>...> &&
   requires(PropertyN&...) {
-    (FoundExactlyOnce<property_category_t<PropertyN>, property_category_t<PropertyN>...> && ... && true) == true;
+    all_true_v<FoundExactlyOnce<property_category_t<PropertyN>, property_category_t<PropertyN>...>...>;
   };
 
 
 
 template<class... PropertyN>
 struct property_set {
-  static_assert((Property<PropertyN> && ... && true), "property_set only supports types that match the Property concept");
+  static_assert(all_true_v<Property<PropertyN>...>, "property_set only supports types that match the Property concept");
   static_assert(UniqueCategory<PropertyN...>, "property_set has multiple properties from the same category");
 };
 
@@ -70,11 +71,12 @@ using __properties_t = typename T::properties;
 template <class T>
 struct property_set_traits : property_traits<std::decay_t<T>> {
 };
-template <Decayed T>
+template <class T>
+  requires Decayed<T>
 struct property_set_traits<T> {
 };
-template <Decayed T>
-  requires Valid<T, __properties_t>
+template <class T>
+  requires Decayed<T> && Valid<T, __properties_t>
 struct property_set_traits<T> {
   using properties = __properties_t<T>;
 };
@@ -124,18 +126,20 @@ using property_insert_t = typename property_set_insert<PS0, PS1>::type;
 template<class PropertySet0, class Category>
 struct property_from_category;
 
-template<class Property0, class... PropertyN, Property P>
+template<class Property0, class... PropertyN, class P>
+  requires Property<Property0> && And<Property<PropertyN>...> && Property<P>
 struct property_from_category<property_set<Property0, PropertyN...>, P> {
   using type = typename property_from_category<property_set<Property0, PropertyN...>, property_category_t<P>>::type;
 };
 
-template<class Category, Property Property0, Property... PropertyN>
-  requires !Property<Category>
+template<class Category, class Property0, class... PropertyN>
+  requires !Property<Category> && Property<Property0> && And<Property<PropertyN>...>
 struct property_from_category<property_set<Property0, PropertyN...>, Category> {
   using type = typename property_from_category<property_set<PropertyN...>, Category>::type;
 };
 
-template<Property Property0, Property... PropertyN>
+template<class Property0, class... PropertyN>
+  requires Property<Property0> && And<Property<PropertyN>...>
 struct property_from_category<property_set<Property0, PropertyN...>, property_category_t<Property0>> {
   using type = Property0;
 };
@@ -152,7 +156,7 @@ using property_from_category_t = typename property_from_category<PS, C>::type;
 
 template<class Expected, class... TN>
 struct found_base : 
-  std::integral_constant<bool, (std::is_base_of<Expected, TN>::value || ... || false)> {};
+  std::integral_constant<bool, any_true_v<std::is_base_of<Expected, TN>::value...>> {};
 template<class Expected, class... TN>
 constexpr bool found_base_v = found_base<Expected, TN...>::value;
 
@@ -164,12 +168,12 @@ template<class PS, class... ExpectedN>
 struct property_query<PS, ExpectedN...> : property_query<properties_t<PS>, ExpectedN...> {};
 
 template<class... PropertyN, class... ExpectedN>
-  requires (Property<PropertyN> && ... && true) &&
-  (Property<ExpectedN> && ... && true)
+  requires And<Property<PropertyN>...> &&
+  And<Property<ExpectedN>...>
 struct property_query<property_set<PropertyN...>, ExpectedN...> : 
-  std::integral_constant<bool, (found_base_v<ExpectedN, PropertyN...> && ... && true)> {};
+  std::integral_constant<bool, all_true_v<found_base_v<ExpectedN, PropertyN...>...>> {};
 
 template<class PS, class... ExpectedN>
-inline constexpr bool property_query_v = property_query<PS, ExpectedN...>::value;
+PUSHMI_INLINE_VAR constexpr bool property_query_v = property_query<PS, ExpectedN...>::value;
 
 } // namespace pushmi

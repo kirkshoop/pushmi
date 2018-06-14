@@ -9,11 +9,48 @@
 
 #include <meta/meta.hpp>
 
+#if __cpp_inline_variables >= 201606
+#define PUSHMI_INLINE_VAR inline
+#else
+#define PUSHMI_INLINE_VAR
+#endif
+
 namespace pushmi {
 namespace detail {
   template <bool...>
   struct bools;
 }
+
+#if __cpp_fold_expressions >= 201603
+template <bool...Bs>
+PUSHMI_INLINE_VAR constexpr bool all_true_v = (Bs &&...);
+#else
+template <bool...Bs>
+PUSHMI_INLINE_VAR constexpr bool all_true_v = std::is_same<detail::bools<Bs..., true>, detail::bools<true, Bs...>>::value;
+#endif
+
+#if __cpp_fold_expressions >= 201603
+template <int...Is>
+PUSHMI_INLINE_VAR constexpr bool sum_v = (Is +...);
+#else
+template <int...Is>
+struct sum;
+template <>
+struct sum<> : std::integral_constant<int, 0> {};
+template <int I, int...Is>
+struct sum<I, Is...> : std::integral_constant<int, I + sum<Is...>::value> {};
+template <int...Is>
+PUSHMI_INLINE_VAR constexpr bool sum_v = sum<Is...>::value;
+#endif
+
+#if __cpp_fold_expressions >= 201603
+template <bool...Bs>
+PUSHMI_INLINE_VAR constexpr bool any_true_v = (Bs ||...);
+#else
+template <bool...Bs>
+PUSHMI_INLINE_VAR constexpr bool any_true_v = sum_v<(int)Bs...> > 0;
+#endif
+
 
 template <class T>
 using remove_cvref_t = std::remove_cv_t<std::remove_reference_t<T>>;
@@ -27,13 +64,11 @@ concept bool Satisfies = bool(Trait<T>::type::value);
 template <class T, class U>
 concept bool Same = __is_same_as(T, U) && __is_same_as(U, T);
 
-#if __cpp_fold_expressions >= 201603
 template <bool...Bs>
-concept bool And = (Bs &&...);
-#else
+concept bool And = all_true_v<Bs...>;
+
 template <bool...Bs>
-concept bool And = Same<detail::bools<Bs..., true>, detail::bools<true, Bs...>>;
-#endif
+concept bool Or = any_true_v<Bs...>;
 
 template <class T>
 concept bool Object = requires(T* p) {
