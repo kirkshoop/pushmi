@@ -9,6 +9,10 @@
 #include <meta/meta.hpp>
 
 namespace pushmi {
+namespace detail {
+  template <bool...>
+  struct bools;
+}
 
 template <class T>
 using remove_cvref_t = std::remove_cv_t<std::remove_reference_t<T>>;
@@ -18,6 +22,17 @@ concept bool Valid = requires { typename C<T>; };
 
 template <class T, template<class...> class Trait, class... Args>
 concept bool Satisfies = bool(Trait<T>::type::value);
+
+template <class T, class U>
+concept bool Same = __is_same_as(T, U) && __is_same_as(U, T);
+
+#if __cpp_fold_expressions >= 201603
+template <bool...Bs>
+concept bool And = (Bs &&...);
+#else
+template <bool...Bs>
+concept bool And = Same<detail::bools<Bs..., true>, detail::bools<true, Bs...>>;
+#endif
 
 template <class T>
 concept bool Object = requires(T* p) {
@@ -36,9 +51,6 @@ concept bool ConvertibleTo =
     std::is_convertible<From, To>::value&& requires(From (&f)()) {
   static_cast<To>(f());
 };
-
-template <class T, class U>
-concept bool Same = __is_same_as(T, U) && __is_same_as(U, T);
 
 template <class A, class B>
 concept bool Derived = __is_base_of(B, A);

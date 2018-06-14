@@ -25,24 +25,20 @@ namespace detail {
   constexpr decltype(auto) apply_impl(F&& f, Tuple&& t, std::index_sequence<Is...>) {
     return pushmi::invoke((F&&) f, std::get<Is>((Tuple&&) t)...);
   }
+  template <class Tuple_, class Tuple = std::remove_reference_t<Tuple_>>
+  using tupidxs = std::make_index_sequence<std::tuple_size<Tuple>::value>;
 } // namespace detail
 
 template <class F, class Tuple>
   requires requires (F&& f, Tuple&& t) {
-    detail::apply_impl(
-      (F&&) f,
-      (Tuple&&) t,
-      std::make_index_sequence<std::tuple_size<std::remove_reference_t<Tuple>>::value>{});
+    detail::apply_impl((F&&) f, (Tuple&&) t, detail::tupidxs<Tuple>{});
   }
 constexpr decltype(auto) apply(F&& f, Tuple&& t) {
-    return detail::apply_impl(
-        (F&&) f,
-        (Tuple&&) t,
-        std::make_index_sequence<std::tuple_size<std::remove_reference_t<Tuple>>::value>{});
+  return detail::apply_impl((F&&) f, (Tuple&&) t, detail::tupidxs<Tuple>{});
 }
 #endif
 
-namespace detail{
+namespace detail {
 
 template <class Tag>
 struct make_receiver;
@@ -61,14 +57,14 @@ struct out_from_fn {
   }
   template <class... Ts, class... Fns,
     class This = std::enable_if_t<sizeof...(Fns) != 0, out_from_fn>>
-    requires (SemiMovable<Fns> &&...) &&
+    requires And<SemiMovable<Fns>...> &&
       Invocable<Make, std::tuple<Ts...>> &&
       Invocable<This, pushmi::invoke_result_t<Make, std::tuple<Ts...>>, Fns...>
   auto operator()(std::tuple<Ts...> args, Fns...fns) const {
     return This()(This()(std::move(args)), std::move(fns)...);
   }
   template <Receiver<sender_category_t<In>> Out, class...Fns>
-    requires (SemiMovable<Fns> &&...)
+    requires And<SemiMovable<Fns>...>
   auto operator()(Out out, Fns... fns) const {
     return Make()(std::move(out), std::move(fns)...);
   }
@@ -119,7 +115,6 @@ auto deferred_from(FN&&... fn) {
       PUSHMI_IF_CONSTEXPR_RETURN( ((bool)SenderTo<In, Out>) (
         return make_deferred((FN&&) fn...);
       ) else (
-        //return void();
       ))
     ))
   ))
@@ -136,7 +131,6 @@ auto deferred_from(In in, FN&&... fn) {
       PUSHMI_IF_CONSTEXPR_RETURN( ((bool)SenderTo<In, Out>) (
         return make_deferred(id(std::move(in)), (FN&&) fn...);
       ) else (
-        //return void();
       ))
     ))
   ))
@@ -158,7 +152,6 @@ constexpr bool deferred_requires_from() {
       PUSHMI_IF_CONSTEXPR_RETURN( ((bool)SenderTo<In, Out>) (
         return SenderRequires;
       ) else (
-        //return void();
       ))
     ))
   ))
