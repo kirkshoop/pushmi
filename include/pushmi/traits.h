@@ -6,6 +6,7 @@
 
 #include <functional>
 #include <type_traits>
+
 #include <meta/meta.hpp>
 
 namespace pushmi {
@@ -48,7 +49,7 @@ concept bool MoveConstructible = Constructible<T, T>;
 
 template <class From, class To>
 concept bool ConvertibleTo =
-    std::is_convertible<From, To>::value&& requires(From (&f)()) {
+    std::is_convertible<From, To>::value && requires(From (&f)()) {
   static_cast<To>(f());
 };
 
@@ -139,26 +140,11 @@ using requires_ = std::enable_if_t<B, T>;
 
 } // namespace detail
 
+namespace mock {
+template <class F, class... Args>
+struct Invocable {
+  void operator()() requires pushmi::Invocable<F, Args...> {}
+};
+} // namespace mock
+
 } // namespace pushmi
-
-#if 1
-#define PUSHMI_VOID_LAMBDA_REQUIRES(...) \
-  ->::pushmi::detail::requires_<(__VA_ARGS__)>
-
-#define PUSHMI_T_LAMBDA_REQUIRES(T, ...) \
-  ->::pushmi::detail::requires_<(__VA_ARGS__), T>
-#elif 0
-
-// unsupported syntax..
-
-#define PUSHMI_VOID_LAMBDA_REQUIRES(RequiresExp...) ->void requires(RequiresExp)
-
-#define PUSHMI_T_LAMBDA_REQUIRES(T, RequiresExp...) ->T requires(RequiresExp)
-
-#else
-
-#define PUSHMI_VOID_LAMBDA_REQUIRES(RequiresExp...) ->void
-
-#define PUSHMI_T_LAMBDA_REQUIRES(T, RequiresExp...) ->T
-
-#endif

@@ -11,6 +11,7 @@
 #include "../boosters.h"
 #include "../single.h"
 #include "../detail/if_constexpr.h"
+#include "../detail/functional.h"
 
 namespace pushmi {
 
@@ -70,36 +71,44 @@ struct out_from_fn {
   }
 };
 
-template<Sender In, class FN>
+template<Sender In, SemiMovable FN>
 auto submit_transform_out(FN fn){
   PUSHMI_IF_CONSTEXPR_RETURN( ((bool)TimeSender<In>) (
     return on_submit(
-      [fn = std::move(fn)]<class TP, class Out>(In& in, TP tp, Out out) {
-        ::pushmi::submit(in, tp, fn(std::move(out)));
-      }
+      constrain<mock::Receiver<_3>>(
+        [fn = std::move(fn)](In& in, auto tp, auto out) {
+          ::pushmi::submit(in, tp, fn(std::move(out)));
+        }
+      )
     );
   ) else (
     return on_submit(
-      [fn = std::move(fn)]<class Out>(In& in, Out out) {
-        ::pushmi::submit(in, fn(std::move(out)));
-      }
+      constrain<mock::Receiver<_2>>(
+        [fn = std::move(fn)](In& in, auto out) {
+          ::pushmi::submit(in, fn(std::move(out)));
+        }
+      )
     );
   ))
 }
 
-template<Sender In, class SDSF, class TSDSF>
-auto submit_transform_out(SDSF sdsf, TSDSF tsdsf){
+template<Sender In, SemiMovable SDSF, SemiMovable TSDSF>
+auto submit_transform_out(SDSF sdsf, TSDSF tsdsf) {
   PUSHMI_IF_CONSTEXPR_RETURN( ((bool)TimeSender<In>) (
     return on_submit(
-      [tsdsf = std::move(tsdsf)]<class TP, class Out>(In& in, TP tp, Out out) {
-        tsdsf(in, tp, std::move(out));
-      }
+      constrain<mock::Receiver<_3>, mock::Invocable<TSDSF&, In&, _2, _3>>(
+        [tsdsf = std::move(tsdsf)](In& in, auto tp, auto out) {
+          tsdsf(in, tp, std::move(out));
+        }
+      )
     );
   ) else (
     return on_submit(
-      [sdsf = std::move(sdsf)]<class Out>(In& in, Out out) {
-        sdsf(in, std::move(out));
-      }
+      constrain<mock::Receiver<_2>, mock::Invocable<SDSF&, In&, _2>>(
+        [sdsf = std::move(sdsf)](In& in, auto out) {
+          sdsf(in, std::move(out));
+        }
+      )
     );
   ))
 }
@@ -166,68 +175,82 @@ namespace detail{
 struct set_value_fn {
   template<class V>
   auto operator()(V&& v) const {
-    return [v = (V&&) v]<class Out>(Out out) mutable PUSHMI_VOID_LAMBDA_REQUIRES(Receiver<Out>) {
-      ::pushmi::set_value(out, (V&&) v);
-    };
+    return constrain<mock::Receiver<_1, single_tag>>(
+        [v = (V&&) v](auto out) mutable {
+          ::pushmi::set_value(out, (V&&) v);
+        }
+    );
   }
 };
 
 struct set_error_fn {
-  template<class E>
+  template<SemiMovable E>
   auto operator()(E e) const {
-    return [e = std::move(e)]<class Out>(Out out) mutable noexcept PUSHMI_VOID_LAMBDA_REQUIRES(Receiver<Out>) {
-      ::pushmi::set_error(out, std::move(e));
-    };
+    return constrain<mock::NoneReceiver<_1, E>>(
+      [e = std::move(e)](auto out) mutable {
+        ::pushmi::set_error(out, std::move(e));
+      }
+    );
   }
 };
 
 struct set_done_fn {
   auto operator()() const {
-    return []<class Out>(Out out) PUSHMI_VOID_LAMBDA_REQUIRES(Receiver<Out>) {
-      ::pushmi::set_done(out);
-    };
+    return constrain<mock::Receiver<_1>>(
+      [](auto out) {
+        ::pushmi::set_done(out);
+      }
+    );
   }
 };
 
 struct set_stopping_fn {
   auto operator()() const {
-    return []<class Out>(Out out) PUSHMI_VOID_LAMBDA_REQUIRES(Receiver<Out>) {
-      ::pushmi::set_stopping(out);
-    };
+    return constrain<mock::Receiver<_1>>(
+      [](auto out) {
+        ::pushmi::set_stopping(out);
+      }
+    );
   }
 };
 
 struct set_starting_fn {
-  template<class Up>
+  template<Receiver Up>
   auto operator()(Up up) const {
-    return [up = std::move(up)]<class Out>(Out out) PUSHMI_VOID_LAMBDA_REQUIRES(Receiver<Out>) {
-      ::pushmi::set_starting(out, std::move(up));
-    };
+    return constrain<mock::Receiver<_1>>(
+      [up = std::move(up)](auto out) {
+        ::pushmi::set_starting(out, std::move(up));
+      }
+    );
   }
 };
 
 struct submit_fn {
-  template <class Out>
+  template <Receiver Out>
   auto operator()(Out out) const {
-    static_assert(Receiver<Out>, "'Out' must be a model of Receiver");
-    return [out = std::move(out)]<class In>(In in) mutable {
-      ::pushmi::submit(in, std::move(out));
-    };
+    return constrain<mock::SenderTo<_1, Out>>(
+      [out = std::move(out)](auto in) mutable {
+        ::pushmi::submit(in, std::move(out));
+      }
+    );
   }
-  template <class TP, class Out>
+  template <class TP, Receiver Out>
   auto operator()(TP tp, Out out) const {
-    static_assert(Receiver<Out>, "'Out' must be a model of Receiver");
-    return [tp = std::move(tp), out = std::move(out)]<class In>(In in) mutable {
-      ::pushmi::submit(in, std::move(tp), std::move(out));
-    };
+    return constrain<mock::TimeSenderTo<_1, Out>>(
+      [tp = std::move(tp), out = std::move(out)](auto in) mutable {
+        ::pushmi::submit(in, std::move(tp), std::move(out));
+      }
+    );
   }
 };
 
 struct now_fn {
   auto operator()() const {
-    return []<class In>(In in) PUSHMI_T_LAMBDA_REQUIRES(decltype(::pushmi::now(in)), TimeSender<In>) {
-      return ::pushmi::now(in);
-    };
+    return constrain<mock::TimeSender<_1>>(
+      [](auto in) {
+        return ::pushmi::now(in);
+      }
+    );
   }
 };
 

@@ -12,12 +12,15 @@ namespace pushmi {
 
 namespace operators {
 
-template <class V>
+template <SemiMovable V>
 auto just(V v) {
-  return make_single_deferred([v = std::move(v)]<class Out>(
-      Out out) mutable PUSHMI_VOID_LAMBDA_REQUIRES(SingleReceiver<Out, V>){
-      ::pushmi::set_value(out, std::move(v));
-  });
+  return make_single_deferred(
+    constrain<mock::SingleReceiver<_1, V>>(
+      [v = std::move(v)](auto out) mutable {
+        ::pushmi::set_value(out, std::move(v));
+      }
+    )
+  );
 }
 
 } // namespace operators

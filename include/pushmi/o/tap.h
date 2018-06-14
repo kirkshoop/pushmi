@@ -72,7 +72,9 @@ inline void do_assert(bool condition, char const*) {
 
 template <class... AN>
 auto tap_fn::operator()(AN... an) const {
-  return [args = std::tuple<AN...>{std::move(an)...}]<class In>(In in) mutable {
+  return constrain<mock::Sender<_1>>(
+    [args = std::tuple<AN...>{std::move(an)...}](auto in) mutable {
+      using In = decltype(in);
       auto sideEffects{::pushmi::detail::out_from_fn<In>()(std::move(args))};
       using SideEffects = decltype(sideEffects);
 
@@ -86,27 +88,31 @@ auto tap_fn::operator()(AN... an) const {
       return ::pushmi::detail::deferred_from<In, SideEffects>(
         std::move(in),
         ::pushmi::detail::submit_transform_out<In>(
-          [sideEffects = std::move(sideEffects)]<class Out>(Out out) {
-            PUSHMI_STATIC_ASSERT(
-              ::pushmi::detail::deferred_requires_from<In, SideEffects,
-                SenderTo<In, Out, none_tag>,
-                SenderTo<In, Out, single_tag>,
-                TimeSenderTo<In, Out, single_tag> >(),
-                "'In' is not deliverable to 'Out'");
-            auto gang{::pushmi::detail::out_from_fn<In>()(
-                detail::make_tap(sideEffects, std::move(out)))};
-            using Gang = decltype(gang);
-            PUSHMI_STATIC_ASSERT(
-              ::pushmi::detail::deferred_requires_from<In, SideEffects,
-                SenderTo<In, Gang>,
-                SenderTo<In, Gang, single_tag>,
-                TimeSenderTo<In, Gang, single_tag> >(),
-                "'In' is not deliverable to 'Out' & 'SideEffects'");
-            return gang;
-          }
+          constrain<mock::Receiver<_1>>(
+            [sideEffects = std::move(sideEffects)](auto out) {
+              using Out = decltype(out);
+              PUSHMI_STATIC_ASSERT(
+                ::pushmi::detail::deferred_requires_from<In, SideEffects,
+                  SenderTo<In, Out, none_tag>,
+                  SenderTo<In, Out, single_tag>,
+                  TimeSenderTo<In, Out, single_tag> >(),
+                  "'In' is not deliverable to 'Out'");
+              auto gang{::pushmi::detail::out_from_fn<In>()(
+                  detail::make_tap(sideEffects, std::move(out)))};
+              using Gang = decltype(gang);
+              PUSHMI_STATIC_ASSERT(
+                ::pushmi::detail::deferred_requires_from<In, SideEffects,
+                  SenderTo<In, Gang>,
+                  SenderTo<In, Gang, single_tag>,
+                  TimeSenderTo<In, Gang, single_tag> >(),
+                  "'In' is not deliverable to 'Out' & 'SideEffects'");
+              return gang;
+            }
+          )
         )
       );
-    };
+    }
+  );
 }
 
 } // namespace detail

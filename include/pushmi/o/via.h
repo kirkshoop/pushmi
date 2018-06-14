@@ -34,44 +34,56 @@ auto make_via_fn_data(Out out, Executor ex) -> via_fn_data<Executor, Out> {
 
 template <Invocable ExecutorFactory>
 auto via_fn::operator()(ExecutorFactory ef) const {
-  return [ef = std::move(ef)]<class In>(In in) {
+  return constrain<mock::Sender<_1>>([ef = std::move(ef)](auto in) {
+    using In = decltype(in);
     return ::pushmi::detail::deferred_from<In, single<>>(
       std::move(in),
       ::pushmi::detail::submit_transform_out<In>(
-        [ef]<class Out>(Out out) {
+        constrain<mock::Receiver<_1>>([ef](auto out) {
+          using Out = decltype(out);
           auto exec = ef();
           return ::pushmi::detail::out_from_fn<In>()(
             make_via_fn_data(std::move(out), std::move(exec)),
             // copy 'f' to allow multiple calls to submit
-            ::pushmi::on_value([]<class V>(auto& data, V&& v){
+            ::pushmi::on_value([](auto& data, auto&& v) {
+              using V = decltype(v);
               ::pushmi::submit(
-                  data.exec,
-                  ::pushmi::now(data.exec),
-                  ::pushmi::make_single([v = (V&&)v, out = std::move(static_cast<Out&>(data))](auto) mutable {
+                data.exec,
+                ::pushmi::now(data.exec),
+                ::pushmi::make_single(
+                  [v = (V&&)v, out = std::move(static_cast<Out&>(data))](auto) mutable {
                     ::pushmi::set_value(out, std::move(v));
-                  }));
+                  }
+                )
+              );
             }),
             ::pushmi::on_error([](auto& data, auto e) noexcept {
               ::pushmi::submit(
-                  data.exec,
-                  ::pushmi::now(data.exec),
-                  ::pushmi::make_single([e = std::move(e), out = std::move(static_cast<Out&>(data))](auto) mutable {
+                data.exec,
+                ::pushmi::now(data.exec),
+                ::pushmi::make_single(
+                  [e = std::move(e), out = std::move(static_cast<Out&>(data))](auto) mutable {
                     ::pushmi::set_error(out, std::move(e));
-                  }));
+                  }
+                )
+              );
             }),
             ::pushmi::on_done([](auto& data){
               ::pushmi::submit(
-                  data.exec,
-                  ::pushmi::now(data.exec),
-                  ::pushmi::make_single([out = std::move(static_cast<Out&>(data))](auto) mutable {
+                data.exec,
+                ::pushmi::now(data.exec),
+                ::pushmi::make_single(
+                  [out = std::move(static_cast<Out&>(data))](auto) mutable {
                     ::pushmi::set_done(out);
-                  }));
+                  }
+                )
+              );
             })
           );
-        }
+        })
       )
     );
-  };
+  });
 }
 
 } // namespace detail

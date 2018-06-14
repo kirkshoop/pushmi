@@ -184,4 +184,43 @@ concept bool FlowSingleSender =
 template <class D, class S>
 concept bool SemiFlowSingleSender = SenderTo<D, S, single_tag>;
 
+
+
+// Mock concepts for use with the constrain() function template for
+// constraining generic lambdas.
+namespace mock {
+
+template <class Out, class Tag = silent_tag>
+struct Receiver {
+  void operator()() requires pushmi::Receiver<Out, Tag> {}
+};
+template <class Out, class E = std::exception_ptr>
+struct NoneReceiver {
+  void operator()() requires pushmi::NoneReceiver<Out, E> {}
+};
+template <class Out, class V, class E = std::exception_ptr>
+struct SingleReceiver {
+  void operator()() requires pushmi::SingleReceiver<Out, V, E> {}
+};
+
+template <class D, class Tag = silent_tag>
+struct Sender {
+  void operator()() requires pushmi::Sender<D, Tag> {}
+};
+template <class D, class S, class Tag = silent_tag>
+struct SenderTo {
+  void operator()() requires pushmi::SenderTo<D, S, Tag> {}
+};
+
+template <class D, class Tag = silent_tag>
+struct TimeSender {
+  void operator()() requires pushmi::TimeSender<D, Tag> {}
+};
+template <class D, class S, class Tag = silent_tag>
+struct TimeSenderTo {
+  void operator()() requires pushmi::TimeSenderTo<D, S, Tag> {}
+};
+
+} // namespace mock
+
 } // namespace pushmi

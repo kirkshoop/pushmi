@@ -117,29 +117,36 @@ private:
       std::condition_variable signaled;
       auto out{::pushmi::detail::out_from_fn<In>()(
         std::move(args_),
-        on_value([&]<class Out, class V>(Out out, V&& v){
-          PUSHMI_IF_CONSTEXPR( ((bool)TimeSender<remove_cvref_t<V>>) (
-            // to keep the blocking semantics, make sure that the
-            // nested submits block here to prevent a spurious
-            // completion signal
-            auto nest = ::pushmi::nested_trampoline();
-            ::pushmi::submit(nest, ::pushmi::now(nest), std::move(out));
-          ) else (
-            ::pushmi::set_value(out, id((V&&) v));
-          ))
-          done = true;
-          signaled.notify_all();
-        }),
-        on_error([&](auto out, auto e) noexcept {
-          ::pushmi::set_error(out, std::move(e));
-          done = true;
-          signaled.notify_all();
-        }),
-        on_done([&](auto out){
-          ::pushmi::set_done(out);
-          done = true;
-          signaled.notify_all();
-        })
+        on_value(constrain<mock::Receiver<_1, single_tag>>(
+          [&](auto out, auto&& v) {
+            using V = decltype(v);
+            PUSHMI_IF_CONSTEXPR( ((bool)TimeSender<remove_cvref_t<V>>) (
+              // to keep the blocking semantics, make sure that the
+              // nested submits block here to prevent a spurious
+              // completion signal
+              auto nest = ::pushmi::nested_trampoline();
+              ::pushmi::submit(nest, ::pushmi::now(nest), std::move(out));
+            ) else (
+              ::pushmi::set_value(out, id((V&&) v));
+            ))
+            done = true;
+            signaled.notify_all();
+          }
+        )),
+        on_error(constrain<mock::NoneReceiver<_1, _2>>(
+          [&](auto out, auto e) noexcept {
+            ::pushmi::set_error(out, std::move(e));
+            done = true;
+            signaled.notify_all();
+          }
+        )),
+        on_done(constrain<mock::Receiver<_1>>(
+          [&](auto out){
+            ::pushmi::set_done(out);
+            done = true;
+            signaled.notify_all();
+          }
+        ))
       )};
       PUSHMI_IF_CONSTEXPR( (IsTimeSender) (
         id(::pushmi::submit)(in, id(::pushmi::now)(in), std::move(out));
