@@ -30,7 +30,7 @@ class flow_single_deferred<V, PE, E> {
   using wrapped_t =
     std::enable_if_t<!std::is_same<U, flow_single_deferred>::value, U>;
  public:
-  using sender_category = flow_tag;
+  using properties = property_set<is_sender<>, is_flow<>, is_single<>>;
 
   flow_single_deferred() = default;
   flow_single_deferred(flow_single_deferred&& that) noexcept
@@ -40,7 +40,7 @@ class flow_single_deferred<V, PE, E> {
   }
   template <
       class Wrapped,
-      FlowSingleSender<flow_single<V, PE, E>, any_none<PE>, V, E> W = wrapped_t<Wrapped>>
+      FlowSender<is_single<>> W = wrapped_t<Wrapped>>
   explicit flow_single_deferred(Wrapped obj) : flow_single_deferred() {
     struct s {
       static void op(data& src, data* dst) {
@@ -58,7 +58,7 @@ class flow_single_deferred<V, PE, E> {
   }
   template <
       class Wrapped,
-      FlowSingleSender<flow_single<V, PE, E>, any_none<PE>, V, E> W = wrapped_t<Wrapped>>
+      FlowSender<is_single<>> W = wrapped_t<Wrapped>>
     requires insitu<Wrapped>()
   explicit flow_single_deferred(Wrapped obj) noexcept : flow_single_deferred() {
     struct s {
@@ -101,13 +101,13 @@ class flow_single_deferred<SF> {
   SF sf_;
 
  public:
-  using sender_category = flow_tag;
+  using properties = property_set<is_sender<>, is_flow<>, is_single<>>;
 
   constexpr flow_single_deferred() = default;
   constexpr explicit flow_single_deferred(SF sf)
       : sf_(std::move(sf)) {}
 
-  template <Receiver<flow_tag> Out>
+  template <Receiver<is_flow<>> Out>
     requires Invocable<SF&, Out>
   void submit(Out out) {
     sf_(std::move(out));

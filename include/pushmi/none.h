@@ -33,7 +33,7 @@ class none<E> {
   using wrapped_t =
     std::enable_if_t<!std::is_same<U, none>::value, U>;
 public:
-  using receiver_category = none_tag;
+  using properties = property_set<is_receiver<>, is_none<>>;
 
   none() = default;
   none(none&& that) noexcept : none() {
@@ -115,7 +115,7 @@ class none<EF, DF> {
   DF df_{};
 
 public:
-  using receiver_category = none_tag;
+  using properties = property_set<is_receiver<>, is_none<>>;
 
   none() = default;
   constexpr explicit none(EF ef)
@@ -144,7 +144,7 @@ public:
   }
 };
 
-template <Receiver<none_tag> Data, class DEF, class DDF>
+template <Receiver<is_none<>> Data, class DEF, class DDF>
   requires Invocable<DDF&, Data&>
 class none<Data, DEF, DDF> {
   bool done_ = false;
@@ -154,7 +154,7 @@ class none<Data, DEF, DDF> {
   static_assert(!detail::is_v<DEF, on_value_fn>);
   static_assert(!detail::is_v<Data, single>);
 public:
-  using receiver_category = none_tag;
+  using properties = property_set<is_receiver<>, is_none<>>;
 
   constexpr explicit none(Data d) : none(std::move(d), DEF{}, DDF{}) {}
   constexpr none(Data d, DDF df)
@@ -204,23 +204,23 @@ template <class EF, class DF>
 auto make_none(EF ef, DF df) -> none<EF, DF> {
   return {std::move(ef), std::move(df)};
 }
-template <Receiver<none_tag> Data>
-  requires !Receiver<Data, single_tag>
+template <Receiver<is_none<>> Data>
+  requires !Receiver<Data, is_single<>>
 auto make_none(Data d) -> none<Data, passDEF, passDDF> {
   return none<Data, passDEF, passDDF>{std::move(d)};
 }
-template <Receiver<none_tag> Data, class DEF>
-  requires !Receiver<Data, single_tag>
+template <Receiver<is_none<>> Data, class DEF>
+  requires !Receiver<Data, is_single<>>
 auto make_none(Data d, DEF ef) -> none<Data, DEF, passDDF> {
   return {std::move(d), std::move(ef)};
 }
-template <Receiver<none_tag> Data, class DDF>
-  requires Invocable<DDF&, Data&> && !Receiver<Data, single_tag>
+template <Receiver<is_none<>> Data, class DDF>
+  requires Invocable<DDF&, Data&> && !Receiver<Data, is_single<>>
 auto make_none(Data d, DDF df) -> none<Data, passDEF, DDF> {
   return {std::move(d), std::move(df)};
 }
-template <Receiver<none_tag> Data, class DEF, class DDF>
-  requires !Receiver<Data, single_tag>
+template <Receiver<is_none<>> Data, class DEF, class DDF>
+  requires !Receiver<Data, is_single<>>
 auto make_none(Data d, DEF ef, DDF df) -> none<Data, DEF, DDF> {
   return {std::move(d), std::move(ef), std::move(df)};
 }
@@ -241,20 +241,20 @@ template <class EF, class DF>
   requires Invocable<DF&>
 none(EF, DF) -> none<EF, DF>;
 
-template <Receiver<none_tag> Data>
-  requires !Receiver<Data, single_tag>
+template <Receiver<is_none<>> Data>
+  requires !Receiver<Data, is_single<>>
 none(Data) -> none<Data, passDEF, passDDF>;
 
-template <Receiver<none_tag> Data, class DEF>
-  requires !Receiver<Data, single_tag>
+template <Receiver<is_none<>> Data, class DEF>
+  requires !Receiver<Data, is_single<>>
 none(Data, DEF) -> none<Data, DEF, passDDF>;
 
-template <Receiver<none_tag> Data, class DDF>
-  requires Invocable<DDF&, Data&> && !Receiver<Data, single_tag>
+template <Receiver<is_none<>> Data, class DDF>
+  requires Invocable<DDF&, Data&> && !Receiver<Data, is_single<>>
 none(Data, DDF) -> none<Data, passDEF, DDF>;
 
-template <Receiver<none_tag> Data, class DEF, class DDF>
-  requires !Receiver<Data, single_tag>
+template <Receiver<is_none<>> Data, class DEF, class DDF>
+  requires !Receiver<Data, is_single<>>
 none(Data, DEF, DDF) -> none<Data, DEF, DDF>;
 #endif
 
@@ -283,7 +283,7 @@ struct construct_deduced<none> {
 //   return none<E>{std::move(w)};
 // }
 
-template <SenderTo<std::promise<void>, none_tag> Out>
+template <SenderTo<std::promise<void>, is_none<>> Out>
 std::future<void> future_from(Out out) {
   std::promise<void> p;
   auto result = p.get_future();

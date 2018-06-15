@@ -30,7 +30,7 @@ class single_deferred<V, E> {
   using wrapped_t =
     std::enable_if_t<!std::is_same<U, single_deferred>::value, U>;
  public:
-  using sender_category = single_tag;
+  using properties = property_set<is_sender<>, is_single<>>;
 
   single_deferred() = default;
   single_deferred(single_deferred&& that) noexcept : single_deferred() {
@@ -39,7 +39,7 @@ class single_deferred<V, E> {
   }
 
   template <class Wrapped>
-    requires SenderTo<wrapped_t<Wrapped>, single<V, E>, single_tag>
+    requires SenderTo<wrapped_t<Wrapped>, single<V, E>, is_single<>>
   explicit single_deferred(Wrapped obj) : single_deferred() {
     struct s {
       static void op(data& src, data* dst) {
@@ -56,7 +56,7 @@ class single_deferred<V, E> {
     vptr_ = &vtbl;
   }
   template <class Wrapped>
-    requires SenderTo<wrapped_t<Wrapped>, single<V, E>, single_tag> && insitu<Wrapped>()
+    requires SenderTo<wrapped_t<Wrapped>, single<V, E>, is_single<>> && insitu<Wrapped>()
   explicit single_deferred(Wrapped obj) noexcept : single_deferred() {
     struct s {
       static void op(data& src, data* dst) {
@@ -97,33 +97,33 @@ class single_deferred<SF> {
   SF sf_;
 
  public:
-  using sender_category = single_tag;
+  using properties = property_set<is_sender<>, is_single<>>;
 
   constexpr single_deferred() = default;
   constexpr explicit single_deferred(SF sf)
       : sf_(std::move(sf)) {}
 
-  template <Receiver<single_tag> Out>
+  template <Receiver<is_single<>> Out>
     requires Invocable<SF&, Out>
   void submit(Out out) {
     sf_(std::move(out));
   }
 };
 
-template <Sender<single_tag> Data, class DSF>
+template <Sender<is_single<>> Data, class DSF>
 class single_deferred<Data, DSF> {
   Data data_;
   DSF sf_;
 
  public:
-  using sender_category = single_tag;
+  using properties = property_set<is_sender<>, is_single<>>;
 
   constexpr single_deferred() = default;
   constexpr explicit single_deferred(Data data)
       : data_(std::move(data)) {}
   constexpr single_deferred(Data data, DSF sf)
       : data_(std::move(data)), sf_(std::move(sf)) {}
-  template <Receiver<single_tag> Out>
+  template <Receiver<is_single<>> Out>
     requires Invocable<DSF&, Data&, Out>
   void submit(Out out) {
     sf_(data_, std::move(out));
@@ -139,11 +139,11 @@ template <class SF>
 auto make_single_deferred(SF sf) -> single_deferred<SF> {
   return single_deferred<SF>{std::move(sf)};
 }
-template <Sender<single_tag> Data>
+template <Sender<is_single<>> Data>
 auto make_single_deferred(Data d) -> single_deferred<Data, passDSF> {
   return single_deferred<Data, passDSF>{std::move(d)};
 }
-template <Sender<single_tag> Data, class DSF>
+template <Sender<is_single<>> Data, class DSF>
 auto make_single_deferred(Data d, DSF sf) -> single_deferred<Data, DSF> {
   return {std::move(d), std::move(sf)};
 }
@@ -156,10 +156,10 @@ single_deferred() -> single_deferred<ignoreSF>;
 template <class SF>
 single_deferred(SF) -> single_deferred<SF>;
 
-template <Sender<single_tag> Data>
+template <Sender<is_single<>> Data>
 single_deferred(Data) -> single_deferred<Data, passDSF>;
 
-template <Sender<single_tag> Data, class DSF>
+template <Sender<is_single<>> Data, class DSF>
 single_deferred(Data, DSF) -> single_deferred<Data, DSF>;
 #endif
 
@@ -169,7 +169,7 @@ using any_single_deferred = single_deferred<V, E>;
 // template <
 //     class V,
 //     class E = std::exception_ptr,
-//     SenderTo<single<V, E>, single_tag> Wrapped>
+//     SenderTo<single<V, E>, is_single<>> Wrapped>
 // auto erase_cast(Wrapped w) {
 //   return single_deferred<V, E>{std::move(w)};
 // }

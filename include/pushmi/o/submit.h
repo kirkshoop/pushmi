@@ -21,7 +21,7 @@ namespace detail {
 template <Sender In, class ...AN>
 using receiver_type_t =
     pushmi::invoke_result_t<
-        pushmi::detail::make_receiver<sender_category_t<In>>,
+        pushmi::detail::make_receiver<property_from_category_t<In, is_silent<>>>,
         AN...>;
 
 template <class In, class ... AN>
@@ -117,10 +117,10 @@ private:
       std::condition_variable signaled;
       auto out{::pushmi::detail::out_from_fn<In>()(
         std::move(args_),
-        on_value(constrain<mock::Receiver<_1, single_tag>>(
+        on_value(constrain<mock::Receiver<_1, is_single<>>>(
           [&](auto out, auto&& v) {
-            using V = decltype(v);
-            PUSHMI_IF_CONSTEXPR( ((bool)TimeSender<remove_cvref_t<V>>) (
+            using V = remove_cvref_t<decltype(v)>;
+            PUSHMI_IF_CONSTEXPR( ((bool)Time<V>) (
               // to keep the blocking semantics, make sure that the
               // nested submits block here to prevent a spurious
               // completion signal
@@ -191,8 +191,8 @@ struct get_fn {
         [&](std::exception_ptr ep) noexcept { ep_ = ep; })
     );
     using Out = decltype(out);
-    static_assert(SenderTo<In, Out, single_tag> ||
-        TimeSenderTo<In, Out, single_tag>,
+    static_assert(SenderTo<In, Out, is_single<>> ||
+        TimeSenderTo<In, Out, is_single<>>,
         "'In' does not deliver value compatible with 'T' to 'Out'");
     blocking_submit_fn{}(std::move(out))(in);
     if (!!ep_) { std::rethrow_exception(ep_); }

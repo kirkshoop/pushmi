@@ -33,7 +33,7 @@ class deferred<detail::erase_deferred_t, E> {
   using wrapped_t =
     std::enable_if_t<!std::is_same<U, deferred>::value, U>;
  public:
-  using sender_category = none_tag;
+  using properties = property_set<is_sender<>, is_none<>>;
 
   deferred() = default;
   deferred(deferred&& that) noexcept : deferred() {
@@ -41,7 +41,7 @@ class deferred<detail::erase_deferred_t, E> {
     std::swap(that.vptr_, vptr_);
   }
   template <class Wrapped>
-    requires SenderTo<wrapped_t<Wrapped>, any_none<E>, none_tag>
+    requires SenderTo<wrapped_t<Wrapped>, any_none<E>, is_none<>>
   explicit deferred(Wrapped obj) : deferred() {
     struct s {
       static void op(data& src, data* dst) {
@@ -58,7 +58,7 @@ class deferred<detail::erase_deferred_t, E> {
     vptr_ = &vtbl;
   }
   template <class Wrapped>
-    requires SenderTo<wrapped_t<Wrapped>, any_none<E>, none_tag> && insitu<Wrapped>()
+    requires SenderTo<wrapped_t<Wrapped>, any_none<E>, is_none<>> && insitu<Wrapped>()
   explicit deferred(Wrapped obj) noexcept : deferred() {
     struct s {
       static void op(data& src, data* dst) {
@@ -99,24 +99,24 @@ class deferred<SF> {
   SF sf_{};
 
  public:
-  using sender_category = none_tag;
+  using properties = property_set<is_sender<>, is_none<>>;
 
   constexpr deferred() = default;
   constexpr explicit deferred(SF sf) : sf_(std::move(sf)) {}
-  template <Receiver<none_tag> Out>
+  template <Receiver<is_none<>> Out>
     requires Invocable<SF&, Out>
   void submit(Out out) {
     sf_(std::move(out));
   }
 };
 
-template <Sender<none_tag> Data, class DSF>
+template <Sender<is_none<>> Data, class DSF>
 class deferred<Data, DSF> {
   Data data_{};
   DSF sf_{};
 
  public:
-  using sender_category = none_tag;
+  using properties = property_set<is_sender<>, is_none<>>;
 
   constexpr deferred() = default;
   constexpr explicit deferred(Data data)
@@ -124,7 +124,7 @@ class deferred<Data, DSF> {
   constexpr deferred(Data data, DSF sf)
       : data_(std::move(data)), sf_(std::move(sf)) {}
 
-  template <Receiver<none_tag> Out>
+  template <Receiver<is_none<>> Out>
     requires Invocable<DSF&, Data&, Out>
   void submit(Out out) {
     sf_(data_, std::move(out));
@@ -140,12 +140,12 @@ template <class SF>
 auto make_deferred(SF sf) -> deferred<SF> {
   return deferred<SF>{std::move(sf)};
 }
-template <Sender<none_tag> Wrapped>
+template <Sender<is_none<>> Wrapped>
 auto make_deferred(Wrapped w) ->
     deferred<detail::erase_deferred_t, std::exception_ptr> {
   return deferred<detail::erase_deferred_t, std::exception_ptr>{std::move(w)};
 }
-template <Sender<none_tag> Data, class DSF>
+template <Sender<is_none<>> Data, class DSF>
 auto make_deferred(Data data, DSF sf) -> deferred<Data, DSF> {
   return deferred<Data, DSF>{std::move(data), std::move(sf)};
 }
@@ -158,24 +158,24 @@ deferred() -> deferred<ignoreSF>;
 template <class SF>
 deferred(SF) -> deferred<SF>;
 
-template <Sender<none_tag> Wrapped>
+template <Sender<is_none<>> Wrapped>
 deferred(Wrapped) ->
     deferred<detail::erase_deferred_t, std::exception_ptr>;
 
-template <Sender<none_tag> Data, class DSF>
+template <Sender<is_none<>> Data, class DSF>
 deferred(Data, DSF) -> deferred<Data, DSF>;
 #endif
 
 template <class E = std::exception_ptr>
 using any_deferred = deferred<detail::erase_deferred_t, E>;
 
-// template <SenderTo<any_none<std::exception_ptr>, none_tag> Wrapped>
+// template <SenderTo<any_none<std::exception_ptr>, is_none<>> Wrapped>
 // auto erase_cast(Wrapped w) {
 //   return deferred<detail::erase_deferred_t, std::exception_ptr>{std::move(w)};
 // }
 //
-// template <class E, SenderTo<any_none<E>, none_tag> Wrapped>
-//   requires Same<none_tag, sender_category_t<Wrapped>>
+// template <class E, SenderTo<any_none<E>, is_none<>> Wrapped>
+//   requires Same<is_none<>, properties_t<Wrapped>>
 // auto erase_cast(Wrapped w) {
 //   return deferred<detail::erase_deferred_t, E>{std::move(w)};
 // }

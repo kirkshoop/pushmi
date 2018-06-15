@@ -33,7 +33,7 @@ class time_single_deferred<V, E, TP> {
     std::enable_if_t<!std::is_same<U, time_single_deferred>::value, U>;
 
  public:
-  using sender_category = single_tag;
+  using properties = property_set<is_time<>, is_single<>>;
 
   time_single_deferred() = default;
   time_single_deferred(time_single_deferred&& that) noexcept
@@ -41,7 +41,7 @@ class time_single_deferred<V, E, TP> {
     that.vptr_->op_(that.data_, &data_);
     std::swap(that.vptr_, vptr_);
   }
-  template <class Wrapped, Sender<single_tag> W = wrapped_t<Wrapped>>
+  template <class Wrapped, Sender<is_single<>> W = wrapped_t<Wrapped>>
     requires TimeSenderTo<W, single<V, E>>
   explicit time_single_deferred(Wrapped obj) : time_single_deferred() {
     struct s {
@@ -64,7 +64,7 @@ class time_single_deferred<V, E, TP> {
     data_.pobj_ = new Wrapped(std::move(obj));
     vptr_ = &vtbl;
   }
-  template <class Wrapped, Sender<single_tag> W = wrapped_t<Wrapped>>
+  template <class Wrapped, Sender<is_single<>> W = wrapped_t<Wrapped>>
     requires TimeSenderTo<W, single<V, E>> && insitu<Wrapped>()
   explicit time_single_deferred(Wrapped obj) noexcept : time_single_deferred() {
     struct s {
@@ -115,7 +115,7 @@ class time_single_deferred<SF, NF> {
   NF nf_{};
 
  public:
-  using sender_category = single_tag;
+  using properties = property_set<is_time<>, is_single<>>;
 
   constexpr time_single_deferred() = default;
   constexpr explicit time_single_deferred(SF sf)
@@ -125,21 +125,21 @@ class time_single_deferred<SF, NF> {
   auto now() {
     return nf_();
   }
-  template <Regular TP, Receiver<single_tag> Out>
+  template <Regular TP, Receiver<is_single<>> Out>
     requires Invocable<SF&, TP, Out>
   void submit(TP tp, Out out) {
     sf_(std::move(tp), std::move(out));
   }
 };
 
-template <TimeSender<single_tag> Data, class DSF, Invocable<Data&> DNF>
+template <TimeSender<is_single<>> Data, class DSF, Invocable<Data&> DNF>
 class time_single_deferred<Data, DSF, DNF> {
   Data data_{};
   DSF sf_{};
   DNF nf_{};
 
  public:
-  using sender_category = single_tag;
+  using properties = property_set<is_time<>, is_single<>>;
 
   constexpr time_single_deferred() = default;
   constexpr explicit time_single_deferred(Data data)
@@ -150,7 +150,7 @@ class time_single_deferred<Data, DSF, DNF> {
     return nf_(data_);
   }
 
-  template <class TP, Receiver<single_tag> Out>
+  template <class TP, Receiver<is_single<>> Out>
     requires Invocable<DSF&, Data&, TP, Out>
   void submit(TP tp, Out out) {
     sf_(data_, std::move(tp), std::move(out));
@@ -171,12 +171,12 @@ template <class SF, Invocable NF>
 auto make_time_single_deferred(SF sf, NF nf) -> time_single_deferred<SF, NF> {
   return {std::move(sf), std::move(nf)};
 }
-template <TimeSender<single_tag> Data, class DSF>
+template <TimeSender<is_single<>> Data, class DSF>
 auto make_time_single_deferred(Data d, DSF sf) ->
     time_single_deferred<Data, DSF, passDNF> {
   return {std::move(d), std::move(sf)};
 }
-template <TimeSender<single_tag> Data, class DSF, class DNF>
+template <TimeSender<is_single<>> Data, class DSF, class DNF>
 auto make_time_single_deferred(Data d, DSF sf, DNF nf) ->
     time_single_deferred<Data, DSF, DNF> {
   return {std::move(d), std::move(sf), std::move(nf)};
@@ -193,10 +193,10 @@ time_single_deferred(SF) -> time_single_deferred<SF, systemNowF>;
 template <class SF, Invocable NF>
 time_single_deferred(SF, NF) -> time_single_deferred<SF, NF>;
 
-template <TimeSender<single_tag> Data, class DSF>
+template <TimeSender<is_single<>> Data, class DSF>
 time_single_deferred(Data, DSF) -> time_single_deferred<Data, DSF, passDNF>;
 
-template <TimeSender<single_tag> Data, class DSF, class DNF>
+template <TimeSender<is_single<>> Data, class DSF, class DNF>
 time_single_deferred(Data, DSF, DNF) -> time_single_deferred<Data, DSF, DNF>;
 #endif
 
@@ -210,7 +210,7 @@ using any_time_single_deferred = time_single_deferred<V, E, TP>;
 //     class V,
 //     class E = std::exception_ptr,
 //     class TP = std::chrono::system_clock::time_point,
-//     TimeSenderTo<single<V, E>, single_tag> Wrapped>
+//     TimeSenderTo<single<V, E>, is_single<>> Wrapped>
 // auto erase_cast(Wrapped w) {
 //   return time_single_deferred<V, E>{std::move(w)};
 // }
