@@ -123,30 +123,25 @@ using property_insert_t = typename property_set_insert<PS0, PS1>::type;
 
 // find property in the specified set that matches the category of the property specified.
 
-template<class PropertySet0, class Category>
+template<class... TN>
 struct property_from_category;
 
-template<class Property0, class... PropertyN, class P>
-  requires Property<Property0> && And<Property<PropertyN>...> && Property<P>
-struct property_from_category<property_set<Property0, PropertyN...>, P> {
-  using type = typename property_from_category<property_set<Property0, PropertyN...>, property_category_t<P>>::type;
-};
+template<class PS, class P>
+  requires Properties<PS> && Property<P>
+struct property_from_category<PS, P> : property_from_category<properties_t<PS>, property_category_t<P>> {};
 
-template<class Category, class Property0, class... PropertyN>
-  requires !Property<Category> && Property<Property0> && And<Property<PropertyN>...>
-struct property_from_category<property_set<Property0, PropertyN...>, Category> {
-  using type = typename property_from_category<property_set<PropertyN...>, Category>::type;
-};
+template<class... PN, class Category>
+  requires And<Property<PN>...> && !Property<Category>
+struct property_from_category<property_set<PN...>, Category> : property_from_category<PN, property_category_t<PN>, Category>... {};
 
-template<class Property0, class... PropertyN>
-  requires Property<Property0> && And<Property<PropertyN>...>
-struct property_from_category<property_set<Property0, PropertyN...>, property_category_t<Property0>> {
-  using type = Property0;
+template<class P, class Category>
+  requires Property<P> && !Property<Category>
+struct property_from_category<P, Category, Category> {
+  using type = P;
 };
-
-template<class Category>
-struct property_from_category<property_set<>, Category> {
-};
+template<class P, class Category, class Expected>
+  requires Property<P> && !Property<Category> && !Property<Expected>
+struct property_from_category<P, Category, Expected> {};
 
 template<class PS, class C>
 using property_from_category_t = typename property_from_category<PS, C>::type;
