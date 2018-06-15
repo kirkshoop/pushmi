@@ -328,7 +328,7 @@ using constraint_t = decltype(::pushmi::top(std::declval<D&>()));
 // constraining generic lambdas.
 namespace mock {
 
-template <class Out, class Tag = silent_tag>
+template <class Out, class Tag = is_silent<>>
 struct Receiver {
   void operator()() requires pushmi::Receiver<Out, Tag> {}
 };
@@ -341,20 +341,20 @@ struct SingleReceiver {
   void operator()() requires pushmi::SingleReceiver<Out, V, E> {}
 };
 
-template <class D, class Tag = silent_tag>
+template <class D, class Tag = is_silent<>>
 struct Sender {
   void operator()() requires pushmi::Sender<D, Tag> {}
 };
-template <class D, class S, class Tag = silent_tag>
+template <class D, class S, class Tag = is_silent<>>
 struct SenderTo {
   void operator()() requires pushmi::SenderTo<D, S, Tag> {}
 };
 
-template <class D, class Tag = silent_tag>
+template <class D, class Tag = is_silent<>>
 struct TimeSender {
   void operator()() requires pushmi::TimeSender<D, Tag> {}
 };
-template <class D, class S, class Tag = silent_tag>
+template <class D, class S, class Tag = is_silent<>>
 struct TimeSenderTo {
   void operator()() requires pushmi::TimeSenderTo<D, S, Tag> {}
 };

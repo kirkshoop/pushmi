@@ -28,19 +28,21 @@ struct tap_ {
   SideEffects sideEffects;
   Out out;
 
-  using side_effects_tag = receiver_category_t<SideEffects>;
-  using out_tag = receiver_category_t<Out>;
-
-  using receiver_category = std::common_type_t<side_effects_tag, out_tag>;
+  // side effect has no effect on the properties.
+  using properties = properties_t<Out>;
 
   template <class V, class UV = std::remove_reference_t<V>>
-    requires SingleReceiver<SideEffects, const UV&> && SingleReceiver<Out, V>
+    requires 
+    // SingleReceiver<SideEffects, const UV&> && 
+    SingleReceiver<Out, V>
   void value(V&& v) {
     ::pushmi::set_value(sideEffects, as_const(v));
     ::pushmi::set_value(out, (V&&) v);
   }
   template <class E>
-    requires NoneReceiver<SideEffects, const E&> && NoneReceiver<Out, E>
+    requires 
+    // NoneReceiver<SideEffects, const E&> && 
+    NoneReceiver<Out, E>
   void error(E e) noexcept {
     ::pushmi::set_error(sideEffects, as_const(e));
     ::pushmi::set_error(out, std::move(e));
@@ -52,6 +54,7 @@ struct tap_ {
 };
 
 template <Receiver SideEffects, Receiver Out>
+  requires Receiver<tap_<SideEffects, Out>, property_from_category_t<Out, is_silent<>>>
 auto make_tap(SideEffects se, Out out) -> tap_<SideEffects, Out> {
   return {std::move(se), std::move(out)};
 }
@@ -80,9 +83,9 @@ auto tap_fn::operator()(AN... an) const {
 
       PUSHMI_STATIC_ASSERT(
         ::pushmi::detail::deferred_requires_from<In, SideEffects,
-          SenderTo<In, SideEffects, none_tag>,
-          SenderTo<In, SideEffects, single_tag>,
-          TimeSenderTo<In, SideEffects, single_tag> >(),
+          SenderTo<In, SideEffects, is_none<>>,
+          SenderTo<In, SideEffects, is_single<>>,
+          TimeSenderTo<In, SideEffects, is_single<>> >(),
           "'In' is not deliverable to 'SideEffects'");
 
       return ::pushmi::detail::deferred_from<In, SideEffects>(
@@ -93,9 +96,9 @@ auto tap_fn::operator()(AN... an) const {
               using Out = decltype(out);
               PUSHMI_STATIC_ASSERT(
                 ::pushmi::detail::deferred_requires_from<In, SideEffects,
-                  SenderTo<In, Out, none_tag>,
-                  SenderTo<In, Out, single_tag>,
-                  TimeSenderTo<In, Out, single_tag> >(),
+                  SenderTo<In, Out, is_none<>>,
+                  SenderTo<In, Out, is_single<>>,
+                  TimeSenderTo<In, Out, is_single<>> >(),
                   "'In' is not deliverable to 'Out'");
               auto gang{::pushmi::detail::out_from_fn<In>()(
                   detail::make_tap(sideEffects, std::move(out)))};
@@ -103,8 +106,8 @@ auto tap_fn::operator()(AN... an) const {
               PUSHMI_STATIC_ASSERT(
                 ::pushmi::detail::deferred_requires_from<In, SideEffects,
                   SenderTo<In, Gang>,
-                  SenderTo<In, Gang, single_tag>,
-                  TimeSenderTo<In, Gang, single_tag> >(),
+                  SenderTo<In, Gang, is_single<>>,
+                  TimeSenderTo<In, Gang, is_single<>> >(),
                   "'In' is not deliverable to 'Out' & 'SideEffects'");
               return gang;
             }

@@ -10,17 +10,42 @@
 
 namespace pushmi {
 
-// tag types
-struct silent_tag;
-struct none_tag;
-struct single_tag;
-struct flow_tag;
+// property_set
 
-template <class>
-struct sender_traits;
+template <class T>
+struct property_traits;
 
-template <class>
-struct receiver_traits;
+template <class T>
+struct property_set_traits;
+
+template<class... PropertyN>
+struct property_set;
+
+// trait & tag types
+template<class...TN>
+struct is_silent;
+template<class...TN>
+struct is_none;
+template<class...TN>
+struct is_single;
+template<class...TN>
+struct is_many;
+
+template<class...TN>
+struct is_flow;
+
+template<class...TN>
+struct is_receiver;
+
+template<class...TN>
+struct is_sender;
+
+template<class...TN>
+struct is_time;
+template<class...TN>
+struct is_constrained;
+
+// implementation types
 
 template <SemiMovable... TN>
 class none;
@@ -58,9 +83,3 @@ namespace aliases {
 }
 
 } // namespace pushmi
-
-#if __cpp_inline_variables >= 201606
-#define PUSHMI_INLINE_VAR inline
-#else
-#define PUSHMI_INLINE_VAR
-#endif

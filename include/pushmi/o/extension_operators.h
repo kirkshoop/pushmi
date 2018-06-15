@@ -44,13 +44,14 @@ namespace detail {
 template <class Tag>
 struct make_receiver;
 template <>
-struct make_receiver<none_tag> : construct_deduced<none> {};
+struct make_receiver<is_none<>> : construct_deduced<none> {};
 template <>
-struct make_receiver<single_tag> : construct_deduced<single> {};
+struct make_receiver<is_single<>> : construct_deduced<single> {};
 
 template <Sender In>
 struct out_from_fn {
-  using Make = make_receiver<sender_category_t<In>>;
+  using Cardinality = property_from_category_t<In, is_silent<>>;
+  using Make = make_receiver<Cardinality>;
   template <class... Ts>
    requires Invocable<Make, Ts...>
   auto operator()(std::tuple<Ts...> args) const {
@@ -64,7 +65,7 @@ struct out_from_fn {
   auto operator()(std::tuple<Ts...> args, Fns...fns) const {
     return This()(This()(std::move(args)), std::move(fns)...);
   }
-  template <Receiver<sender_category_t<In>> Out, class...Fns>
+  template <Receiver<Cardinality> Out, class...Fns>
     requires And<SemiMovable<Fns>...>
   auto operator()(Out out, Fns... fns) const {
     return Make()(std::move(out), std::move(fns)...);
@@ -115,10 +116,10 @@ auto submit_transform_out(SDSF sdsf, TSDSF tsdsf) {
 
 template<Sender In, Receiver Out, class... FN>
 auto deferred_from(FN&&... fn) {
-  PUSHMI_IF_CONSTEXPR_RETURN( ((bool)TimeSenderTo<In, Out, single_tag>) (
+  PUSHMI_IF_CONSTEXPR_RETURN( ((bool)TimeSenderTo<In, Out, is_single<>>) (
     return make_time_single_deferred((FN&&) fn...);
   ) else (
-    PUSHMI_IF_CONSTEXPR_RETURN( ((bool)SenderTo<In, Out, single_tag>) (
+    PUSHMI_IF_CONSTEXPR_RETURN( ((bool)SenderTo<In, Out, is_single<>>) (
       return make_single_deferred((FN&&) fn...);
     ) else (
       PUSHMI_IF_CONSTEXPR_RETURN( ((bool)SenderTo<In, Out>) (
@@ -131,10 +132,10 @@ auto deferred_from(FN&&... fn) {
 
 template<Sender In, Receiver Out, class... FN>
 auto deferred_from(In in, FN&&... fn) {
-  PUSHMI_IF_CONSTEXPR_RETURN( ((bool)TimeSenderTo<In, Out, single_tag>) (
+  PUSHMI_IF_CONSTEXPR_RETURN( ((bool)TimeSenderTo<In, Out, is_single<>>) (
     return make_time_single_deferred(id(std::move(in)), (FN&&) fn...);
   ) else (
-    PUSHMI_IF_CONSTEXPR_RETURN( ((bool)SenderTo<In, Out, single_tag>) (
+    PUSHMI_IF_CONSTEXPR_RETURN( ((bool)SenderTo<In, Out, is_single<>>) (
       return make_single_deferred(id(std::move(in)), (FN&&) fn...);
     ) else (
       PUSHMI_IF_CONSTEXPR_RETURN( ((bool)SenderTo<In, Out>) (
@@ -152,10 +153,10 @@ template<
     bool SingleSenderRequires,
     bool TimeSingleSenderRequires>
 constexpr bool deferred_requires_from() {
-  PUSHMI_IF_CONSTEXPR_RETURN( ((bool)TimeSenderTo<In, Out, single_tag>) (
+  PUSHMI_IF_CONSTEXPR_RETURN( ((bool)TimeSenderTo<In, Out, is_single<>>) (
     return TimeSingleSenderRequires;
   ) else (
-    PUSHMI_IF_CONSTEXPR_RETURN( ((bool)SenderTo<In, Out, single_tag>) (
+    PUSHMI_IF_CONSTEXPR_RETURN( ((bool)SenderTo<In, Out, is_single<>>) (
       return SingleSenderRequires;
     ) else (
       PUSHMI_IF_CONSTEXPR_RETURN( ((bool)SenderTo<In, Out>) (
@@ -175,7 +176,7 @@ namespace detail{
 struct set_value_fn {
   template<class V>
   auto operator()(V&& v) const {
-    return constrain<mock::Receiver<_1, single_tag>>(
+    return constrain<mock::Receiver<_1, is_single<>>>(
         [v = (V&&) v](auto out) mutable {
           ::pushmi::set_value(out, (V&&) v);
         }

@@ -38,7 +38,7 @@ class flow_single<V, PE, E> {
   using wrapped_t =
     std::enable_if_t<!std::is_same<U, flow_single>::value, U>;
 public:
-  using receiver_category = flow_tag;
+  using properties = property_set<is_receiver<>, is_flow<>, is_single<>>;
 
   flow_single() = default;
   flow_single(flow_single&& that) noexcept : flow_single() {
@@ -46,7 +46,7 @@ public:
     std::swap(that.vptr_, vptr_);
   }
   template <class Wrapped>
-    requires FlowSingle<wrapped_t<Wrapped>, any_none<PE>, V, PE, E>
+    requires FlowSingleReceiver<wrapped_t<Wrapped>, any_none<PE>, V, PE, E>
   explicit flow_single(Wrapped obj) : flow_single() {
     struct s {
       static void op(data& src, data* dst) {
@@ -75,7 +75,7 @@ public:
     vptr_ = &vtbl;
   }
   template <class Wrapped>
-    requires FlowSingle<wrapped_t<Wrapped>, any_none<PE>, V, PE, E> && insitu<Wrapped>()
+    requires FlowSingleReceiver<wrapped_t<Wrapped>, any_none<PE>, V, PE, E> && insitu<Wrapped>()
   explicit flow_single(Wrapped obj) noexcept : flow_single() {
     struct s {
       static void op(data& src, data* dst) {
@@ -147,7 +147,7 @@ class flow_single<VF, EF, DF, StpF, StrtF> {
   StrtF strtf_;
 
  public:
-  using receiver_category = flow_tag;
+  using properties = property_set<is_receiver<>, is_flow<>, is_single<>>;
 
   static_assert(
       !detail::is_v<VF, on_error_fn>,
@@ -193,7 +193,7 @@ class flow_single<VF, EF, DF, StpF, StrtF> {
   void stopping() noexcept {
     stpf_();
   }
-  template <Receiver<none_tag> Up>
+  template <Receiver<is_none<>> Up>
     requires Invocable<StrtF&, Up&>
   void starting(Up& up) {
     strtf_(up);
@@ -217,7 +217,7 @@ class flow_single<Data, DVF, DEF, DDF, DStpF, DStrtF> {
   DStrtF strtf_;
 
  public:
-  using receiver_category = flow_tag;
+  using properties = property_set<is_receiver<>, is_flow<>, is_single<>>;
 
   static_assert(
       !detail::is_v<DVF, on_error_fn>,
@@ -310,7 +310,7 @@ auto make_flow_single(on_done_fn<DF> df)
       std::move(df)};
 }
 template <class V, class PE, class E, class Wrapped>
-    requires FlowSingle<Wrapped, V, PE, E> &&
+    requires FlowSingleReceiver<Wrapped, V, PE, E> &&
     !detail::is_v<Wrapped, none>
 auto make_flow_single(Wrapped w) -> flow_single<V, PE, E> {
   return flow_single<V, PE, E>{std::move(w)};
@@ -447,7 +447,7 @@ flow_single(on_done_fn<DF>)
     -> flow_single<ignoreVF, abortEF, on_done_fn<DF>, ignoreStpF, ignoreStrtF>;
 
 template <class V, class PE, class E, class Wrapped>
-    requires FlowSingle<Wrapped, V, PE, E> &&
+    requires FlowSingleReceiver<Wrapped, V, PE, E> &&
     !detail::is_v<Wrapped, none> flow_single(Wrapped) -> flow_single<V, PE, E>;
 
 template <class VF, class EF>
@@ -540,7 +540,7 @@ template <class V, class PE = std::exception_ptr, class E = PE>
 using any_flow_single = flow_single<V, PE, E>;
 
 // template <class V, class PE = std::exception_ptr, class E = PE, class Wrapped>
-//     requires FlowSingle<Wrapped, V, PE, E> && !detail::is_v<Wrapped, none> &&
+//     requires FlowSingleReceiver<Wrapped, V, PE, E> && !detail::is_v<Wrapped, none> &&
 //     !detail::is_v<Wrapped, std::promise>
 //     auto erase_cast(Wrapped w) {
 //   return flow_single<V, PE, E>{std::move(w)};

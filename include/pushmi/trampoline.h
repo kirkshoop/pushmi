@@ -95,14 +95,14 @@ class delegator {
   using time_point = typename trampoline<E>::time_point;
 
  public:
-  using sender_category = single_tag;
+  using properties = property_set<is_time<>, is_single<>>;
 
   time_point now() {
     return trampoline<E>::now();
   }
 
   template <class SingleReceiver>
-    requires Receiver<remove_cvref_t<SingleReceiver>, single_tag>
+    requires Receiver<remove_cvref_t<SingleReceiver>, is_single<>>
   void submit(time_point when, SingleReceiver&& what) {
     trampoline<E>::submit(
         ownordelegate, when, std::forward<SingleReceiver>(what));
@@ -114,7 +114,7 @@ class nester {
   using time_point = typename trampoline<E>::time_point;
 
  public:
-  using sender_category = single_tag;
+  using properties = property_set<is_time<>, is_single<>>;
 
   time_point now() {
     return trampoline<E>::now();

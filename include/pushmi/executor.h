@@ -27,12 +27,12 @@ private:
   using wrapped_t =
     std::enable_if_t<!std::is_base_of<any_time_executor_ref_base, U>::value, U>;
 public:
-  using sender_category = single_tag;
+  using properties = property_set<is_time<>, is_single<>>;
 
   any_time_executor_ref_base() = delete;
   any_time_executor_ref_base(const any_time_executor_ref_base&) = default;
 
-  template <class Wrapped, TimeSender<single_tag> W = wrapped_t<Wrapped>>
+  template <class Wrapped, TimeSender<is_single<>> W = wrapped_t<Wrapped>>
     // requires TimeSenderTo<W, single<Other, E>>
   any_time_executor_ref_base(Wrapped& w) {
     // This can't be a requirement because it asks if submit(w, now(w), single<T,E>)

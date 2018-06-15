@@ -254,12 +254,12 @@ PUSHMI_INLINE_VAR constexpr __adl::get_now_fn now{};
 PUSHMI_INLINE_VAR constexpr __adl::get_now_fn top{};
 
 template <class T>
-struct receiver_traits<std::promise<T>> {
-  using receiver_category = single_tag;
+struct property_set_traits<std::promise<T>> {
+  using properties = property_set<is_receiver<>, is_single<>>;
 };
 template <>
-struct receiver_traits<std::promise<void>> {
-  using receiver_category = none_tag;
+struct property_set_traits<std::promise<void>> {
+  using properties = property_set<is_receiver<>, is_none<>>;
 };
 
 } // namespace pushmi

@@ -47,7 +47,7 @@ class single<V, E> {
       "Wrapped single must support E and be noexcept");
   }
 public:
-  using receiver_category = single_tag;
+  using properties = property_set<is_receiver<>, is_single<>>;
 
   single() = default;
   single(single&& that) noexcept : single() {
@@ -171,7 +171,7 @@ class single<VF, EF, DF> {
       "error function must be noexcept and support std::exception_ptr");
 
  public:
-  using receiver_category = single_tag;
+  using properties = property_set<is_receiver<>, is_single<>>;
 
   single() = default;
   constexpr explicit single(VF vf) : single(std::move(vf), EF{}, DF{}) {}
@@ -225,7 +225,7 @@ requires Invocable<DDF&, Data&> class single<Data, DVF, DEF, DDF> {
       "error function must be noexcept and support std::exception_ptr");
 
  public:
-  using receiver_category = single_tag;
+  using properties = property_set<is_receiver<>, is_single<>>;
 
   constexpr explicit single(Data d)
       : single(std::move(d), DVF{}, DEF{}, DDF{}) {}
@@ -300,34 +300,34 @@ template <class VF, class EF, class DF>
 auto make_single(VF vf, EF ef, DF df) -> single<VF, EF, DF> {
   return {std::move(vf), std::move(ef), std::move(df)};
 }
-template <Receiver<single_tag> Data>
+template <Receiver<is_single<>> Data>
 auto make_single(Data d) -> single<Data, passDVF, passDEF, passDDF> {
   return single<Data, passDVF, passDEF, passDDF>{std::move(d)};
 }
-template <Receiver<single_tag> Data, class DVF>
+template <Receiver<is_single<>> Data, class DVF>
 auto make_single(Data d, DVF vf) -> single<Data, DVF, passDEF, passDDF> {
   return {std::move(d), std::move(vf)};
 }
-template <Receiver<single_tag> Data, class... DEFN>
+template <Receiver<is_single<>> Data, class... DEFN>
 auto make_single(Data d, on_error_fn<DEFN...> ef) ->
     single<Data, passDVF, on_error_fn<DEFN...>, passDDF> {
   return {std::move(d), std::move(ef)};
 }
-template <Receiver<single_tag> Data, class DDF>
+template <Receiver<is_single<>> Data, class DDF>
   requires Invocable<DDF&, Data&>
 auto make_single(Data d, DDF df) -> single<Data, passDVF, passDEF, DDF> {
   return {std::move(d), std::move(df)};
 }
-template <Receiver<single_tag> Data, class DVF, class DEF>
+template <Receiver<is_single<>> Data, class DVF, class DEF>
 auto make_single(Data d, DVF vf, DEF ef) -> single<Data, DVF, DEF, passDDF> {
   return {std::move(d), std::move(vf), std::move(ef)};
 }
-template <Receiver<single_tag> Data, class DEF, class DDF>
+template <Receiver<is_single<>> Data, class DEF, class DDF>
   requires Invocable<DDF&, Data&>
 auto make_single(Data d, DEF ef, DDF df) -> single<Data, passDVF, DEF, DDF> {
   return {std::move(d), std::move(ef), std::move(df)};
 }
-template <Receiver<single_tag> Data, class DVF, class DEF, class DDF>
+template <Receiver<is_single<>> Data, class DVF, class DEF, class DDF>
 auto make_single(Data d, DVF vf, DEF ef, DDF df) -> single<Data, DVF, DEF, DDF> {
   return {std::move(d), std::move(vf), std::move(ef), std::move(df)};
 }
@@ -358,28 +358,28 @@ template <class VF, class EF, class DF>
   requires Invocable<DF&>
 single(VF, EF, DF) -> single<VF, EF, DF>;
 
-template <Receiver<single_tag> Data>
+template <Receiver<is_single<>> Data>
 single(Data d) -> single<Data, passDVF, passDEF, passDDF>;
 
-template <Receiver<single_tag> Data, class DVF>
+template <Receiver<is_single<>> Data, class DVF>
 single(Data d, DVF vf) -> single<Data, DVF, passDEF, passDDF>;
 
-template <Receiver<single_tag> Data, class... DEFN>
+template <Receiver<is_single<>> Data, class... DEFN>
 single(Data d, on_error_fn<DEFN...>) ->
     single<Data, passDVF, on_error_fn<DEFN...>, passDDF>;
 
-template <Receiver<single_tag> Data, class DDF>
+template <Receiver<is_single<>> Data, class DDF>
   requires Invocable<DDF&, Data&>
 single(Data d, DDF) -> single<Data, passDVF, passDEF, DDF>;
 
-template <Receiver<single_tag> Data, class DVF, class DEF>
+template <Receiver<is_single<>> Data, class DVF, class DEF>
 single(Data d, DVF vf, DEF ef) -> single<Data, DVF, DEF, passDDF>;
 
-template <Receiver<single_tag> Data, class DEF, class DDF>
+template <Receiver<is_single<>> Data, class DEF, class DDF>
   requires Invocable<DDF&, Data&>
 single(Data d, DEF, DDF) -> single<Data, passDVF, DEF, DDF>;
 
-template <Receiver<single_tag> Data, class DVF, class DEF, class DDF>
+template <Receiver<is_single<>> Data, class DVF, class DEF, class DDF>
 single(Data d, DVF vf, DEF ef, DDF df) -> single<Data, DVF, DEF, DDF>;
 #endif
 
@@ -400,7 +400,7 @@ struct construct_deduced<single> {
 //   return single<V, E>{std::move(w)};
 // }
 
-template<class T, SenderTo<std::promise<T>, single_tag> Out>
+template<class T, SenderTo<std::promise<T>, is_single<>> Out>
 std::future<T> future_from(Out singleSender) {
   std::promise<T> p;
   auto result = p.get_future();
