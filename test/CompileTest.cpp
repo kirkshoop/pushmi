@@ -1,22 +1,8 @@
-#include <type_traits>
-
-#include <chrono>
-using namespace std::literals;
-
-#include "pushmi/flow_single_deferred.h"
-#include "pushmi/o/empty.h"
-#include "pushmi/o/just.h"
-#include "pushmi/o/on.h"
-#include "pushmi/o/transform.h"
-#include "pushmi/o/tap.h"
-#include "pushmi/o/via.h"
-#include "pushmi/o/submit.h"
-#include "pushmi/o/extension_operators.h"
-
-#include "pushmi/trampoline.h"
-#include "pushmi/new_thread.h"
+#include "pushmi.h"
 
 using namespace pushmi::aliases;
+
+using namespace std::literals;
 
 #if __cpp_deduction_guides >= 201703
 #define MAKE(x) x MAKE_
