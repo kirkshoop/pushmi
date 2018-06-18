@@ -25,6 +25,7 @@ set(header_files
     "${CMAKE_CURRENT_SOURCE_DIR}/external/meta/include/meta/meta.hpp"
 
     "${CMAKE_CURRENT_SOURCE_DIR}/include/pushmi/traits.h"
+    "${CMAKE_CURRENT_SOURCE_DIR}/include/pushmi/detail/concept_def.h"
     "${CMAKE_CURRENT_SOURCE_DIR}/include/pushmi/detail/functional.h"
     "${CMAKE_CURRENT_SOURCE_DIR}/include/pushmi/detail/if_constexpr.h"
     "${CMAKE_CURRENT_SOURCE_DIR}/include/pushmi/detail/opt.h"

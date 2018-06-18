@@ -3568,6 +3568,8 @@ namespace meta
 #define PUSHMI_INLINE_VAR
 #endif
 
+//#include "detail/concept_def.h"
+
 namespace pushmi {
 namespace detail {
   template <bool...>
@@ -3579,21 +3581,8 @@ template <bool...Bs>
 PUSHMI_INLINE_VAR constexpr bool all_true_v = (Bs &&...);
 #else
 template <bool...Bs>
-PUSHMI_INLINE_VAR constexpr bool all_true_v = std::is_same<detail::bools<Bs..., true>, detail::bools<true, Bs...>>::value;
-#endif
-
-#if __cpp_fold_expressions >= 201603
-template <int...Is>
-PUSHMI_INLINE_VAR constexpr bool sum_v = (Is +...);
-#else
-template <int...Is>
-struct sum;
-template <>
-struct sum<> : std::integral_constant<int, 0> {};
-template <int I, int...Is>
-struct sum<I, Is...> : std::integral_constant<int, I + sum<Is...>::value> {};
-template <int...Is>
-PUSHMI_INLINE_VAR constexpr bool sum_v = sum<Is...>::value;
+PUSHMI_INLINE_VAR constexpr bool all_true_v =
+  std::is_same<detail::bools<Bs..., true>, detail::bools<true, Bs...>>::value;
 #endif
 
 #if __cpp_fold_expressions >= 201603
@@ -3601,80 +3590,152 @@ template <bool...Bs>
 PUSHMI_INLINE_VAR constexpr bool any_true_v = (Bs ||...);
 #else
 template <bool...Bs>
-PUSHMI_INLINE_VAR constexpr bool any_true_v = sum_v<(int)Bs...> > 0;
+PUSHMI_INLINE_VAR constexpr bool any_true_v =
+  !std::is_same<detail::bools<Bs..., false>, detail::bools<false, Bs...>>::value;
 #endif
 
+#if __cpp_fold_expressions >= 201603
+template <int...Is>
+PUSHMI_INLINE_VAR constexpr int sum_v = (Is +...);
+#else
+template <std::size_t N>
+constexpr int sum_impl(int const (&rgi)[N], int i = 0, int state = 0) noexcept {
+  return i == N ? state : sum_impl(rgi, i+1, state + rgi[i]);
+}
+template <int... Is>
+constexpr int sum_impl() noexcept {
+  using RGI = int[sizeof...(Is)];
+  return sum_impl(RGI{Is...});
+}
+template <int...Is>
+PUSHMI_INLINE_VAR constexpr int sum_v = sum_impl<Is...>();
+#endif
 
 template <class T>
 using remove_cvref_t = std::remove_cv_t<std::remove_reference_t<T>>;
 
-template <class T, template <class> class C>
-concept bool Valid = requires { typename C<T>; };
+PUSHMI_CONCEPT_DEF(
+  template(class T, template<class> class C)
+  (concept Valid)(T, C),
+    requires () (
+      typename_<C<T>>
+    )
+);
 
-template <class T, template<class...> class Trait, class... Args>
-concept bool Satisfies = bool(Trait<T>::type::value);
+PUSHMI_CONCEPT_DEF(
+  template (class T, template<class...> class Trait, class... Args)
+  (concept Satisfies)(T, Trait, Args...),
+    bool(Trait<T>::type::value)
+);
 
-template <class T, class U>
-concept bool Same = __is_same_as(T, U) && __is_same_as(U, T);
+PUSHMI_CONCEPT_DEF(
+  template (class T, class U)
+  concept Same,
+    __is_same_as(T, U) && __is_same_as(U, T)
+);
 
-template <bool...Bs>
-concept bool And = all_true_v<Bs...>;
+PUSHMI_CONCEPT_DEF(
+  template (bool...Bs)
+  (concept And)(Bs...),
+    all_true_v<Bs...>
+);
 
-template <bool...Bs>
-concept bool Or = any_true_v<Bs...>;
+PUSHMI_CONCEPT_DEF(
+  template (bool...Bs)
+  (concept Or)(Bs...),
+    any_true_v<Bs...>
+);
 
-template <class T>
-concept bool Object = requires(T* p) {
-  *p;
-  { p } -> const volatile void*;
-};
+PUSHMI_CONCEPT_DEF(
+  template (class T)
+  concept Object,
+    requires (T* p) (
+      *p,
+      implicitly_convertible_to<const volatile void*>(p)
+    )
+);
 
-template <class T, class... Args>
-concept bool Constructible = __is_constructible(T, Args...);
+PUSHMI_CONCEPT_DEF(
+  template (class T, class... Args)
+  (concept Constructible)(T, Args...),
+    __is_constructible(T, Args...)
+);
 
-template <class T>
-concept bool MoveConstructible = Constructible<T, T>;
+PUSHMI_CONCEPT_DEF(
+  template (class T)
+  concept MoveConstructible,
+    Constructible<T, T>
+);
 
-template <class From, class To>
-concept bool ConvertibleTo =
-    std::is_convertible<From, To>::value && requires(From (&f)()) {
-  static_cast<To>(f());
-};
+PUSHMI_CONCEPT_DEF(
+  template (class From, class To)
+  concept ConvertibleTo,
+    requires (From (&f)()) (
+      static_cast<To>(f())
+    ) && std::is_convertible<From, To>::value
+);
 
-template <class A, class B>
-concept bool Derived = __is_base_of(B, A);
+PUSHMI_CONCEPT_DEF(
+  template (class A, class B)
+  concept Derived,
+    __is_base_of(B, A)
+);
 
-template <class A>
-concept bool Decayed = Same<A, std::decay_t<A>>;
+PUSHMI_CONCEPT_DEF(
+  template (class A)
+  concept Decayed,
+    Same<A, std::decay_t<A>>
+);
 
-template <class T, class U>
-concept bool Assignable = Same<T, T&>&& requires(T t, U&& u) {
-  { t = (U &&) u } -> Same<T>&&;
-};
+PUSHMI_CONCEPT_DEF(
+  template (class T, class U)
+  concept Assignable,
+    requires(T t, U&& u) (
+      t = (U &&) u,
+      requires_<Same<decltype(t = (U &&) u), T>>
+    ) && Same<T, T&>
+);
 
-template <class T>
-concept bool EqualityComparable = requires(remove_cvref_t<T> const & t) {
-  { t == t } -> bool;
-  { t != t } -> bool;
-};
+PUSHMI_CONCEPT_DEF(
+  template (class T)
+  concept EqualityComparable,
+    requires(remove_cvref_t<T> const & t) (
+      implicitly_convertible_to<bool>( t == t ),
+      implicitly_convertible_to<bool>( t != t )
+    )
+);
 
-template <class T>
-concept bool SemiMovable =
-    Object<T>&& Constructible<T, T>&& ConvertibleTo<T, T>;
+PUSHMI_CONCEPT_DEF(
+  template (class T)
+  concept SemiMovable,
+    Object<T> && Constructible<T, T> && ConvertibleTo<T, T>
+);
 
-template <class T>
-concept bool Movable = SemiMovable<T>&& Assignable<T&, T>;
+PUSHMI_CONCEPT_DEF(
+  template (class T)
+  concept Movable,
+    SemiMovable<T> && Assignable<T&, T>
+);
 
-template <class T>
-concept bool Copyable = Movable<T>&&
-  Assignable<T&, const T&> &&
-  ConvertibleTo<const T&, T>;
+PUSHMI_CONCEPT_DEF(
+  template (class T)
+  concept Copyable,
+    Movable<T> &&
+    Assignable<T&, const T&> &&
+    ConvertibleTo<const T&, T>
+);
 
-template <class T>
-concept bool Semiregular = Copyable<T>&& Constructible<T>;
+PUSHMI_CONCEPT_DEF(
+  template (class T)
+  concept Semiregular,
+    Copyable<T> && Constructible<T>
+);
 
-template <class T>
-concept bool Regular = Semiregular<T>&& EqualityComparable<T>;
+PUSHMI_CONCEPT_DEF(
+  template (class T)
+  concept Regular,
+    Semiregular<T> && EqualityComparable<T>
+);
 
 #if __cpp_lib_invoke >= 201411
 using std::invoke;
@@ -3687,8 +3748,9 @@ decltype(auto) invoke(F&& f, As&&...as)
     noexcept(noexcept(((F&&) f)((As&&) as...))) {
   return ((F&&) f)((As&&) as...);
 }
-template <Satisfies<std::is_member_pointer> F, class...As>
-  requires requires (F f, As&&...as) { std::mem_fn(f)((As&&) as...); }
+template <class F, class...As>
+  requires Satisfies<F, std::is_member_pointer> &&
+    requires (F f, As&&...as) { std::mem_fn(f)((As&&) as...); }
 decltype(auto) invoke(F f, As&&...as)
     noexcept(noexcept(std::mem_fn(f)((As&&) as...))) {
   return std::mem_fn(f)((As&&) as...);
@@ -3736,6 +3798,361 @@ struct Invocable {
 } // namespace mock
 
 } // namespace pushmi
+// clang-format off
+//#pragma once
+// Copyright (c) 2018-present, Facebook, Inc.
+//
+// This source code is licensed under the MIT license found in the
+// LICENSE file in the root directory of this source tree.
+
+// disable buggy compatibility warning about "requires" and "concept" being
+// C++20 keywords.
+#if defined(__clang__)
+#define PUSHMI_PP_IGNORE_CXX2A_COMPAT_BEGIN \
+    _Pragma("GCC diagnostic push") \
+    _Pragma("GCC diagnostic ignored \"-Wunknown-pragmas\"") \
+    _Pragma("GCC diagnostic ignored \"-Wpragmas\"") \
+    _Pragma("GCC diagnostic ignored \"-Wc++2a-compat\"") \
+    _Pragma("GCC diagnostic ignored \"-Wfloat-equal\"") \
+    /**/
+#define PUSHMI_PP_IGNORE_CXX2A_COMPAT_END \
+    _Pragma("GCC diagnostic pop")
+#else
+#define PUSHMI_PP_IGNORE_CXX2A_COMPAT_BEGIN
+#define PUSHMI_PP_IGNORE_CXX2A_COMPAT_END
+// #pragma GCC diagnostic push
+// #pragma GCC diagnostic ignored "-Wunknown-pragmas"
+// #pragma GCC diagnostic ignored "-Wpragmas"
+// #pragma GCC diagnostic ignored "-Wc++2a-compat"
+#endif
+
+PUSHMI_PP_IGNORE_CXX2A_COMPAT_BEGIN
+#define PUSHMI_INLINE_VAR
+
+
+#ifdef __clang__
+#define PUSHMI_PP_IS_SAME(A, B) __is_same(A, B)
+#elif defined(__GNUC__) && __GNUC__ >= 6
+#define PUSHMI_PP_IS_SAME(A, B) __is_same_as(A, B)
+#else
+#define PUSHMI_PP_IS_SAME(A, B) std::is_same<A, B>::value
+#endif
+
+#if __COUNTER__ != __COUNTER__
+#define PUSHMI_COUNTER __COUNTER__
+#else
+#define PUSHMI_COUNTER __LINE__
+#endif
+
+#define PUSHMI_PP_CHECK(...) PUSHMI_PP_CHECK_N(__VA_ARGS__, 0,)
+#define PUSHMI_PP_CHECK_N(x, n, ...) n
+#define PUSHMI_PP_PROBE(x) x, 1,
+
+// PUSHMI_CXX_VA_OPT
+#ifndef PUSHMI_CXX_VA_OPT
+#if __cplusplus > 201703L
+#define PUSHMI_CXX_VA_OPT_(...) PUSHMI_PP_CHECK(__VA_OPT__(,) 1)
+#define PUSHMI_CXX_VA_OPT PUSHMI_CXX_VA_OPT_(~)
+#else
+#define PUSHMI_CXX_VA_OPT 0
+#endif
+#endif // PUSHMI_CXX_VA_OPT
+
+#define PUSHMI_PP_CAT_(X, ...)  X ## __VA_ARGS__
+#define PUSHMI_PP_CAT(X, ...)   PUSHMI_PP_CAT_(X, __VA_ARGS__)
+#define PUSHMI_PP_CAT2_(X, ...) X ## __VA_ARGS__
+#define PUSHMI_PP_CAT2(X, ...)  PUSHMI_PP_CAT2_(X, __VA_ARGS__)
+
+#define PUSHMI_PP_EVAL(X, ...) X(__VA_ARGS__)
+#define PUSHMI_PP_EVAL2(X, ...) X(__VA_ARGS__)
+#define PUSHMI_PP_EVAL3(X, ...) X(__VA_ARGS__)
+#define PUSHMI_PP_EVAL4(X, ...) X(__VA_ARGS__)
+
+#define PUSHMI_PP_EXPAND(...) __VA_ARGS__
+#define PUSHMI_PP_EAT(...)
+
+#define PUSHMI_PP_IS_PAREN(x) PUSHMI_PP_CHECK(PUSHMI_PP_IS_PAREN_PROBE x)
+#define PUSHMI_PP_IS_PAREN_PROBE(...) PUSHMI_PP_PROBE(~)
+
+#define PUSHMI_PP_COUNT(...)                                                   \
+    PUSHMI_PP_COUNT_(__VA_ARGS__,                                              \
+        50,49,48,47,46,45,44,43,42,41,40,39,38,37,36,35,34,33,32,31,           \
+        30,29,28,27,26,25,24,23,22,21,20,19,18,17,16,15,14,13,12,11,           \
+        10,9,8,7,6,5,4,3,2,1,)                                                 \
+        /**/
+#define PUSHMI_PP_COUNT_(                                                      \
+    _1, _2, _3, _4, _5, _6, _7, _8, _9, _10,                                   \
+    _11, _12, _13, _14, _15, _16, _17, _18, _19, _20,                          \
+    _21, _22, _23, _24, _25, _26, _27, _28, _29, _30,                          \
+    _31, _32, _33, _34, _35, _36, _37, _38, _39, _40,                          \
+    _41, _42, _43, _44, _45, _46, _47, _48, _49, _50, N, ...)                  \
+    N                                                                          \
+    /**/
+
+#define PUSHMI_PP_IS_EQUAL(X,Y) \
+    PUSHMI_PP_CHECK(PUSHMI_PP_CAT(PUSHMI_PP_CAT(PUSHMI_PP_IS_EQUAL_, X), Y))
+#define PUSHMI_PP_IS_EQUAL_00 PUSHMI_PP_PROBE(~)
+#define PUSHMI_PP_IS_EQUAL_11 PUSHMI_PP_PROBE(~)
+#define PUSHMI_PP_IS_EQUAL_22 PUSHMI_PP_PROBE(~)
+#define PUSHMI_PP_IS_EQUAL_33 PUSHMI_PP_PROBE(~)
+#define PUSHMI_PP_IS_EQUAL_44 PUSHMI_PP_PROBE(~)
+#define PUSHMI_PP_IS_EQUAL_55 PUSHMI_PP_PROBE(~)
+#define PUSHMI_PP_IS_EQUAL_66 PUSHMI_PP_PROBE(~)
+#define PUSHMI_PP_IS_EQUAL_77 PUSHMI_PP_PROBE(~)
+#define PUSHMI_PP_IS_EQUAL_88 PUSHMI_PP_PROBE(~)
+#define PUSHMI_PP_IS_EQUAL_99 PUSHMI_PP_PROBE(~)
+#define PUSHMI_PP_IS_EQUAL_1010 PUSHMI_PP_PROBE(~)
+#define PUSHMI_PP_IS_EQUAL_1111 PUSHMI_PP_PROBE(~)
+#define PUSHMI_PP_IS_EQUAL_1212 PUSHMI_PP_PROBE(~)
+#define PUSHMI_PP_IS_EQUAL_1313 PUSHMI_PP_PROBE(~)
+#define PUSHMI_PP_IS_EQUAL_1414 PUSHMI_PP_PROBE(~)
+#define PUSHMI_PP_IS_EQUAL_1515 PUSHMI_PP_PROBE(~)
+#define PUSHMI_PP_IS_EQUAL_1616 PUSHMI_PP_PROBE(~)
+
+#define PUSHMI_PP_NOT(X) PUSHMI_PP_CAT(PUSHMI_PP_NOT_, X)
+#define PUSHMI_PP_NOT_0 1
+#define PUSHMI_PP_NOT_1 0
+
+#define PUSHMI_PP_IIF(BIT) PUSHMI_PP_CAT_(PUSHMI_PP_IIF_, BIT)
+#define PUSHMI_PP_IIF_0(TRUE, ...) __VA_ARGS__
+#define PUSHMI_PP_IIF_1(TRUE, ...) TRUE
+#define PUSHMI_PP_FIRST(X, ...) X
+#define PUSHMI_PP_SECOND(X, ...) __VA_ARGS__
+
+#define PUSHMI_PP_OR(X,Y) \
+    PUSHMI_PP_NOT(PUSHMI_PP_CHECK(PUSHMI_PP_CAT(                               \
+        PUSHMI_PP_CAT(PUSHMI_PP_NOR_, X), Y)))
+#define PUSHMI_PP_NOR_00 PUSHMI_PP_PROBE(~)
+
+#if PUSHMI_CXX_VA_OPT
+
+#define PUSHMI_PP_IS_EMPTY_NON_FUNCTION(...) \
+    PUSHMI_PP_CHECK(__VA_OPT__(, 0), 1)
+
+#else // RANGES_VA_OPT
+
+#define PUSHMI_PP_SPLIT(i, ...)                                                \
+    PUSHMI_PP_CAT_(PUSHMI_PP_SPLIT_, i)(__VA_ARGS__)                           \
+    /**/
+#define PUSHMI_PP_SPLIT_0(a, ...) a
+#define PUSHMI_PP_SPLIT_1(a, ...) __VA_ARGS__
+
+#define PUSHMI_PP_IS_VARIADIC(...)                                             \
+    PUSHMI_PP_SPLIT(                                                           \
+        0,                                                                     \
+        PUSHMI_PP_CAT(                                                         \
+            PUSHMI_PP_IS_VARIADIC_R_,                                          \
+            PUSHMI_PP_IS_VARIADIC_C __VA_ARGS__))                              \
+    /**/
+#define PUSHMI_PP_IS_VARIADIC_C(...) 1
+#define PUSHMI_PP_IS_VARIADIC_R_1 1,
+#define PUSHMI_PP_IS_VARIADIC_R_PUSHMI_PP_IS_VARIADIC_C 0,
+
+// emptiness detection macro...
+
+#define PUSHMI_PP_IS_EMPTY_NON_FUNCTION(...)                                   \
+    PUSHMI_PP_IIF(PUSHMI_PP_IS_VARIADIC(__VA_ARGS__))                          \
+    (0, PUSHMI_PP_IS_VARIADIC(PUSHMI_PP_IS_EMPTY_NON_FUNCTION_C __VA_ARGS__()))\
+    /**/
+#define PUSHMI_PP_IS_EMPTY_NON_FUNCTION_C() ()
+
+#endif // PUSHMI_PP_VA_OPT
+
+#define PUSHMI_PP_EMPTY()
+#define PUSHMI_PP_COMMA() ,
+#define PUSHMI_PP_COMMA_IIF(X)                                                 \
+    PUSHMI_PP_IIF(X)(PUSHMI_PP_EMPTY, PUSHMI_PP_COMMA)()
+
+#define PUSHMI_CONCEPT_ASSERT(...)                                             \
+    static_assert((bool) (__VA_ARGS__),                                        \
+        "Concept assertion failed : " #__VA_ARGS__)
+
+////////////////////////////////////////////////////////////////////////////////
+// PUSHMI_CONCEPT_DEF
+//   For defining concepts with a syntax symilar to C++20. For example:
+//
+//     PUSHMI_CONCEPT_DEF(
+//         // The Assignable concept from the C++20
+//         template(class T, class U)
+//         concept Assignable,
+//             requires (T t, U &&u) (
+//                 t = (U &&) u,
+//                 ::pushmi::concepts::requires_<Same<decltype(t = (U &&) u), T>>
+//             ) &&
+//             std::is_lvalue_reference<T>{}
+//     );
+#define PUSHMI_CONCEPT_DEF(DECL, ...)                                          \
+    PUSHMI_PP_EVAL(                                                            \
+        PUSHMI_PP_DECL_DEF,                                                    \
+        PUSHMI_PP_CAT(PUSHMI_PP_DEF_DECL_, DECL),                              \
+        __VA_ARGS__,                                                           \
+        PUSHMI_PP_EAT)                                                         \
+    /**/
+#define PUSHMI_PP_DECL_DEF_NAME(...) __VA_ARGS__,
+#define PUSHMI_PP_DECL_DEF(TPARAM, NAME, REQUIRES, ...)                        \
+    PUSHMI_PP_CAT(PUSHMI_PP_DECL_DEF_, PUSHMI_PP_IS_PAREN(NAME))(              \
+        TPARAM,                                                                \
+        NAME,                                                                  \
+        REQUIRES,                                                              \
+        __VA_ARGS__)                                                           \
+    /**/
+// The defn is of the form:
+//   template(class A, class B = void, class... Rest)
+//   (concept Name)(A, B, Rest...),
+//      // requirements...
+#define PUSHMI_PP_DECL_DEF_1(TPARAM, NAME, REQUIRES, ...)                      \
+    PUSHMI_PP_EVAL4(                                                           \
+        PUSHMI_PP_DECL_DEF_IMPL,                                               \
+        TPARAM,                                                                \
+        PUSHMI_PP_DECL_DEF_NAME NAME,                                          \
+        REQUIRES,                                                              \
+        __VA_ARGS__)                                                           \
+    /**/
+// The defn is of the form:
+//   template(class A, class B)
+//   concept Name,
+//      // requirements...
+// Compute the template arguments (A, B) from the template introducer.
+#define PUSHMI_PP_DECL_DEF_0(TPARAM, NAME, REQUIRES, ...)                      \
+    PUSHMI_PP_DECL_DEF_IMPL(                                                   \
+        TPARAM,                                                                \
+        NAME,                                                                  \
+        (PUSHMI_PP_CAT(PUSHMI_PP_AUX_, TPARAM)),                               \
+        REQUIRES,                                                              \
+        __VA_ARGS__)                                                           \
+    /**/
+// Expand the template definition into a struct and template alias like:
+//    struct NameConcept {
+//      template<class A, class B>
+//      static auto _concept_requires_(/* args (optional)*/) ->
+//          decltype(/*requirements...*/);
+//      template<class A, class B>
+//      static constexpr auto is_satisfied_by(int) ->
+//          decltype(bool(&_concept_requires_<A,B>)) { return true; }
+//      template<class A, class B>
+//      static constexpr bool is_satisfied_by(long) { return false; }
+//    };
+//    template<class A, class B>
+//    inline constexpr bool Name = NameConcept::is_satisfied_by<A, B>(0);
+#define PUSHMI_PP_DECL_DEF_IMPL(TPARAM, NAME, ARGS, REQUIRES, ...)             \
+    struct PUSHMI_PP_CAT(PUSHMI_PP_CAT(PUSHMI_PP_DEF_, NAME), Concept) {       \
+        using Concept =                                                        \
+            PUSHMI_PP_CAT(PUSHMI_PP_CAT(PUSHMI_PP_DEF_, NAME), Concept);       \
+        PUSHMI_PP_IGNORE_CXX2A_COMPAT_BEGIN                                    \
+        PUSHMI_PP_CAT(PUSHMI_PP_DEF_, TPARAM)                                  \
+        static auto _concept_requires_ PUSHMI_PP_EVAL2(                        \
+            PUSHMI_PP_DEF_WRAP,                                                \
+            PUSHMI_PP_CAT(PUSHMI_PP_DEF_, REQUIRES),                           \
+            REQUIRES,                                                          \
+            (__VA_ARGS__))(~) int>;                                            \
+        PUSHMI_PP_IGNORE_CXX2A_COMPAT_END                                      \
+        PUSHMI_PP_CAT(PUSHMI_PP_DEF_, TPARAM)                                  \
+        static constexpr decltype(::pushmi::concepts::detail                   \
+            ::gcc_bugs_bugs_bugs(&_concept_requires_<PUSHMI_PP_EXPAND ARGS>))  \
+        is_satisfied_by(int) noexcept { return true; }                         \
+        PUSHMI_PP_CAT(PUSHMI_PP_DEF_, TPARAM)                                  \
+        static constexpr bool is_satisfied_by(long) noexcept { return false; } \
+    };                                                                         \
+    PUSHMI_PP_CAT(PUSHMI_PP_DEF_, TPARAM)                                      \
+    PUSHMI_INLINE_VAR constexpr bool PUSHMI_PP_CAT(PUSHMI_PP_DEF_, NAME) =     \
+        PUSHMI_PP_CAT(PUSHMI_PP_CAT(PUSHMI_PP_DEF_, NAME), Concept)            \
+            ::is_satisfied_by<PUSHMI_PP_EXPAND ARGS>(0);                       \
+    /**/
+
+#define PUSHMI_PP_DEF_DECL_template(...)                                       \
+    template(__VA_ARGS__),                                                     \
+    /**/
+#define PUSHMI_PP_DEF_template(...)                                            \
+    template<__VA_ARGS__>                                                      \
+    /**/
+#define PUSHMI_PP_DEF_concept
+#define PUSHMI_PP_DEF_class
+#define PUSHMI_PP_DEF_typename
+#define PUSHMI_PP_DEF_int
+#define PUSHMI_PP_DEF_bool
+#define PUSHMI_PP_DEF_size_t
+#define PUSHMI_PP_DEF_unsigned
+#define PUSHMI_PP_DEF_requires ~,
+#define PUSHMI_PP_AUX_template(...)                                            \
+    PUSHMI_PP_CAT2(                                                            \
+        PUSHMI_PP_TPARAM_,                                                     \
+        PUSHMI_PP_COUNT(__VA_ARGS__))(__VA_ARGS__)                             \
+    /**/
+#define PUSHMI_PP_TPARAM_1(_1)                                                 \
+    PUSHMI_PP_CAT2(PUSHMI_PP_DEF_, _1)
+#define PUSHMI_PP_TPARAM_2(_1, ...)                                            \
+    PUSHMI_PP_CAT2(PUSHMI_PP_DEF_, _1), PUSHMI_PP_TPARAM_1(__VA_ARGS__)
+#define PUSHMI_PP_TPARAM_3(_1, ...)                                            \
+    PUSHMI_PP_CAT2(PUSHMI_PP_DEF_, _1), PUSHMI_PP_TPARAM_2(__VA_ARGS__)
+#define PUSHMI_PP_TPARAM_4(_1, ...)                                            \
+    PUSHMI_PP_CAT2(PUSHMI_PP_DEF_, _1), PUSHMI_PP_TPARAM_3(__VA_ARGS__)
+#define PUSHMI_PP_TPARAM_5(_1, ...)                                            \
+    PUSHMI_PP_CAT2(PUSHMI_PP_DEF_, _1), PUSHMI_PP_TPARAM_4(__VA_ARGS__)
+
+#define PUSHMI_PP_DEF_WRAP(X, Y, ...)                                          \
+    PUSHMI_PP_EVAL3(                                                           \
+        PUSHMI_PP_CAT(PUSHMI_PP_DEF_WRAP_, PUSHMI_PP_COUNT(__VA_ARGS__)),      \
+        X,                                                                     \
+        Y,                                                                     \
+        __VA_ARGS__)                                                           \
+    /**/
+
+// No requires expression:
+#define PUSHMI_PP_DEF_WRAP_1(_, HEAD, TAIL)                                    \
+    () -> std::enable_if_t<HEAD, PUSHMI_PP_EXPAND TAIL                         \
+    /**/
+// Requires expression:
+#define PUSHMI_PP_DEF_WRAP_2(_a, HEAD, _b, TAIL)                               \
+    PUSHMI_PP_CAT(PUSHMI_PP_DEF_REQUIRES_, PUSHMI_PP_IS_PAREN(HEAD)) HEAD,     \
+    PUSHMI_PP_EXPAND TAIL                                                      \
+    /**/
+// Requires expression without a requirement parameter list:
+#define PUSHMI_PP_DEF_REQUIRES_0                                               \
+    () -> decltype(::pushmi::concepts::detail::requires_                       \
+        PUSHMI_PP_DEF_REQUIRES_EXPRS                                           \
+    /**/
+// Requires expression with a requirement parameter list:
+#define PUSHMI_PP_DEF_REQUIRES_1(...)                                          \
+    (__VA_ARGS__) -> std::enable_if_t<::pushmi::concepts::detail::requires_    \
+        PUSHMI_PP_DEF_REQUIRES_EXPRS                                           \
+    /**/
+
+#define  PUSHMI_PP_DEF_REQUIRES_EXPRS(...) \
+    <decltype(__VA_ARGS__, void())>()\
+    /**/
+
+#define PUSHMI_TYPE_CONSTRAINT(X) class
+
+#define PUSHMI_TEMPLATE(...)                                                   \
+    template<__VA_ARGS__ PUSHMI_TEMPLATE_AUX_
+#define PUSHMI_TEMPLATE_AUX_(...) ,                                            \
+    int (*_pushmi_concept_unique_)[PUSHMI_COUNTER] = nullptr,                  \
+    std::enable_if_t<_pushmi_concept_unique_ ||                                \
+        bool(PUSHMI_PP_CAT(PUSHMI_TEMPLATE_AUX_3_, __VA_ARGS__)), int> = 0>
+#define PUSHMI_TEMPLATE_AUX_3_requires
+
+namespace pushmi {
+namespace concepts {
+namespace detail {
+template <class>
+inline constexpr bool requires_() {
+  return true;
+}
+template<typename T>
+bool gcc_bugs_bugs_bugs(T);
+}
+}
+template <class T>
+PUSHMI_INLINE_VAR constexpr bool typename_ = true;
+template <class T>
+constexpr bool implicitly_convertible_to(T) {
+  return true;
+}
+template <bool B>
+PUSHMI_INLINE_VAR constexpr std::enable_if_t<B, bool> requires_ = true;
+}
+
+PUSHMI_PP_IGNORE_CXX2A_COMPAT_END
 // clang-format off
 // clang format does not support the '<>' in the lambda syntax yet.. []<>()->{}
 //#pragma once
@@ -4124,25 +4541,25 @@ struct is_constrained;
 
 // implementation types
 
-template <SemiMovable... TN>
+template <PUSHMI_TYPE_CONSTRAINT(SemiMovable)... TN>
 class none;
 
-template <SemiMovable... TN>
+template <PUSHMI_TYPE_CONSTRAINT(SemiMovable)... TN>
 class deferred;
 
-template <SemiMovable... TN>
+template <PUSHMI_TYPE_CONSTRAINT(SemiMovable)... TN>
 class single;
 
-template <SemiMovable... TN>
+template <PUSHMI_TYPE_CONSTRAINT(SemiMovable)... TN>
 class single_deferred;
 
-template <SemiMovable... TN>
+template <PUSHMI_TYPE_CONSTRAINT(SemiMovable)... TN>
 class time_single_deferred;
 
-template <SemiMovable... TN>
+template <PUSHMI_TYPE_CONSTRAINT(SemiMovable)... TN>
 class flow_single;
 
-template <SemiMovable... TN>
+template <PUSHMI_TYPE_CONSTRAINT(SemiMovable)... TN>
 class flow_single_deferred;
 
 template<
@@ -4878,7 +5295,8 @@ concept bool TimeSender = Sender<D> &&
   Time<D> && 
   None<D> &&
   requires(D& d) {
-    { ::pushmi::now(d) } -> Regular
+    ::pushmi::now(d);
+    requires Regular<decltype(::pushmi::now(d))>;
   };
 
 template <class D, class S, class... PropertyN>
@@ -4908,7 +5326,8 @@ concept bool ConstrainedSender = Sender<D> &&
   Constrained<D> &&
   None<D> && 
   requires(D& d) {
-    { ::pushmi::top(d) } -> Regular
+    ::pushmi::top(d);
+    requires Regular<decltype(::pushmi::top(d))>;
   };
 
 template <class D, class S>
@@ -5101,7 +5520,7 @@ struct passDNF {
 
 // inspired by Ovrld - shown in a presentation by Nicolai Josuttis
 #if __cpp_variadic_using >= 201611
-template <SemiMovable... Fns>
+template <PUSHMI_TYPE_CONSTRAINT(SemiMovable)... Fns>
   requires sizeof...(Fns) > 0
 struct overload_fn : Fns... {
   constexpr overload_fn() = default;
@@ -5112,7 +5531,7 @@ struct overload_fn : Fns... {
   using Fns::operator()...;
 };
 #else
-template <SemiMovable... Fns>
+template <PUSHMI_TYPE_CONSTRAINT(SemiMovable)... Fns>
   requires sizeof...(Fns) > 0
 struct overload_fn;
 template <class Fn>
@@ -5984,6 +6403,7 @@ requires Invocable<DDF&, Data&> class single<Data, DVF, DEF, DDF> {
 template <>
 class single<>
     : public single<ignoreVF, abortEF, ignoreDF> {
+public:
   single() = default;
 };
 
@@ -6432,8 +6852,9 @@ class time_single_deferred<SF, NF> {
   auto now() {
     return nf_();
   }
-  template <Regular TP, Receiver<is_single<>> Out>
-    requires Invocable<SF&, TP, Out>
+  PUSHMI_TEMPLATE(class TP, class Out)
+    (requires Regular<TP> && Receiver<Out, is_single<>> &&
+      Invocable<SF&, TP, Out>)
   void submit(TP tp, Out out) {
     sf_(std::move(tp), std::move(out));
   }
@@ -6456,9 +6877,9 @@ class time_single_deferred<Data, DSF, DNF> {
   auto now() {
     return nf_(data_);
   }
-
-  template <class TP, Receiver<is_single<>> Out>
-    requires Invocable<DSF&, Data&, TP, Out>
+  PUSHMI_TEMPLATE(class TP, class Out)
+    (requires Regular<TP> && Receiver<Out, is_single<>> &&
+      Invocable<DSF&, Data&, TP, Out>)
   void submit(TP tp, Out out) {
     sf_(data_, std::move(tp), std::move(out));
   }
@@ -7674,19 +8095,17 @@ namespace pushmi {
 //
 
 struct __new_thread_submit {
-  template<Regular TP, Receiver Out>
-  void operator()(TP at, Out out) const;
+  PUSHMI_TEMPLATE(class TP, class Out)
+    (requires Regular<TP> && Receiver<Out>)
+  void operator()(TP at, Out out) const {
+    std::thread t{[at = std::move(at), out = std::move(out)]() mutable {
+      auto tr = trampoline();
+      ::pushmi::submit(tr, std::move(at), std::move(out));
+    }};
+    // pass ownership of thread to out
+    t.detach();
+  }
 };
-
-template<Regular TP, Receiver Out>
-void __new_thread_submit::operator()(TP at, Out out) const {
-  std::thread t{[at = std::move(at), out = std::move(out)]() mutable {
-    auto tr = trampoline();
-    ::pushmi::submit(tr, std::move(at), std::move(out));
-  }};
-  // pass ownership of thread to out
-  t.detach();
-}
 
 inline auto new_thread() {
   return make_time_single_deferred(__new_thread_submit{});
@@ -7804,7 +8223,8 @@ struct out_from_fn {
   }
 };
 
-template<Sender In, SemiMovable FN>
+PUSHMI_TEMPLATE(class In, class FN)
+  (requires Sender<In> && SemiMovable<FN>)
 auto submit_transform_out(FN fn){
   PUSHMI_IF_CONSTEXPR_RETURN( ((bool)TimeSender<In>) (
     return on_submit(
@@ -7825,7 +8245,8 @@ auto submit_transform_out(FN fn){
   ))
 }
 
-template<Sender In, SemiMovable SDSF, SemiMovable TSDSF>
+PUSHMI_TEMPLATE(class In, class SDSF, class TSDSF)
+  (requires Sender<In> && SemiMovable<SDSF> && SemiMovable<TSDSF>)
 auto submit_transform_out(SDSF sdsf, TSDSF tsdsf) {
   PUSHMI_IF_CONSTEXPR_RETURN( ((bool)TimeSender<In>) (
     return on_submit(
@@ -7917,7 +8338,8 @@ struct set_value_fn {
 };
 
 struct set_error_fn {
-  template<SemiMovable E>
+  PUSHMI_TEMPLATE(class E)
+    (requires SemiMovable<E>)
   auto operator()(E e) const {
     return constrain<mock::NoneReceiver<_1, E>>(
       [e = std::move(e)](auto out) mutable {
@@ -8015,7 +8437,8 @@ namespace pushmi {
 
 namespace operators {
 
-template <SemiMovable V>
+PUSHMI_TEMPLATE(class V)
+  (requires SemiMovable<V>)
 auto just(V v) {
   return make_single_deferred(
     constrain<mock::SingleReceiver<_1, V>>(
@@ -8293,7 +8716,7 @@ public:
 
 struct submit_at_fn {
 private:
-  template <Regular TP, class... AN>
+  template <class TP, class...AN>
   struct fn {
     TP at_;
     std::tuple<AN...> args_;
@@ -8305,7 +8728,8 @@ private:
     }
   };
 public:
-  template <Regular TP, class... AN>
+  PUSHMI_TEMPLATE(class TP, class...AN)
+    (requires Regular<TP>)
   auto operator()(TP at, AN... an) const {
     return submit_at_fn::fn<TP, AN...>{std::move(at), {(AN&&) an...}};
   }
@@ -8313,7 +8737,7 @@ public:
 
 struct submit_after_fn {
 private:
-  template <Regular D, class... AN>
+  template <class D, class... AN>
   struct fn {
     D after_;
     std::tuple<AN...> args_;
@@ -8329,7 +8753,8 @@ private:
     }
   };
 public:
-  template <Regular D, class... AN>
+  PUSHMI_TEMPLATE(class D, class...AN)
+    (requires Regular<D>)
   auto operator()(D after, AN... an) const {
     return submit_after_fn::fn<D, AN...>{std::move(after), {(AN&&) an...}};
   }

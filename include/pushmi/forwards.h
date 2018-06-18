@@ -47,25 +47,25 @@ struct is_constrained;
 
 // implementation types
 
-template <SemiMovable... TN>
+template <PUSHMI_TYPE_CONSTRAINT(SemiMovable)... TN>
 class none;
 
-template <SemiMovable... TN>
+template <PUSHMI_TYPE_CONSTRAINT(SemiMovable)... TN>
 class deferred;
 
-template <SemiMovable... TN>
+template <PUSHMI_TYPE_CONSTRAINT(SemiMovable)... TN>
 class single;
 
-template <SemiMovable... TN>
+template <PUSHMI_TYPE_CONSTRAINT(SemiMovable)... TN>
 class single_deferred;
 
-template <SemiMovable... TN>
+template <PUSHMI_TYPE_CONSTRAINT(SemiMovable)... TN>
 class time_single_deferred;
 
-template <SemiMovable... TN>
+template <PUSHMI_TYPE_CONSTRAINT(SemiMovable)... TN>
 class flow_single;
 
-template <SemiMovable... TN>
+template <PUSHMI_TYPE_CONSTRAINT(SemiMovable)... TN>
 class flow_single_deferred;
 
 template<

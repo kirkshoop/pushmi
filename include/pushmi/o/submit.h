@@ -60,7 +60,7 @@ public:
 
 struct submit_at_fn {
 private:
-  template <Regular TP, class... AN>
+  template <class TP, class...AN>
   struct fn {
     TP at_;
     std::tuple<AN...> args_;
@@ -72,7 +72,8 @@ private:
     }
   };
 public:
-  template <Regular TP, class... AN>
+  PUSHMI_TEMPLATE(class TP, class...AN)
+    (requires Regular<TP>)
   auto operator()(TP at, AN... an) const {
     return submit_at_fn::fn<TP, AN...>{std::move(at), {(AN&&) an...}};
   }
@@ -80,7 +81,7 @@ public:
 
 struct submit_after_fn {
 private:
-  template <Regular D, class... AN>
+  template <class D, class... AN>
   struct fn {
     D after_;
     std::tuple<AN...> args_;
@@ -96,7 +97,8 @@ private:
     }
   };
 public:
-  template <Regular D, class... AN>
+  PUSHMI_TEMPLATE(class D, class...AN)
+    (requires Regular<D>)
   auto operator()(D after, AN... an) const {
     return submit_after_fn::fn<D, AN...>{std::move(after), {(AN&&) an...}};
   }

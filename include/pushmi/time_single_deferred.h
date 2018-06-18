@@ -125,8 +125,9 @@ class time_single_deferred<SF, NF> {
   auto now() {
     return nf_();
   }
-  template <Regular TP, Receiver<is_single<>> Out>
-    requires Invocable<SF&, TP, Out>
+  PUSHMI_TEMPLATE(class TP, class Out)
+    (requires Regular<TP> && Receiver<Out, is_single<>> &&
+      Invocable<SF&, TP, Out>)
   void submit(TP tp, Out out) {
     sf_(std::move(tp), std::move(out));
   }
@@ -149,9 +150,9 @@ class time_single_deferred<Data, DSF, DNF> {
   auto now() {
     return nf_(data_);
   }
-
-  template <class TP, Receiver<is_single<>> Out>
-    requires Invocable<DSF&, Data&, TP, Out>
+  PUSHMI_TEMPLATE(class TP, class Out)
+    (requires Regular<TP> && Receiver<Out, is_single<>> &&
+      Invocable<DSF&, Data&, TP, Out>)
   void submit(TP tp, Out out) {
     sf_(data_, std::move(tp), std::move(out));
   }

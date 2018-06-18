@@ -72,7 +72,8 @@ struct out_from_fn {
   }
 };
 
-template<Sender In, SemiMovable FN>
+PUSHMI_TEMPLATE(class In, class FN)
+  (requires Sender<In> && SemiMovable<FN>)
 auto submit_transform_out(FN fn){
   PUSHMI_IF_CONSTEXPR_RETURN( ((bool)TimeSender<In>) (
     return on_submit(
@@ -93,7 +94,8 @@ auto submit_transform_out(FN fn){
   ))
 }
 
-template<Sender In, SemiMovable SDSF, SemiMovable TSDSF>
+PUSHMI_TEMPLATE(class In, class SDSF, class TSDSF)
+  (requires Sender<In> && SemiMovable<SDSF> && SemiMovable<TSDSF>)
 auto submit_transform_out(SDSF sdsf, TSDSF tsdsf) {
   PUSHMI_IF_CONSTEXPR_RETURN( ((bool)TimeSender<In>) (
     return on_submit(
@@ -185,7 +187,8 @@ struct set_value_fn {
 };
 
 struct set_error_fn {
-  template<SemiMovable E>
+  PUSHMI_TEMPLATE(class E)
+    (requires SemiMovable<E>)
   auto operator()(E e) const {
     return constrain<mock::NoneReceiver<_1, E>>(
       [e = std::move(e)](auto out) mutable {

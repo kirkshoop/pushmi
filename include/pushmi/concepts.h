@@ -277,7 +277,8 @@ concept bool TimeSender = Sender<D> &&
   Time<D> && 
   None<D> &&
   requires(D& d) {
-    { ::pushmi::now(d) } -> Regular
+    ::pushmi::now(d);
+    requires Regular<decltype(::pushmi::now(d))>;
   };
 
 template <class D, class S, class... PropertyN>
@@ -307,7 +308,8 @@ concept bool ConstrainedSender = Sender<D> &&
   Constrained<D> &&
   None<D> && 
   requires(D& d) {
-    { ::pushmi::top(d) } -> Regular
+    ::pushmi::top(d);
+    requires Regular<decltype(::pushmi::top(d))>;
   };
 
 template <class D, class S>

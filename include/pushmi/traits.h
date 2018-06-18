@@ -15,6 +15,8 @@
 #define PUSHMI_INLINE_VAR
 #endif
 
+#include "detail/concept_def.h"
+
 namespace pushmi {
 namespace detail {
   template <bool...>
@@ -26,21 +28,8 @@ template <bool...Bs>
 PUSHMI_INLINE_VAR constexpr bool all_true_v = (Bs &&...);
 #else
 template <bool...Bs>
-PUSHMI_INLINE_VAR constexpr bool all_true_v = std::is_same<detail::bools<Bs..., true>, detail::bools<true, Bs...>>::value;
-#endif
-
-#if __cpp_fold_expressions >= 201603
-template <int...Is>
-PUSHMI_INLINE_VAR constexpr bool sum_v = (Is +...);
-#else
-template <int...Is>
-struct sum;
-template <>
-struct sum<> : std::integral_constant<int, 0> {};
-template <int I, int...Is>
-struct sum<I, Is...> : std::integral_constant<int, I + sum<Is...>::value> {};
-template <int...Is>
-PUSHMI_INLINE_VAR constexpr bool sum_v = sum<Is...>::value;
+PUSHMI_INLINE_VAR constexpr bool all_true_v =
+  std::is_same<detail::bools<Bs..., true>, detail::bools<true, Bs...>>::value;
 #endif
 
 #if __cpp_fold_expressions >= 201603
@@ -48,80 +37,152 @@ template <bool...Bs>
 PUSHMI_INLINE_VAR constexpr bool any_true_v = (Bs ||...);
 #else
 template <bool...Bs>
-PUSHMI_INLINE_VAR constexpr bool any_true_v = sum_v<(int)Bs...> > 0;
+PUSHMI_INLINE_VAR constexpr bool any_true_v =
+  !std::is_same<detail::bools<Bs..., false>, detail::bools<false, Bs...>>::value;
 #endif
 
+#if __cpp_fold_expressions >= 201603
+template <int...Is>
+PUSHMI_INLINE_VAR constexpr int sum_v = (Is +...);
+#else
+template <std::size_t N>
+constexpr int sum_impl(int const (&rgi)[N], int i = 0, int state = 0) noexcept {
+  return i == N ? state : sum_impl(rgi, i+1, state + rgi[i]);
+}
+template <int... Is>
+constexpr int sum_impl() noexcept {
+  using RGI = int[sizeof...(Is)];
+  return sum_impl(RGI{Is...});
+}
+template <int...Is>
+PUSHMI_INLINE_VAR constexpr int sum_v = sum_impl<Is...>();
+#endif
 
 template <class T>
 using remove_cvref_t = std::remove_cv_t<std::remove_reference_t<T>>;
 
-template <class T, template <class> class C>
-concept bool Valid = requires { typename C<T>; };
+PUSHMI_CONCEPT_DEF(
+  template(class T, template<class> class C)
+  (concept Valid)(T, C),
+    requires () (
+      typename_<C<T>>
+    )
+);
 
-template <class T, template<class...> class Trait, class... Args>
-concept bool Satisfies = bool(Trait<T>::type::value);
+PUSHMI_CONCEPT_DEF(
+  template (class T, template<class...> class Trait, class... Args)
+  (concept Satisfies)(T, Trait, Args...),
+    bool(Trait<T>::type::value)
+);
 
-template <class T, class U>
-concept bool Same = __is_same_as(T, U) && __is_same_as(U, T);
+PUSHMI_CONCEPT_DEF(
+  template (class T, class U)
+  concept Same,
+    __is_same_as(T, U) && __is_same_as(U, T)
+);
 
-template <bool...Bs>
-concept bool And = all_true_v<Bs...>;
+PUSHMI_CONCEPT_DEF(
+  template (bool...Bs)
+  (concept And)(Bs...),
+    all_true_v<Bs...>
+);
 
-template <bool...Bs>
-concept bool Or = any_true_v<Bs...>;
+PUSHMI_CONCEPT_DEF(
+  template (bool...Bs)
+  (concept Or)(Bs...),
+    any_true_v<Bs...>
+);
 
-template <class T>
-concept bool Object = requires(T* p) {
-  *p;
-  { p } -> const volatile void*;
-};
+PUSHMI_CONCEPT_DEF(
+  template (class T)
+  concept Object,
+    requires (T* p) (
+      *p,
+      implicitly_convertible_to<const volatile void*>(p)
+    )
+);
 
-template <class T, class... Args>
-concept bool Constructible = __is_constructible(T, Args...);
+PUSHMI_CONCEPT_DEF(
+  template (class T, class... Args)
+  (concept Constructible)(T, Args...),
+    __is_constructible(T, Args...)
+);
 
-template <class T>
-concept bool MoveConstructible = Constructible<T, T>;
+PUSHMI_CONCEPT_DEF(
+  template (class T)
+  concept MoveConstructible,
+    Constructible<T, T>
+);
 
-template <class From, class To>
-concept bool ConvertibleTo =
-    std::is_convertible<From, To>::value && requires(From (&f)()) {
-  static_cast<To>(f());
-};
+PUSHMI_CONCEPT_DEF(
+  template (class From, class To)
+  concept ConvertibleTo,
+    requires (From (&f)()) (
+      static_cast<To>(f())
+    ) && std::is_convertible<From, To>::value
+);
 
-template <class A, class B>
-concept bool Derived = __is_base_of(B, A);
+PUSHMI_CONCEPT_DEF(
+  template (class A, class B)
+  concept Derived,
+    __is_base_of(B, A)
+);
 
-template <class A>
-concept bool Decayed = Same<A, std::decay_t<A>>;
+PUSHMI_CONCEPT_DEF(
+  template (class A)
+  concept Decayed,
+    Same<A, std::decay_t<A>>
+);
 
-template <class T, class U>
-concept bool Assignable = Same<T, T&>&& requires(T t, U&& u) {
-  { t = (U &&) u } -> Same<T>&&;
-};
+PUSHMI_CONCEPT_DEF(
+  template (class T, class U)
+  concept Assignable,
+    requires(T t, U&& u) (
+      t = (U &&) u,
+      requires_<Same<decltype(t = (U &&) u), T>>
+    ) && Same<T, T&>
+);
 
-template <class T>
-concept bool EqualityComparable = requires(remove_cvref_t<T> const & t) {
-  { t == t } -> bool;
-  { t != t } -> bool;
-};
+PUSHMI_CONCEPT_DEF(
+  template (class T)
+  concept EqualityComparable,
+    requires(remove_cvref_t<T> const & t) (
+      implicitly_convertible_to<bool>( t == t ),
+      implicitly_convertible_to<bool>( t != t )
+    )
+);
 
-template <class T>
-concept bool SemiMovable =
-    Object<T>&& Constructible<T, T>&& ConvertibleTo<T, T>;
+PUSHMI_CONCEPT_DEF(
+  template (class T)
+  concept SemiMovable,
+    Object<T> && Constructible<T, T> && ConvertibleTo<T, T>
+);
 
-template <class T>
-concept bool Movable = SemiMovable<T>&& Assignable<T&, T>;
+PUSHMI_CONCEPT_DEF(
+  template (class T)
+  concept Movable,
+    SemiMovable<T> && Assignable<T&, T>
+);
 
-template <class T>
-concept bool Copyable = Movable<T>&&
-  Assignable<T&, const T&> &&
-  ConvertibleTo<const T&, T>;
+PUSHMI_CONCEPT_DEF(
+  template (class T)
+  concept Copyable,
+    Movable<T> &&
+    Assignable<T&, const T&> &&
+    ConvertibleTo<const T&, T>
+);
 
-template <class T>
-concept bool Semiregular = Copyable<T>&& Constructible<T>;
+PUSHMI_CONCEPT_DEF(
+  template (class T)
+  concept Semiregular,
+    Copyable<T> && Constructible<T>
+);
 
-template <class T>
-concept bool Regular = Semiregular<T>&& EqualityComparable<T>;
+PUSHMI_CONCEPT_DEF(
+  template (class T)
+  concept Regular,
+    Semiregular<T> && EqualityComparable<T>
+);
 
 #if __cpp_lib_invoke >= 201411
 using std::invoke;
@@ -134,8 +195,9 @@ decltype(auto) invoke(F&& f, As&&...as)
     noexcept(noexcept(((F&&) f)((As&&) as...))) {
   return ((F&&) f)((As&&) as...);
 }
-template <Satisfies<std::is_member_pointer> F, class...As>
-  requires requires (F f, As&&...as) { std::mem_fn(f)((As&&) as...); }
+template <class F, class...As>
+  requires Satisfies<F, std::is_member_pointer> &&
+    requires (F f, As&&...as) { std::mem_fn(f)((As&&) as...); }
 decltype(auto) invoke(F f, As&&...as)
     noexcept(noexcept(std::mem_fn(f)((As&&) as...))) {
   return std::mem_fn(f)((As&&) as...);

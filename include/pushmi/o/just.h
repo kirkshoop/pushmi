@@ -12,7 +12,8 @@ namespace pushmi {
 
 namespace operators {
 
-template <SemiMovable V>
+PUSHMI_TEMPLATE(class V)
+  (requires SemiMovable<V>)
 auto just(V v) {
   return make_single_deferred(
     constrain<mock::SingleReceiver<_1, V>>(

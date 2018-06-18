@@ -265,6 +265,7 @@ requires Invocable<DDF&, Data&> class single<Data, DVF, DEF, DDF> {
 template <>
 class single<>
     : public single<ignoreVF, abortEF, ignoreDF> {
+public:
   single() = default;
 };
 
