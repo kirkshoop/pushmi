@@ -27,8 +27,12 @@
 #endif
 
 PUSHMI_PP_IGNORE_CXX2A_COMPAT_BEGIN
-#define PUSHMI_INLINE_VAR
 
+#if __cpp_inline_variables >= 201606
+#define PUSHMI_INLINE_VAR inline
+#else
+#define PUSHMI_INLINE_VAR
+#endif
 
 #ifdef __clang__
 #define PUSHMI_PP_IS_SAME(A, B) __is_same(A, B)

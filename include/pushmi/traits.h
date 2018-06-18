@@ -9,12 +9,6 @@
 
 #include <meta/meta.hpp>
 
-#if __cpp_inline_variables >= 201606
-#define PUSHMI_INLINE_VAR inline
-#else
-#define PUSHMI_INLINE_VAR
-#endif
-
 #include "detail/concept_def.h"
 
 namespace pushmi {
