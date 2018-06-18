@@ -6,6 +6,7 @@ project(pushmi-project CXX)
 FIND_PACKAGE (Threads)
 
 add_library(pushmi INTERFACE)
+
 target_include_directories(pushmi INTERFACE
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/external/networking-ts-impl/include>
@@ -19,6 +20,9 @@ target_compile_features(pushmi INTERFACE cxx_std_14)
 target_compile_options(pushmi INTERFACE
     #$<$<CXX_COMPILER_ID:GNU>:-std=c++2a>
     $<$<CXX_COMPILER_ID:GNU>:-fconcepts>)
+
+add_custom_target(buildSingleHeader COMMAND ${CMAKE_COMMAND} -P ${CMAKE_CURRENT_SOURCE_DIR}/buildSingleHeader.cmake WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
+add_dependencies(pushmi buildSingleHeader)
 
 install(
     DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/include/
