@@ -29,41 +29,48 @@ auto naive_executor_bulk_target(Executor e, Allocator a = Allocator{}) {
               std::atomic<decltype(init(input))>, // accumulation
               std::atomic<std::size_t>, // pending
               std::atomic<std::size_t> // exception count (protects assignment to first exception)
-            >>(allocState, std::exception_ptr{}, std::move(out), std::move(selector), std::move(func), init(std::move(input)), 0, 0);
-          for (decltype(sb) idx{sb}; idx != se; ++idx, ++std::get<5>(*shared_state)){
-              e | op::submit([shared_state, idx](auto ex){
+            >>(allocState, std::exception_ptr{}, std::move(out), std::move(selector), std::move(func), init(std::move(input)), 1, 0);
+          e | op::submit([e, sb, se, shared_state](auto ){
+            auto stepDone = [](auto shared_state){
+              // pending
+              if (--std::get<5>(*shared_state) == 0) {
+                // first exception
+                if (std::get<0>(*shared_state)) {
+                  mi::set_error(std::get<1>(*shared_state), std::get<0>(*shared_state));
+                  return;
+                }
                 try {
-                  auto old = std::get<4>(*shared_state).load();
-                  auto step = old;
-                  do {
-                    step = old;
-                    // func(accumulation, idx)
-                    std::get<3>(*shared_state)(step, idx);
-                  } while(!std::get<4>(*shared_state).compare_exchange_strong(old, step));
+                  // selector(accumulation)
+                  auto result = std::get<2>(*shared_state)(std::move(std::get<4>(*shared_state).load()));
+                  mi::set_value(std::get<1>(*shared_state), std::move(result));
                 } catch(...) {
-                  // exception count
-                  if (std::get<6>(*shared_state)++ == 0) {
-                    // store first exception
-                    std::get<0>(*shared_state) = std::current_exception();
-                  } // else eat the exception
+                  mi::set_error(std::get<1>(*shared_state), std::current_exception());
                 }
-                // pending
-                if (--std::get<5>(*shared_state) == 0) {
-                  // first exception
-                  if (std::get<0>(*shared_state)) {
-                    mi::set_error(std::get<1>(*shared_state), std::get<0>(*shared_state));
-                    return;
-                  }
+              }
+            };
+            for (decltype(sb) idx{sb}; idx != se; ++idx, ++std::get<5>(*shared_state)){
+                e | op::submit([shared_state, idx, stepDone](auto ex){
                   try {
-                    // selector(accumulation)
-                    auto result = std::get<2>(*shared_state)(std::move(std::get<4>(*shared_state).load()));
-                    mi::set_value(std::get<1>(*shared_state), std::move(result));
+                    // this indicates to me that bulk is not the right abstraction
+                    auto old = std::get<4>(*shared_state).load();
+                    auto step = old;
+                    do {
+                      step = old;
+                      // func(accumulation, idx)
+                      std::get<3>(*shared_state)(step, idx);
+                    } while(!std::get<4>(*shared_state).compare_exchange_strong(old, step));
                   } catch(...) {
-                    mi::set_error(std::get<1>(*shared_state), std::current_exception());
+                    // exception count
+                    if (std::get<6>(*shared_state)++ == 0) {
+                      // store first exception
+                      std::get<0>(*shared_state) = std::current_exception();
+                    } // else eat the exception
                   }
-                }
-              });
-          }
+                  stepDone(shared_state);
+                });
+            }
+            stepDone(shared_state);
+          });
         } catch(...) {
           e | op::submit([out = std::move(out), ep = std::current_exception()]() mutable {
             mi::set_error(out, ep);
