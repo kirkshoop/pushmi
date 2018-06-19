@@ -3,7 +3,7 @@
 #include <cassert>
 #include <iostream>
 
-#include <for_each.h>
+#include <reduce.h>
 
 using namespace pushmi::aliases;
 
@@ -32,12 +32,11 @@ auto inline_bulk_target() {
 int main()
 {
   std::vector<int> vec(10);
+  std::fill(vec.begin(), vec.end(), 4);
 
-  mi::for_each(inline_bulk_target(), vec.begin(), vec.end(), [](int& x){
-    x = 42;
-  });
+  auto fortyTwo = mi::reduce(inline_bulk_target(), vec.begin(), vec.end(), 2, std::plus<>{});
 
-  assert(std::count(vec.begin(), vec.end(), 42) == static_cast<int>(vec.size()));
+  assert((2 + std::accumulate(vec.begin(), vec.end())) == fortyTwo);
 
   std::cout << "OK" << std::endl;
 }

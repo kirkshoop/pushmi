@@ -27,7 +27,7 @@ struct __pool_submit {
 template<class Executor>
 template<Regular TP, Receiver Out>
 void __pool_submit<Executor>::operator()(TP at, Out out) const {
-  e.execute([at = std::move(at), out = std::move(out)]() mutable {
+  e.execute([e = this->e, at = std::move(at), out = std::move(out)]() mutable {
     auto tr = trampoline();
     ::pushmi::submit(tr, std::move(at), std::move(out));
   });
@@ -48,4 +48,4 @@ public:
   inline void wait() {p.wait();}
 };
 
-}
+} // namespace pushmi

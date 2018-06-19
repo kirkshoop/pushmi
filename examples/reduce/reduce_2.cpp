@@ -3,7 +3,8 @@
 #include <cassert>
 #include <iostream>
 
-#include <for_each.h>
+#include <pool.h>
+#include <reduce.h>
 
 using namespace pushmi::aliases;
 
@@ -76,12 +77,11 @@ int main()
   mi::pool p{std::max(1u,std::thread::hardware_concurrency())};
 
   std::vector<int> vec(10);
+  std::fill(vec.begin(), vec.end(), 4);
 
-  mi::for_each(naive_executor_bulk_target(p.executor()), vec.begin(), vec.end(), [](int& x){
-    x = 42;
-  });
+  auto fortyTwo = mi::reduce(naive_executor_bulk_target(p.executor()), vec.begin(), vec.end(), 2, std::plus<>{});
 
-  assert(std::count(vec.begin(), vec.end(), 42) == static_cast<int>(vec.size()));
+  assert((2 + std::accumulate(vec.begin(), vec.end())) == fortyTwo);
 
   std::cout << "OK" << std::endl;
 

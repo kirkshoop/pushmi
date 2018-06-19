@@ -12,17 +12,21 @@
 namespace pushmi {
 
 template<class ExecutionPolicy, class RandomAccessIterator, class Function>
-void for_each(ExecutionPolicy&& policy, RandomAccessIterator first, RandomAccessIterator last, Function f)
+void for_each(
+  ExecutionPolicy&& policy, 
+  RandomAccessIterator begin, 
+  RandomAccessIterator end, 
+  Function f)
 {
-  auto n = last - first;
-
-  future_from<int>(operators::just(std::make_tuple(first, f)) | 
+  operators::just(0) | 
     operators::bulk(
-      [](auto& acc, auto idx){ return std::get<1>(acc)(std::get<0>(acc)[idx]); }, 
-      n, 
+      [f](auto& acc, auto cursor){ f(*cursor); }, 
+      begin,
+      end, 
       policy, 
       [](auto&& args){ return args; }, 
-      [](auto&& acc){ return 0; })).wait();
+      [](auto&& acc){ return 0; }) |
+    operators::blocking_submit();
 }
 
 } // namespace pushmi

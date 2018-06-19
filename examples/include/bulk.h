@@ -18,18 +18,19 @@ namespace pushmi {
 
 namespace operators {
 
-template<class F, class Shape, class Target, class IF, class RS>
+template<class F, class ShapeBegin, class ShapeEnd, class Target, class IF, class RS>
 auto bulk(
     F&& func,
-    Shape s,
+    ShapeBegin sb,
+    ShapeEnd se,
     Target&& driver,
     IF&& initFunc,
     RS&& selector) {
-      return [func, s, driver, initFunc, selector](auto in){
-          return MAKE(single_deferred)([in, func, s, driver, initFunc, selector](auto out) mutable {
+      return [func, sb, se, driver, initFunc, selector](auto in){
+          return MAKE(single_deferred)([in, func, sb, se, driver, initFunc, selector](auto out) mutable {
               submit(in, MAKE(single)(std::move(out),
-                  [func, s, driver, initFunc, selector](auto& out, auto input){
-                      driver(initFunc, selector, std::move(input), func, s, std::move(out));
+                  [func, sb, se, driver, initFunc, selector](auto& out, auto input){
+                      driver(initFunc, selector, std::move(input), func, sb, se, std::move(out));
                   }
               ));
           });

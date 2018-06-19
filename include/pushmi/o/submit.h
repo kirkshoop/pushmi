@@ -7,7 +7,7 @@
 // LICENSE file in the root directory of this source tree.
 
 #include <functional>
-#include "../single.h"
+#include "../time_single_deferred.h"
 #include "../boosters.h"
 #include "extension_operators.h"
 #include "../trampoline.h"
