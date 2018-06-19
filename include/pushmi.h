@@ -4570,6 +4570,7 @@ namespace operators {}
 namespace extension_operators {}
 namespace aliases {
     namespace v = ::pushmi;
+    namespace mi = ::pushmi;
     namespace op = ::pushmi::operators;
     namespace ep = ::pushmi::extension_operators;
 }
@@ -8429,7 +8430,7 @@ PUSHMI_INLINE_VAR constexpr detail::now_fn top{};
 // This source code is licensed under the MIT license found in the
 // LICENSE file in the root directory of this source tree.
 
-//#include "../single.h"
+//#include "../single_deferred.h"
 
 namespace pushmi {
 
@@ -8661,7 +8662,7 @@ auto on(ExecutorFactory factory) {
 // LICENSE file in the root directory of this source tree.
 
 //#include <functional>
-//#include "../single.h"
+//#include "../time_single_deferred.h"
 //#include "../boosters.h"
 //#include "extension_operators.h"
 //#include "../trampoline.h"

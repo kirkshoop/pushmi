@@ -78,6 +78,7 @@ namespace operators {}
 namespace extension_operators {}
 namespace aliases {
     namespace v = ::pushmi;
+    namespace mi = ::pushmi;
     namespace op = ::pushmi::operators;
     namespace ep = ::pushmi::extension_operators;
 }
