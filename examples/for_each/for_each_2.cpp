@@ -3,6 +3,7 @@
 #include <cassert>
 #include <iostream>
 
+#include <pool.h>
 #include <for_each.h>
 
 using namespace pushmi::aliases;

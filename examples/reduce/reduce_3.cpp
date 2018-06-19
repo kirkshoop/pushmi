@@ -1,7 +1,8 @@
 #include <vector>
-#include <algorithm>
+#include <numeric>
 #include <cassert>
 #include <iostream>
+#include <exception>
 
 #include <reduce.h>
 
@@ -36,7 +37,7 @@ int main()
 
   auto fortyTwo = mi::reduce(inline_bulk_target(), vec.begin(), vec.end(), 2, std::plus<>{});
 
-  assert((2 + std::accumulate(vec.begin(), vec.end())) == fortyTwo);
+  assert(std::accumulate(vec.begin(), vec.end(), 2) == fortyTwo);
 
   std::cout << "OK" << std::endl;
 }

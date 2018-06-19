@@ -20,18 +20,15 @@ struct __pool_submit {
   using e_t = Executor;
   e_t e;
   explicit __pool_submit(e_t e) : e(std::move(e)) {}
-  template<Regular TP, Receiver Out>
-  void operator()(TP at, Out out) const;
+  PUSHMI_TEMPLATE(class TP, class Out)
+    (requires Regular<TP> && Receiver<Out>)
+  void operator()(TP at, Out out) const {
+    e.execute([e = this->e, at = std::move(at), out = std::move(out)]() mutable {
+      auto tr = trampoline();
+      ::pushmi::submit(tr, std::move(at), std::move(out));
+    });
+  }
 };
-
-template<class Executor>
-template<Regular TP, Receiver Out>
-void __pool_submit<Executor>::operator()(TP at, Out out) const {
-  e.execute([e = this->e, at = std::move(at), out = std::move(out)]() mutable {
-    auto tr = trampoline();
-    ::pushmi::submit(tr, std::move(at), std::move(out));
-  });
-}
 
 class pool {
   static_thread_pool p;
