@@ -4330,6 +4330,13 @@ constexpr bool is_v = is_<T, C>::value;
 template <bool B, class T = void>
 using requires_ = std::enable_if_t<B, T>;
 
+PUSHMI_INLINE_VAR constexpr struct as_const_fn {
+  template <class T>
+  constexpr const T& operator()(T& t) const noexcept {
+    return t;
+  }
+} const as_const {};
+
 } // namespace detail
 
 } // namespace pushmi
@@ -4994,39 +5001,6 @@ using properties_t = __properties_t<property_set_traits<T>>;
 template<class T>
 concept bool Properties = Valid<T, properties_t>;
 
-// insert
-// insert will replace the property in the left set with the property in the 
-// right set that matches on the category-type and add the properties from the 
-// right set that do not match on the category-type of any of the properties
-// in the left set.
-
-template<class PropertySet0, class... PropertySetN>
-struct property_set_insert;
-
-template<class... Properties0, class Property0, class... PropertyN>
-  requires Property<Property0>
-struct property_set_insert<property_set<Properties0...>, Property0, PropertyN...> {
-  using type = typename property_set_insert<property_set<Properties0..., Properties0...>, PropertyN...>::type;
-};
-
-template<class... Properties0, class... Properties1, class... PropertySetN>
-struct property_set_insert<property_set<Properties0...>, property_set<Properties1...>, PropertySetN...> {
-  using type = typename property_set_insert<property_set<Properties0..., Properties1...>, PropertySetN...>::type;
-};
-
-template<class... Properties0, class Property, class... PropertySetN>
-struct property_set_insert<property_set<Properties0...>, Property, PropertySetN...> {
-  using type = typename property_set_insert<property_set<Properties0..., Property>, PropertySetN...>::type;
-};
-
-template<class... Properties0>
-struct property_set_insert<property_set<Properties0...>> {
-  using type = property_set<Properties0...>;
-};
-
-template<class PS0, class PS1>
-using property_insert_t = typename property_set_insert<PS0, PS1>::type;
-
 // find property in the specified set that matches the category of the property specified.
 
 template<class... TN>
@@ -5052,6 +5026,87 @@ struct property_from_category<P, Category, Expected> {};
 template<class PS, class C>
 using property_from_category_t = typename property_from_category<PS, C>::type;
 
+// remove property in the specified set that matches the category of the property specified.
+
+template<class... TN>
+struct remove_property_from_category;
+
+template<class PS, class P>
+  requires Properties<PS> && Property<P>
+struct remove_property_from_category<PS, P> : remove_property_from_category<properties_t<PS>, property_category_t<P>> {};
+
+template<class P0, class... PN, class Category>
+  requires Property<P0> && And<Property<PN>...> && !Property<Category>
+struct remove_property_from_category<property_set<P0, PN...>, Category> {
+  using type = typename remove_property_from_category<property_set<>, Category, P0, PN...>::type;
+};
+
+template<class Category>
+  requires !Property<Category>
+struct remove_property_from_category<property_set<>, Category> {
+  using type = property_set<>;
+};
+
+template<class... PN, class Category, class R0, class... RN>
+  requires And<Property<PN>...> && !Property<Category> && !Same<property_category_t<R0>, Category>
+struct remove_property_from_category<property_set<PN...>, Category, R0, RN...> {
+  using type = typename remove_property_from_category<property_set<PN..., R0>, Category, RN...>::type;
+};
+
+template<class... PN, class Category, class R0, class... RN>
+  requires And<Property<PN>...> && !Property<Category> && Same<property_category_t<R0>, Category>
+struct remove_property_from_category<property_set<PN...>, Category, R0, RN...> {
+  using type = typename remove_property_from_category<property_set<PN...>, Category, RN...>::type;
+};
+
+template<class... PN, class Category, class R0>
+  requires And<Property<PN>...> && !Property<Category> && !Same<property_category_t<R0>, Category>
+struct remove_property_from_category<property_set<PN...>, Category, R0> {
+  using type = property_set<PN..., R0>;
+};
+
+template<class... PN, class Category, class R0>
+  requires And<Property<PN>...> && !Property<Category> && Same<property_category_t<R0>, Category>
+struct remove_property_from_category<property_set<PN...>, Category, R0> {
+  using type = property_set<PN...>;
+};
+
+template<class PS, class C>
+using remove_property_from_category_t = typename remove_property_from_category<PS, C>::type;
+
+// insert
+// insert will replace the property in the left set with the property in the 
+// right set that matches on the category-type and add the properties from the 
+// right set that do not match on the category-type of any of the properties
+// in the left set.
+
+template<class PropertySet0, class... PropertySetN>
+struct property_set_insert;
+
+template<class... Properties0, class Property0, class... PropertyN>
+  requires Property<Property0> && And<!Same<property_category_t<Properties0>, property_category_t<Property0>>...>
+struct property_set_insert<property_set<Properties0...>, Property0, PropertyN...> {
+  using type = typename property_set_insert<property_set<Properties0..., Property0>, PropertyN...>::type;
+};
+
+template<class... Properties0, class Property0, class... PropertyN>
+  requires Property<Property0> && Or<Same<property_category_t<Properties0>, property_category_t<Property0>>...>
+struct property_set_insert<property_set<Properties0...>, Property0, PropertyN...> {
+  using type = typename property_set_insert<remove_property_from_category_t<property_set<Properties0...>, property_category_t<Property0>>, Property0, PropertyN...>::type;
+};
+
+template<class... Properties0, class... Properties1, class... PropertySetN>
+struct property_set_insert<property_set<Properties0...>, property_set<Properties1...>, PropertySetN...> {
+  using type = typename property_set_insert<property_set<Properties0...>, Properties1..., PropertySetN...>::type;
+};
+
+template<class... Properties0>
+struct property_set_insert<property_set<Properties0...>> {
+  using type = property_set<Properties0...>;
+};
+
+template<class PS0, class PS1>
+using property_insert_t = typename property_set_insert<PS0, PS1>::type;
 
 // query for properties on types with properties.
 

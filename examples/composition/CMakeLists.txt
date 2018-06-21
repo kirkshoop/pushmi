@@ -6,3 +6,9 @@ target_link_libraries(composition_2
   examples
   Threads::Threads)
   
+add_executable(composition_3 composition_3.cpp)
+  target_link_libraries(composition_3
+    pushmi
+    examples
+    Threads::Threads)
+  

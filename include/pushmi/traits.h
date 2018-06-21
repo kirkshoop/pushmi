@@ -233,6 +233,13 @@ constexpr bool is_v = is_<T, C>::value;
 template <bool B, class T = void>
 using requires_ = std::enable_if_t<B, T>;
 
+PUSHMI_INLINE_VAR constexpr struct as_const_fn {
+  template <class T>
+  constexpr const T& operator()(T& t) const noexcept {
+    return t;
+  }
+} const as_const {};
+
 } // namespace detail
 
 } // namespace pushmi

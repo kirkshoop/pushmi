@@ -4,7 +4,6 @@
 #include <iostream>
 
 #include <pool.h>
-#include <for_each.h>
 
 #include <pushmi/o/transform.h>
 #include <pushmi/o/via.h>
