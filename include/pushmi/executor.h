@@ -32,8 +32,9 @@ public:
   any_time_executor_ref_base() = delete;
   any_time_executor_ref_base(const any_time_executor_ref_base&) = default;
 
-  template <class Wrapped, TimeSender<is_single<>> W = wrapped_t<Wrapped>>
-    // requires TimeSenderTo<W, single<Other, E>>
+  PUSHMI_TEMPLATE (class Wrapped)
+    (requires TimeSender<wrapped_t<Wrapped>, is_single<>>)
+    // (requires TimeSenderTo<wrapped_t<Wrapped>, single<Other, E>>)
   any_time_executor_ref_base(Wrapped& w) {
     // This can't be a requirement because it asks if submit(w, now(w), single<T,E>)
     // is well-formed (where T is an alias for any_time_executor_ref). If w
@@ -41,7 +42,7 @@ public:
     // will ask whether value(single<T,E>, T'&) is well-formed. And *that* will
     // ask whether T'& is convertible to T. That brings us right back to this
     // constructor. Constraint recursion!
-    static_assert(TimeSenderTo<W, single<Other, E>>);
+    static_assert(TimeSenderTo<Wrapped, single<Other, E>>);
     struct s {
       static TP now(void* pobj) {
         return ::pushmi::now(*static_cast<Wrapped*>(pobj));

@@ -45,8 +45,9 @@ public:
     that.vptr_->op_(that.data_, &data_);
     std::swap(that.vptr_, vptr_);
   }
-  template <class Wrapped>
-    requires FlowSingleReceiver<wrapped_t<Wrapped>, any_none<PE>, V, PE, E>
+  PUSHMI_TEMPLATE(class Wrapped)
+    (requires FlowSingleReceiver<wrapped_t<Wrapped>, any_none<PE>, V, PE, E>
+      PUSHMI_BROKEN_SUBSUMPTION(&& !insitu<Wrapped>()))
   explicit flow_single(Wrapped obj) : flow_single() {
     struct s {
       static void op(data& src, data* dst) {
@@ -74,8 +75,9 @@ public:
     data_.pobj_ = new Wrapped(std::move(obj));
     vptr_ = &vtbl;
   }
-  template <class Wrapped>
-    requires FlowSingleReceiver<wrapped_t<Wrapped>, any_none<PE>, V, PE, E> && insitu<Wrapped>()
+  PUSHMI_TEMPLATE(class Wrapped)
+    (requires FlowSingleReceiver<wrapped_t<Wrapped>, any_none<PE>, V, PE, E>
+      && insitu<Wrapped>())
   explicit flow_single(Wrapped obj) noexcept : flow_single() {
     struct s {
       static void op(data& src, data* dst) {

@@ -40,8 +40,9 @@ public:
     that.vptr_->op_(that.data_, &data_);
     std::swap(that.vptr_, vptr_);
   }
-  template <class Wrapped>
-    requires NoneReceiver<wrapped_t<Wrapped>, E>
+  PUSHMI_TEMPLATE(class Wrapped)
+    (requires NoneReceiver<wrapped_t<Wrapped>, E>
+      PUSHMI_BROKEN_SUBSUMPTION(&& !insitu<Wrapped>()))
   explicit none(Wrapped obj) : none() {
     struct s {
       static void op(data& src, data* dst) {
@@ -60,8 +61,8 @@ public:
     data_.pobj_ = new Wrapped(std::move(obj));
     vptr_ = &vtable_v;
   }
-  template <class Wrapped>
-    requires NoneReceiver<wrapped_t<Wrapped>, E> && insitu<Wrapped>()
+  PUSHMI_TEMPLATE(class Wrapped)
+    (requires NoneReceiver<wrapped_t<Wrapped>, E> && insitu<Wrapped>())
   explicit none(Wrapped obj) noexcept : none() {
     struct s {
       static void op(data& src, data* dst) {
@@ -291,7 +292,8 @@ struct construct_deduced<none> {
 //   return none<E>{std::move(w)};
 // }
 
-template <SenderTo<std::promise<void>, is_none<>> Out>
+PUSHMI_TEMPLATE (class Out)
+  (requires SenderTo<Out, std::promise<void>, is_none<>>)
 std::future<void> future_from(Out out) {
   std::promise<void> p;
   auto result = p.get_future();

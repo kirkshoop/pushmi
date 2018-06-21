@@ -32,25 +32,26 @@ struct property_traits<T> {
 template <class T>
 using property_category_t = __property_category_t<property_traits<T>>;
 
-template<class T>
-concept bool Property = Valid<T, property_category_t>;
-
+PUSHMI_CONCEPT_DEF(
+  template (class T)
+  concept Property,
+    Valid<T, property_category_t>
+);
 
 // in cases where Set contains T, allow T to find itself only once
-template<class T, class... Set>
-concept bool FoundExactlyOnce = 
-  requires(T&, Set&...) {
-    sum_v<(std::is_same<T, Set>::value ? 1 : 0)...> == 1;
-  };
+PUSHMI_CONCEPT_DEF(
+  template (class T, class... Set)
+  (concept FoundExactlyOnce)(T, Set...),
+    sum_v<(std::is_same<T, Set>::value ? 1 : 0)...> == 1
+);
 
-template<class... PropertyN>
-concept bool UniqueCategory = 
-  And<Property<PropertyN>...> &&
-  requires(PropertyN&...) {
-    all_true_v<FoundExactlyOnce<property_category_t<PropertyN>, property_category_t<PropertyN>...>...>;
-  };
-
-
+PUSHMI_CONCEPT_DEF(
+  template (class... PropertyN)
+  (concept UniqueCategory)(PropertyN...),
+    all_true_v<FoundExactlyOnce<property_category_t<PropertyN>,
+                                property_category_t<PropertyN>...>...> &&
+    And<Property<PropertyN>...>
+);
 
 template<class... PropertyN>
 struct property_set {
@@ -59,9 +60,11 @@ struct property_set {
 };
 
 
-
-template<class T>
-concept bool PropertySet = detail::is_v<T, property_set>;
+PUSHMI_CONCEPT_DEF(
+  template (class T)
+  concept PropertySet,
+    detail::is_v<T, property_set>
+);
 
 // customization point for a type with properties
 
@@ -85,8 +88,11 @@ template <class T>
   requires PropertySet<__properties_t<property_set_traits<T>>>
 using properties_t = __properties_t<property_set_traits<T>>;
 
-template<class T>
-concept bool Properties = Valid<T, properties_t>;
+PUSHMI_CONCEPT_DEF(
+  template (class T)
+  concept Properties,
+    Valid<T, properties_t>
+);
 
 // find property in the specified set that matches the category of the property specified.
 

@@ -40,8 +40,9 @@ class deferred<detail::erase_deferred_t, E> {
     that.vptr_->op_(that.data_, &data_);
     std::swap(that.vptr_, vptr_);
   }
-  template <class Wrapped>
-    requires SenderTo<wrapped_t<Wrapped>, any_none<E>, is_none<>>
+  PUSHMI_TEMPLATE(class Wrapped)
+    (requires SenderTo<wrapped_t<Wrapped>, any_none<E>, is_none<>>
+      PUSHMI_BROKEN_SUBSUMPTION(&& !insitu<Wrapped>()))
   explicit deferred(Wrapped obj) : deferred() {
     struct s {
       static void op(data& src, data* dst) {
@@ -57,8 +58,9 @@ class deferred<detail::erase_deferred_t, E> {
     data_.pobj_ = new Wrapped(std::move(obj));
     vptr_ = &vtbl;
   }
-  template <class Wrapped>
-    requires SenderTo<wrapped_t<Wrapped>, any_none<E>, is_none<>> && insitu<Wrapped>()
+  PUSHMI_TEMPLATE(class Wrapped)
+    (requires SenderTo<wrapped_t<Wrapped>, any_none<E>, is_none<>>
+      && insitu<Wrapped>())
   explicit deferred(Wrapped obj) noexcept : deferred() {
     struct s {
       static void op(data& src, data* dst) {
@@ -110,7 +112,8 @@ class deferred<SF> {
   }
 };
 
-template <Sender<is_none<>> Data, class DSF>
+template <class Data, class DSF>
+  requires Sender<Data, is_none<>>
 class deferred<Data, DSF> {
   Data data_{};
   DSF sf_{};
@@ -140,12 +143,14 @@ template <class SF>
 auto make_deferred(SF sf) -> deferred<SF> {
   return deferred<SF>{std::move(sf)};
 }
-template <Sender<is_none<>> Wrapped>
+PUSHMI_TEMPLATE(class Wrapped)
+  (requires Sender<Wrapped, is_none<>>)
 auto make_deferred(Wrapped w) ->
     deferred<detail::erase_deferred_t, std::exception_ptr> {
   return deferred<detail::erase_deferred_t, std::exception_ptr>{std::move(w)};
 }
-template <Sender<is_none<>> Data, class DSF>
+PUSHMI_TEMPLATE(class Data, class DSF)
+  (requires Sender<Data, is_none<>>)
 auto make_deferred(Data data, DSF sf) -> deferred<Data, DSF> {
   return deferred<Data, DSF>{std::move(data), std::move(sf)};
 }
@@ -158,11 +163,13 @@ deferred() -> deferred<ignoreSF>;
 template <class SF>
 deferred(SF) -> deferred<SF>;
 
-template <Sender<is_none<>> Wrapped>
+PUSHMI_TEMPLATE(class Wrapped)
+  (requires Sender<Wrapped, is_none<>>)
 deferred(Wrapped) ->
     deferred<detail::erase_deferred_t, std::exception_ptr>;
 
-template <Sender<is_none<>> Data, class DSF>
+PUSHMI_TEMPLATE(class Data, class DSF)
+  (requires Sender<Data, is_none<>>)
 deferred(Data, DSF) -> deferred<Data, DSF>;
 #endif
 

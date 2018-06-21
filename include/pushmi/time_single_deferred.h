@@ -41,8 +41,9 @@ class time_single_deferred<V, E, TP> {
     that.vptr_->op_(that.data_, &data_);
     std::swap(that.vptr_, vptr_);
   }
-  template <class Wrapped, Sender<is_single<>> W = wrapped_t<Wrapped>>
-    requires TimeSenderTo<W, single<V, E>>
+  PUSHMI_TEMPLATE (class Wrapped)
+    (requires TimeSenderTo<wrapped_t<Wrapped>, single<V, E>>
+      PUSHMI_BROKEN_SUBSUMPTION(&& !insitu<Wrapped>()))
   explicit time_single_deferred(Wrapped obj) : time_single_deferred() {
     struct s {
       static void op(data& src, data* dst) {
@@ -64,8 +65,9 @@ class time_single_deferred<V, E, TP> {
     data_.pobj_ = new Wrapped(std::move(obj));
     vptr_ = &vtbl;
   }
-  template <class Wrapped, Sender<is_single<>> W = wrapped_t<Wrapped>>
-    requires TimeSenderTo<W, single<V, E>> && insitu<Wrapped>()
+  PUSHMI_TEMPLATE (class Wrapped)
+    (requires TimeSenderTo<wrapped_t<Wrapped>, single<V, E>> &&
+      insitu<Wrapped>())
   explicit time_single_deferred(Wrapped obj) noexcept : time_single_deferred() {
     struct s {
       static void op(data& src, data* dst) {
@@ -134,8 +136,8 @@ class time_single_deferred<SF, NF> {
   }
 };
 
-template <TimeSender<is_single<>> Data, class DSF, class DNF>
-  requires Invocable<DNF&, Data&>
+template <class Data, class DSF, class DNF>
+  requires TimeSender<Data, is_single<>> && Invocable<DNF&, Data&>
 class time_single_deferred<Data, DSF, DNF> {
   Data data_{};
   DSF sf_{};
@@ -170,18 +172,19 @@ template <class SF>
 auto make_time_single_deferred(SF sf) -> time_single_deferred<SF, systemNowF> {
   return time_single_deferred<SF, systemNowF>{std::move(sf)};
 }
-template <class SF, class NF>
-  requires Invocable<NF&>
+PUSHMI_TEMPLATE (class SF, class NF)
+  (requires Invocable<NF&>)
 auto make_time_single_deferred(SF sf, NF nf) -> time_single_deferred<SF, NF> {
   return {std::move(sf), std::move(nf)};
 }
-template <TimeSender<is_single<>> Data, class DSF>
+PUSHMI_TEMPLATE (class Data, class DSF)
+  (requires TimeSender<Data, is_single<>>)
 auto make_time_single_deferred(Data d, DSF sf) ->
     time_single_deferred<Data, DSF, passDNF> {
   return {std::move(d), std::move(sf)};
 }
-template <TimeSender<is_single<>> Data, class DSF, class DNF>
-  requires Invocable<DNF&, Data&>
+PUSHMI_TEMPLATE (class Data, class DSF, class DNF)
+  (requires TimeSender<Data, is_single<>> && Invocable<DNF&, Data&>)
 auto make_time_single_deferred(Data d, DSF sf, DNF nf) ->
     time_single_deferred<Data, DSF, DNF> {
   return {std::move(d), std::move(sf), std::move(nf)};
@@ -195,15 +198,16 @@ time_single_deferred() -> time_single_deferred<ignoreSF, systemNowF>;
 template <class SF>
 time_single_deferred(SF) -> time_single_deferred<SF, systemNowF>;
 
-template <class SF, class NF>
-  requires Invocable<NF&>
+PUSHMI_TEMPLATE (class SF, class NF)
+  (requires Invocable<NF&>)
 time_single_deferred(SF, NF) -> time_single_deferred<SF, NF>;
 
-template <TimeSender<is_single<>> Data, class DSF>
+PUSHMI_TEMPLATE (class Data, class DSF)
+  (requires TimeSender<Data, is_single<>>)
 time_single_deferred(Data, DSF) -> time_single_deferred<Data, DSF, passDNF>;
 
-template <TimeSender<is_single<>> Data, class DSF, class DNF>
-  requires Invocable<DNF&, Data&>
+PUSHMI_TEMPLATE (class Data, class DSF, class DNF)
+  (requires TimeSender<Data, is_single<>> && Invocable<DNF&, Data&>)
 time_single_deferred(Data, DSF, DNF) -> time_single_deferred<Data, DSF, DNF>;
 #endif
 

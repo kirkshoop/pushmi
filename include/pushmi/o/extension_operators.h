@@ -48,7 +48,8 @@ struct make_receiver<is_none<>> : construct_deduced<none> {};
 template <>
 struct make_receiver<is_single<>> : construct_deduced<single> {};
 
-template <Sender In>
+template <class In>
+  requires Sender<In>
 struct out_from_fn {
   using Cardinality = property_from_category_t<In, is_silent<>>;
   using Make = make_receiver<Cardinality>;
@@ -172,12 +173,6 @@ constexpr bool deferred_requires_from() {
   ))
 }
 
-} // namespace detail
-
-namespace extension_operators {
-
-namespace detail{
-
 struct set_value_fn {
   template<class V>
   auto operator()(V&& v) const {
@@ -233,7 +228,7 @@ struct set_starting_fn {
   }
 };
 
-struct submit_fn {
+struct do_submit_fn {
   PUSHMI_TEMPLATE(class Out)
     (requires Receiver<Out>)
   auto operator()(Out out) const {
@@ -266,12 +261,14 @@ struct now_fn {
 
 } // namespace detail
 
+namespace extension_operators {
+
 PUSHMI_INLINE_VAR constexpr detail::set_done_fn set_done{};
 PUSHMI_INLINE_VAR constexpr detail::set_error_fn set_error{};
 PUSHMI_INLINE_VAR constexpr detail::set_value_fn set_value{};
 PUSHMI_INLINE_VAR constexpr detail::set_stopping_fn set_stopping{};
 PUSHMI_INLINE_VAR constexpr detail::set_starting_fn set_starting{};
-PUSHMI_INLINE_VAR constexpr detail::submit_fn submit{};
+PUSHMI_INLINE_VAR constexpr detail::do_submit_fn submit{};
 PUSHMI_INLINE_VAR constexpr detail::now_fn now{};
 PUSHMI_INLINE_VAR constexpr detail::now_fn top{};
 

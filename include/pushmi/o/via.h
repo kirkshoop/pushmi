@@ -10,8 +10,6 @@
 
 namespace pushmi {
 
-namespace operators {
-
 namespace detail {
 
 template<class Executor, class Out>
@@ -27,7 +25,7 @@ auto make_via_fn_data(Out out, Executor ex) -> via_fn_data<Executor, Out> {
   return {std::move(out), std::move(ex)};
 }
 
-class via_fn {
+struct via_fn {
   PUSHMI_TEMPLATE(class ExecutorFactory)
     (requires Invocable<ExecutorFactory&>)
   auto operator()(ExecutorFactory ef) const {
@@ -86,8 +84,8 @@ class via_fn {
 
 } // namespace detail
 
+namespace operators {
 PUSHMI_INLINE_VAR constexpr detail::via_fn via{};
-
 } // namespace operators
 
 #if 0

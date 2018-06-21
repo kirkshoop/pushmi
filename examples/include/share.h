@@ -14,15 +14,12 @@
 
 namespace pushmi {
 
-namespace operators {
-
 namespace detail {
 
 template<class T>
 struct share_fn {
   auto operator()() const;
 };
-
 
 template<class T>
 auto share_fn<T>::operator()() const {
@@ -41,6 +38,8 @@ auto share_fn<T>::operator()() const {
 }
 
 } // namespace detail
+
+namespace operators {
 
 template<class T>
 PUSHMI_INLINE_VAR constexpr detail::share_fn<T> share{}; 

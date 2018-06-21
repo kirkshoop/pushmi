@@ -86,7 +86,8 @@ struct passDVF {
 };
 
 struct passDEF {
-  template <class E, NoneReceiver<E> Data>
+  PUSHMI_TEMPLATE(class E, class Data)
+    (requires NoneReceiver<Data, E>)
   void operator()(Data& out, E e) const noexcept {
     ::pushmi::set_error(out, e);
   }
@@ -132,7 +133,8 @@ struct passDSF {
 };
 
 struct passDNF {
-  template <TimeSender Data>
+  PUSHMI_TEMPLATE(class Data)
+    (requires TimeSender<Data>)
   auto operator()(Data& in) const noexcept {
     return ::pushmi::now(in);
   }

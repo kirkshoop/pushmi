@@ -14,14 +14,7 @@
 
 namespace pushmi {
 
-namespace operators {
 namespace detail {
-PUSHMI_INLINE_VAR constexpr struct as_const_fn {
-  template <class T>
-  constexpr const T& operator()(T& t) const noexcept {
-    return t;
-  }
-} const as_const {};
 
 PUSHMI_TEMPLATE(class SideEffects, class Out)
   (requires Receiver<SideEffects> && Receiver<Out>)
@@ -122,8 +115,8 @@ auto tap_fn::operator()(AN... an) const {
 
 } // namespace detail
 
+namespace operators {
 PUSHMI_INLINE_VAR constexpr detail::tap_fn tap{};
-
 } // namespace operators
 
 } // namespace pushmi

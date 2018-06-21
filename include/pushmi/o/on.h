@@ -10,8 +10,6 @@
 
 namespace pushmi {
 
-namespace operators {
-
 namespace detail {
 
 struct on_fn {
@@ -46,6 +44,8 @@ struct on_fn {
 };
 
 } // namespace detail
+
+namespace operators {
 
 PUSHMI_INLINE_VAR constexpr detail::on_fn on{};
 

@@ -194,126 +194,160 @@ PUSHMI_CONCEPT_DEF(
     is_receiver_v<S>
 );
 
-template <class N, class E = std::exception_ptr>
-concept bool NoneReceiver = Receiver<N> &&
-  None<N> &&
-  SemiMovable<E> &&
-  requires(N& n, E&& e) {
-    ::pushmi::set_error(n, (E &&) e);
-  };
+PUSHMI_CONCEPT_DEF(
+  template (class N, class E = std::exception_ptr)
+  (concept NoneReceiver)(N, E),
+    requires(N& n, E&& e) (
+      ::pushmi::set_error(n, (E &&) e)
+    ) &&
+    Receiver<N> &&
+    None<N> &&
+    SemiMovable<E>
+);
 
-template <class S, class T, class E = std::exception_ptr>
-concept bool SingleReceiver = NoneReceiver<S, E> &&
-  SemiMovable<T> &&
-  SemiMovable<E> &&
-  Single<S> &&
-  requires(S& s, T&& t) {
-    ::pushmi::set_value(s, (T &&) t); // Semantics: called exactly once.
-  };
+PUSHMI_CONCEPT_DEF(
+  template (class S, class T, class E = std::exception_ptr)
+  (concept SingleReceiver)(S, T, E),
+    requires(S& s, T&& t) (
+      ::pushmi::set_value(s, (T &&) t) // Semantics: called exactly once.
+    ) &&
+    NoneReceiver<S, E> &&
+    SemiMovable<T> &&
+    SemiMovable<E> &&
+    Single<S>
+);
 
-template <class S, class T, class E = std::exception_ptr>
-concept bool ManyReceiver = NoneReceiver<S, E> &&
-  SemiMovable<T> &&
-  SemiMovable<E> &&
-  Many<S>;
-
-
+PUSHMI_CONCEPT_DEF(
+  template (class S, class T, class E = std::exception_ptr)
+  (concept ManyReceiver)(S, T, E),
+    NoneReceiver<S, E> &&
+    SemiMovable<T> &&
+    SemiMovable<E> &&
+    Many<S>
+);
 
 
 // silent does not really make sense, but cannot test for
 // None without the error type, use is_none<> to strengthen 
 // requirements
-template <class D, class... PropertyN>
-concept bool Sender = SemiMovable<D> &&
-  None<D> && 
-  property_query_v<D, PropertyN...> &&
-  is_sender_v<D>;
+PUSHMI_CONCEPT_DEF(
+  template (class D, class... PropertyN)
+  (concept Sender)(D, PropertyN...),
+    SemiMovable<D> &&
+    None<D> && 
+    property_query_v<D, PropertyN...> &&
+    is_sender_v<D>
+);
 
-template <class D, class S, class... PropertyN>
-concept bool SenderTo = Sender<D> &&
-  Receiver<S> &&
-  property_query_v<D, PropertyN...> &&
-  requires(D& d, S&& s) {
-    ::pushmi::submit(d, (S &&) s);
-  };
-
+PUSHMI_CONCEPT_DEF(
+  template (class D, class S, class... PropertyN)
+  (concept SenderTo)(D, S, PropertyN...),
+    requires(D& d, S&& s) (
+      ::pushmi::submit(d, (S &&) s)
+    ) &&
+    Sender<D> &&
+    Receiver<S> &&
+    property_query_v<D, PropertyN...>
+);
 
 // add concepts to support cancellation
 //
 
-template <class S, class... PropertyN>
-concept bool FlowReceiver = Receiver<S> &&
-  property_query_v<S, PropertyN...> &&
-  Flow<S> &&
-  requires(S& s) {
-    ::pushmi::set_stopping(s);
-  };
+PUSHMI_CONCEPT_DEF(
+  template (class S, class... PropertyN)
+  (concept FlowReceiver)(S, PropertyN...),
+    requires(S& s) (
+      ::pushmi::set_stopping(s)
+    ) &&
+    Receiver<S> &&
+    property_query_v<S, PropertyN...> &&
+    Flow<S>
+);
 
-template <
-  class N, 
-  class Up, 
-  class PE = std::exception_ptr,
-  class E = PE>
-concept bool FlowNoneReceiver = FlowReceiver<N> && 
-  Receiver<Up> &&
-  SemiMovable<PE> &&
-  SemiMovable<E> &&
-  NoneReceiver<Up, PE> && 
-  NoneReceiver<N, E> &&
-  requires(N& n, Up& up) {
-    ::pushmi::set_starting(n, up);
-  };
-
-template <
-    class S,
-    class Up,
-    class T,
+PUSHMI_CONCEPT_DEF(
+  template (
+    class N, 
+    class Up, 
     class PE = std::exception_ptr,
-    class E = PE>
-concept bool FlowSingleReceiver = 
-  SingleReceiver<S, T, E> && 
-  FlowNoneReceiver<S, Up, PE, E>;
+    class E = PE)
+  (concept FlowNoneReceiver)(N, Up, PE, E),
+    requires(N& n, Up& up) (
+      ::pushmi::set_starting(n, up)
+    ) &&
+    FlowReceiver<N> && 
+    Receiver<Up> &&
+    SemiMovable<PE> &&
+    SemiMovable<E> &&
+    NoneReceiver<Up, PE> && 
+    NoneReceiver<N, E>
+);
 
-template <
-    class S,
-    class Up,
-    class T,
-    class PE = std::exception_ptr,
-    class E = PE>
-concept bool FlowManyReceiver = 
-  ManyReceiver<S, T, E> && 
-  FlowSingleReceiver<S, Up, T, PE, E>;
+PUSHMI_CONCEPT_DEF(
+  template (
+      class S,
+      class Up,
+      class T,
+      class PE = std::exception_ptr,
+      class E = PE)
+  (concept FlowSingleReceiver)(S, Up, T, PE, E),
+    SingleReceiver<S, T, E> && 
+    FlowNoneReceiver<S, Up, PE, E>
+);
 
-template <class S, class... PropertyN>
-concept bool FlowSender = Sender<S> &&
-  property_query_v<S, PropertyN...> &&
-  Flow<S>;
+PUSHMI_CONCEPT_DEF(
+  template (
+      class S,
+      class Up,
+      class T,
+      class PE = std::exception_ptr,
+      class E = PE)
+  (concept FlowManyReceiver)(S, Up, T, PE, E),
+    ManyReceiver<S, T, E> && 
+    FlowSingleReceiver<S, Up, T, PE, E>
+);
 
-template <class D, class S, class... PropertyN>
-concept bool FlowSenderTo = FlowSender<D> &&
-  property_query_v<D, PropertyN...> &&
-  FlowReceiver<S>;
+PUSHMI_CONCEPT_DEF(
+  template (class S, class... PropertyN)
+  (concept FlowSender)(S, PropertyN...),
+    Sender<S> &&
+    property_query_v<S, PropertyN...> &&
+    Flow<S>
+);
+
+PUSHMI_CONCEPT_DEF(
+  template (class D, class S, class... PropertyN)
+  (concept FlowSenderTo)(D, S, PropertyN...),
+    FlowSender<D> &&
+    property_query_v<D, PropertyN...> &&
+    FlowReceiver<S>
+);
 
 // add concepts for constraints
 //
 
-template <class D, class... PropertyN>
-concept bool TimeSender = Sender<D> && 
-  property_query_v<D, PropertyN...> &&
-  Time<D> && 
-  None<D> &&
-  requires(D& d) {
-    ::pushmi::now(d);
-    requires Regular<decltype(::pushmi::now(d))>;
-  };
+PUSHMI_CONCEPT_DEF(
+  template (class D, class... PropertyN)
+  (concept TimeSender)(D, PropertyN...),
+    requires(D& d) (
+      ::pushmi::now(d),
+      requires_<Regular<decltype(::pushmi::now(d))>>
+    ) &&
+    Sender<D> && 
+    property_query_v<D, PropertyN...> &&
+    Time<D> && 
+    None<D>
+);
 
-template <class D, class S, class... PropertyN>
-concept bool TimeSenderTo = TimeSender<D> && 
-  property_query_v<D, PropertyN...> &&
-  Receiver<S> &&
-  requires(D& d, S&& s) {
-    ::pushmi::submit(d, ::pushmi::now(d), (S &&) s);
-  };
+PUSHMI_CONCEPT_DEF(
+  template (class D, class S, class... PropertyN)
+  (concept TimeSenderTo)(D, S, PropertyN...),
+    requires(D& d, S&& s) (
+      ::pushmi::submit(d, ::pushmi::now(d), (S &&) s)
+    ) &&
+    TimeSender<D> && 
+    property_query_v<D, PropertyN...> &&
+    Receiver<S>
+);
 
 template <class D>
   requires TimeSender<D>
@@ -329,87 +363,30 @@ using time_point_t = decltype(::pushmi::now(std::declval<D&>()));
 // I would like to replace Time.. with Constrained.. but not sure if it will
 // obscure too much.
 
-template <class D>
-concept bool ConstrainedSender = Sender<D> &&
-  Constrained<D> &&
-  None<D> && 
-  requires(D& d) {
-    ::pushmi::top(d);
-    requires Regular<decltype(::pushmi::top(d))>;
-  };
+PUSHMI_CONCEPT_DEF(
+  template (class D)
+  concept ConstrainedSender,
+    requires(D& d) (
+      ::pushmi::top(d),
+      requires_<Regular<decltype(::pushmi::top(d))>>
+    ) &&
+    Sender<D> &&
+    Constrained<D> &&
+    None<D>
+);
 
-template <class D, class S>
-concept bool ConstrainedSenderTo = ConstrainedSender<D> && 
-  Receiver<S> &&
-  requires(D& d, S&& s) {
-    ::pushmi::submit(d, ::pushmi::top(d), (S &&) s);
-  };
+PUSHMI_CONCEPT_DEF(
+  template (class D, class S)
+  concept ConstrainedSenderTo,
+    requires(D& d, S&& s) (
+      ::pushmi::submit(d, ::pushmi::top(d), (S &&) s)
+    ) &&
+    ConstrainedSender<D> &&
+    Receiver<S>
+);
 
 template <class D>
   requires ConstrainedSender<D>
 using constraint_t = decltype(::pushmi::top(std::declval<D&>()));
-
-
-
-
-// Mock concepts for use with the constrain() function template for
-// constraining generic lambdas.
-namespace lazy {
-
-template <class Out, class E = std::exception_ptr>
-struct NoneReceiver_ {
-  explicit constexpr operator bool() const noexcept {
-    return pushmi::NoneReceiver<Out, E>;
-  }
-};
-template <class Out, class E = std::exception_ptr>
-PUSHMI_INLINE_VAR constexpr auto NoneReceiver = NoneReceiver_<Out, E>{};
-
-template <class Out, class V, class E = std::exception_ptr>
-struct SingleReceiver_ {
-  explicit constexpr operator bool() const noexcept {
-    return pushmi::SingleReceiver<Out, V, E>;
-  }
-};
-template <class Out, class V, class E = std::exception_ptr>
-PUSHMI_INLINE_VAR constexpr auto SingleReceiver = SingleReceiver_<Out, V, E>{};
-
-template <class D, class Tag = is_silent<>>
-struct Sender_ {
-  explicit constexpr operator bool() const noexcept {
-    return pushmi::Sender<D, Tag>;
-  }
-};
-template <class D, class Tag = is_silent<>>
-PUSHMI_INLINE_VAR constexpr auto Sender = Sender_<D, Tag>{};
-
-template <class D, class S, class Tag = is_silent<>>
-struct SenderTo_ {
-  explicit constexpr operator bool() const noexcept {
-    return pushmi::SenderTo<D, S, Tag>;
-  }
-};
-template <class D, class S, class Tag = is_silent<>>
-PUSHMI_INLINE_VAR constexpr auto SenderTo = SenderTo_<D, S, Tag>{};
-
-template <class D, class Tag = is_silent<>>
-struct TimeSender_ {
-  explicit constexpr operator bool() const noexcept {
-    return pushmi::TimeSender<D, Tag>;
-  }
-};
-template <class D, class Tag = is_silent<>>
-PUSHMI_INLINE_VAR constexpr auto TimeSender = TimeSender_<D, Tag>{};
-
-template <class D, class S, class Tag = is_silent<>>
-struct TimeSenderTo_ {
-  explicit constexpr operator bool() const noexcept {
-    return pushmi::TimeSenderTo<D, S, Tag>;
-  }
-};
-template <class D, class S, class Tag = is_silent<>>
-PUSHMI_INLINE_VAR constexpr auto TimeSenderTo = TimeSenderTo_<D, S, Tag>{};
-
-} // namespace lazy
 
 } // namespace pushmi

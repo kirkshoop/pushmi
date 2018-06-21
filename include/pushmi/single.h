@@ -54,8 +54,9 @@ public:
     that.vptr_->op_(that.data_, &data_);
     std::swap(that.vptr_, vptr_);
   }
-  template <class Wrapped>
-   requires SingleReceiver<wrapped_t<Wrapped>, V, E>
+  PUSHMI_TEMPLATE(class Wrapped)
+    (requires SingleReceiver<wrapped_t<Wrapped>, V, E>
+      PUSHMI_BROKEN_SUBSUMPTION(&& !insitu<Wrapped>()))
   explicit single(Wrapped obj) : single() {
     check<Wrapped>();
     struct s {
@@ -81,8 +82,8 @@ public:
     data_.pobj_ = new Wrapped(std::move(obj));
     vptr_ = &vtbl;
   }
-  template <class Wrapped>
-   requires SingleReceiver<wrapped_t<Wrapped>, V, E> && insitu<Wrapped>()
+  PUSHMI_TEMPLATE(class Wrapped)
+    (requires SingleReceiver<wrapped_t<Wrapped>, V, E> && insitu<Wrapped>())
   explicit single(Wrapped obj) noexcept : single() {
     check<Wrapped>();
     struct s {
@@ -416,7 +417,8 @@ struct construct_deduced<single> {
 //   return single<V, E>{std::move(w)};
 // }
 
-template<class T, SenderTo<std::promise<T>, is_single<>> Out>
+PUSHMI_TEMPLATE (class T, class Out)
+  (requires SenderTo<Out, std::promise<T>, is_none<>>)
 std::future<T> future_from(Out singleSender) {
   std::promise<T> p;
   auto result = p.get_future();

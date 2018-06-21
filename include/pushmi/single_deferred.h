@@ -38,8 +38,9 @@ class single_deferred<V, E> {
     std::swap(that.vptr_, vptr_);
   }
 
-  template <class Wrapped>
-    requires SenderTo<wrapped_t<Wrapped>, single<V, E>, is_single<>>
+  PUSHMI_TEMPLATE(class Wrapped)
+    (requires SenderTo<wrapped_t<Wrapped>, single<V, E>, is_single<>>
+      PUSHMI_BROKEN_SUBSUMPTION(&& !insitu<Wrapped>()))
   explicit single_deferred(Wrapped obj) : single_deferred() {
     struct s {
       static void op(data& src, data* dst) {
@@ -55,8 +56,9 @@ class single_deferred<V, E> {
     data_.pobj_ = new Wrapped(std::move(obj));
     vptr_ = &vtbl;
   }
-  template <class Wrapped>
-    requires SenderTo<wrapped_t<Wrapped>, single<V, E>, is_single<>> && insitu<Wrapped>()
+  PUSHMI_TEMPLATE(class Wrapped)
+    (requires SenderTo<wrapped_t<Wrapped>, single<V, E>, is_single<>>
+      && insitu<Wrapped>())
   explicit single_deferred(Wrapped obj) noexcept : single_deferred() {
     struct s {
       static void op(data& src, data* dst) {
@@ -110,7 +112,8 @@ class single_deferred<SF> {
   }
 };
 
-template <Sender<is_single<>> Data, class DSF>
+template <class Data, class DSF>
+  requires Sender<Data, is_single<>>
 class single_deferred<Data, DSF> {
   Data data_;
   DSF sf_;
@@ -139,11 +142,13 @@ template <class SF>
 auto make_single_deferred(SF sf) -> single_deferred<SF> {
   return single_deferred<SF>{std::move(sf)};
 }
-template <Sender<is_single<>> Data>
+PUSHMI_TEMPLATE(class Data)
+  (requires Sender<Data, is_single<>>)
 auto make_single_deferred(Data d) -> single_deferred<Data, passDSF> {
   return single_deferred<Data, passDSF>{std::move(d)};
 }
-template <Sender<is_single<>> Data, class DSF>
+PUSHMI_TEMPLATE(class Data, class DSF)
+  (requires Sender<Data, is_single<>>)
 auto make_single_deferred(Data d, DSF sf) -> single_deferred<Data, DSF> {
   return {std::move(d), std::move(sf)};
 }
@@ -156,10 +161,12 @@ single_deferred() -> single_deferred<ignoreSF>;
 template <class SF>
 single_deferred(SF) -> single_deferred<SF>;
 
-template <Sender<is_single<>> Data>
+PUSHMI_TEMPLATE(class Data)
+  (requires Sender<Data, is_single<>>)
 single_deferred(Data) -> single_deferred<Data, passDSF>;
 
-template <Sender<is_single<>> Data, class DSF>
+PUSHMI_TEMPLATE(class Data, class DSF)
+  (requires Sender<Data, is_single<>>)
 single_deferred(Data, DSF) -> single_deferred<Data, DSF>;
 #endif
 

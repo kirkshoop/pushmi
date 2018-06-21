@@ -12,8 +12,6 @@
 
 namespace pushmi {
 
-namespace operators {
-
 namespace detail {
 
 struct transform_fn {
@@ -55,8 +53,8 @@ auto transform_fn::operator()(FN... fn) const {
 
 } // namespace detail
 
+namespace operators {
 PUSHMI_INLINE_VAR constexpr detail::transform_fn transform{};
-
 } // namespace operators
 
 } // namespace pushmi

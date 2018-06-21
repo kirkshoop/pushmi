@@ -38,9 +38,9 @@ class flow_single_deferred<V, PE, E> {
     that.vptr_->op_(that.data_, &data_);
     std::swap(that.vptr_, vptr_);
   }
-  template <
-      class Wrapped,
-      FlowSender<is_single<>> W = wrapped_t<Wrapped>>
+  PUSHMI_TEMPLATE (class Wrapped)
+    (requires FlowSender<wrapped_t<Wrapped>, is_single<>>
+      PUSHMI_BROKEN_SUBSUMPTION(&& !insitu<Wrapped>()))
   explicit flow_single_deferred(Wrapped obj) : flow_single_deferred() {
     struct s {
       static void op(data& src, data* dst) {
@@ -56,10 +56,8 @@ class flow_single_deferred<V, PE, E> {
     data_.pobj_ = new Wrapped(std::move(obj));
     vptr_ = &vtbl;
   }
-  template <
-      class Wrapped,
-      FlowSender<is_single<>> W = wrapped_t<Wrapped>>
-    requires insitu<Wrapped>()
+  PUSHMI_TEMPLATE (class Wrapped)
+    (requires FlowSender<wrapped_t<Wrapped>, is_single<>> && insitu<Wrapped>())
   explicit flow_single_deferred(Wrapped obj) noexcept : flow_single_deferred() {
     struct s {
       static void op(data& src, data* dst) {

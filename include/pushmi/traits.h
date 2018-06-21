@@ -211,12 +211,14 @@ PUSHMI_CONCEPT_DEF(
     )
 );
 
-template <class F, class... Args>
-concept bool NothrowInvocable =
-  Invocable<F, Args...> &&
-  requires(F&& f, Args&&... args) {
-    { pushmi::invoke((F &&) f, (Args &&) args...) } noexcept;
-  };
+PUSHMI_CONCEPT_DEF(
+  template (class F, class... Args)
+  (concept NothrowInvocable)(F, Args...),
+    requires(F&& f, Args&&... args) (
+      requires_<noexcept(pushmi::invoke((F &&) f, (Args &&) args...))>
+    ) &&
+    Invocable<F, Args...>
+);
 
 namespace detail {
 // is_ taken from meta library
