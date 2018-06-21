@@ -41,31 +41,45 @@ template <template <class...> class R, class... Ts, class Args>
 struct substitute<R<Ts...>, Args> {
   using type = R<meta::_t<replace<Ts, Args>>...>;
 };
+template <class T, class Args>
+  requires requires { typename meta::_t<substitute<T, Args>>; }
+struct substitute<pushmi::concepts::detail::Not<T>, Args> {
+  using type = pushmi::concepts::detail::Not<meta::_t<substitute<T, Args>>>;
+};
+template <class T, class U, class Args>
+  requires requires {
+    typename meta::_t<substitute<T, Args>>;
+    typename meta::_t<substitute<U, Args>>;
+  }
+struct substitute<pushmi::concepts::detail::And<T, U>, Args> {
+  using type = pushmi::concepts::detail::And<
+    meta::_t<substitute<T, Args>>,
+    meta::_t<substitute<U, Args>>>;
+};
 
-template <class Fn, class...Requirements>
+template <class Fn, class Requirements>
 struct constrained_fn : Fn {
   constrained_fn() = default;
   constrained_fn(Fn fn) : Fn(std::move(fn)) {}
 
   template <class... Ts>
     requires Invocable<Fn&, Ts...> &&
-      And<Invocable<meta::_t<substitute<Requirements, meta::list<Ts...>>>>...>
+      (bool)meta::_t<substitute<Requirements, meta::list<Ts...>>>{}
   decltype(auto) operator()(Ts&&... ts) noexcept(noexcept(std::declval<Fn&>()((Ts&&) ts...))) {
     return static_cast<Fn&>(*this)((Ts&&) ts...);
   }
   template <class... Ts>
     requires Invocable<const Fn&, Ts...> &&
-      And<Invocable<meta::_t<substitute<Requirements, meta::list<Ts...>>>>...>
+      (bool)meta::_t<substitute<Requirements, meta::list<Ts...>>>{}
   decltype(auto) operator()(Ts&&... ts) const noexcept(noexcept(std::declval<const Fn&>()((Ts&&) ts...))) {
     return static_cast<const Fn&>(*this)((Ts&&) ts...);
   }
 };
 
-template <class...Requirements>
 struct constrain_fn {
-  template <class Fn>
-  constexpr auto operator()(Fn fn) const {
-    return constrained_fn<Fn, Requirements...>{std::move(fn)};
+  template <class Requirements, class Fn>
+  constexpr auto operator()(Requirements, Fn fn) const {
+    return constrained_fn<Fn, Requirements>{std::move(fn)};
   }
 };
 
@@ -75,7 +89,6 @@ using _1 = detail::placeholder[1];
 using _2 = detail::placeholder[2];
 using _3 = detail::placeholder[3];
 
-template <class...Requirements>
-PUSHMI_INLINE_VAR constexpr const detail::constrain_fn<Requirements...> constrain {};
+PUSHMI_INLINE_VAR constexpr const detail::constrain_fn constrain {};
 
 } // namespace pushmi

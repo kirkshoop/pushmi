@@ -103,8 +103,8 @@ class single_deferred<SF> {
   constexpr explicit single_deferred(SF sf)
       : sf_(std::move(sf)) {}
 
-  template <Receiver<is_single<>> Out>
-    requires Invocable<SF&, Out>
+  PUSHMI_TEMPLATE(class Out)
+    (requires lazy::Receiver<Out, is_single<>> && lazy::Invocable<SF&, Out>)
   void submit(Out out) {
     sf_(std::move(out));
   }
@@ -123,8 +123,8 @@ class single_deferred<Data, DSF> {
       : data_(std::move(data)) {}
   constexpr single_deferred(Data data, DSF sf)
       : data_(std::move(data)), sf_(std::move(sf)) {}
-  template <Receiver<is_single<>> Out>
-    requires Invocable<DSF&, Data&, Out>
+  PUSHMI_TEMPLATE(class Out)
+    (requires lazy::Receiver<Out, is_single<>> && lazy::Invocable<DSF&, Data&, Out>)
   void submit(Out out) {
     sf_(data_, std::move(out));
   }

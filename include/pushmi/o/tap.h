@@ -23,7 +23,8 @@ PUSHMI_INLINE_VAR constexpr struct as_const_fn {
   }
 } const as_const {};
 
-template <Receiver SideEffects, Receiver Out>
+PUSHMI_TEMPLATE(class SideEffects, class Out)
+  (requires Receiver<SideEffects> && Receiver<Out>)
 struct tap_ {
   SideEffects sideEffects;
   Out out;
@@ -31,18 +32,18 @@ struct tap_ {
   // side effect has no effect on the properties.
   using properties = properties_t<Out>;
 
-  template <class V, class UV = std::remove_reference_t<V>>
-    requires 
-    // SingleReceiver<SideEffects, const UV&> && 
-    SingleReceiver<Out, V>
+  PUSHMI_TEMPLATE(class V, class UV = std::remove_reference_t<V>)
+    (requires
+      // SingleReceiver<SideEffects, const UV&> &&
+      SingleReceiver<Out, V>)
   void value(V&& v) {
     ::pushmi::set_value(sideEffects, as_const(v));
     ::pushmi::set_value(out, (V&&) v);
   }
-  template <class E>
-    requires 
-    // NoneReceiver<SideEffects, const E&> && 
-    NoneReceiver<Out, E>
+  PUSHMI_TEMPLATE(class E)
+    (requires
+      // NoneReceiver<SideEffects, const E&> &&
+      NoneReceiver<Out, E>)
   void error(E e) noexcept {
     ::pushmi::set_error(sideEffects, as_const(e));
     ::pushmi::set_error(out, std::move(e));
@@ -53,8 +54,9 @@ struct tap_ {
   }
 };
 
-template <Receiver SideEffects, Receiver Out>
-  requires Receiver<tap_<SideEffects, Out>, property_from_category_t<Out, is_silent<>>>
+PUSHMI_TEMPLATE(class SideEffects, class Out)
+  (requires Receiver<SideEffects> && Receiver<Out> &&
+    Receiver<tap_<SideEffects, Out>, property_from_category_t<Out, is_silent<>>>)
 auto make_tap(SideEffects se, Out out) -> tap_<SideEffects, Out> {
   return {std::move(se), std::move(out)};
 }
@@ -75,7 +77,7 @@ inline void do_assert(bool condition, char const*) {
 
 template <class... AN>
 auto tap_fn::operator()(AN... an) const {
-  return constrain<mock::Sender<_1>>(
+  return constrain(lazy::Sender<_1>,
     [args = std::tuple<AN...>{std::move(an)...}](auto in) mutable {
       using In = decltype(in);
       auto sideEffects{::pushmi::detail::out_from_fn<In>()(std::move(args))};
@@ -91,7 +93,7 @@ auto tap_fn::operator()(AN... an) const {
       return ::pushmi::detail::deferred_from<In, SideEffects>(
         std::move(in),
         ::pushmi::detail::submit_transform_out<In>(
-          constrain<mock::Receiver<_1>>(
+          constrain(lazy::Receiver<_1>,
             [sideEffects = std::move(sideEffects)](auto out) {
               using Out = decltype(out);
               PUSHMI_STATIC_ASSERT(

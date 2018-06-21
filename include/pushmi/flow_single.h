@@ -193,21 +193,21 @@ class flow_single<VF, EF, DF, StpF, StrtF> {
   void stopping() noexcept {
     stpf_();
   }
-  template <Receiver<is_none<>> Up>
-    requires Invocable<StrtF&, Up&>
+  PUSHMI_TEMPLATE(class Up)
+    (requires Receiver<Up, is_none<>> && Invocable<StrtF&, Up&>)
   void starting(Up& up) {
     strtf_(up);
   }
 };
 
-template <
-    Receiver Data,
+template<
+    class Data,
     class DVF,
     class DEF,
     class DDF,
     class DStpF,
     class DStrtF>
-requires Invocable<DDF&, Data&>
+  requires Receiver<Data> && Invocable<DDF&, Data&>
 class flow_single<Data, DVF, DEF, DDF, DStpF, DStrtF> {
   Data data_;
   DVF vf_;
@@ -351,20 +351,22 @@ auto make_flow_single(VF vf, EF ef, DF df, StpF stpf, StrtF strtf)
     -> flow_single<VF, EF, DF, StpF, StrtF> {
   return {std::move(vf), std::move(ef), std::move(df), std::move(stpf), std::move(strtf)};
 }
-template <Receiver Data>
+PUSHMI_TEMPLATE(class Data)
+  (requires Receiver<Data>)
 auto make_flow_single(Data d)
     -> flow_single<Data, passDVF, passDEF, passDDF, passDStpF, passDStrtF> {
   return flow_single<Data, passDVF, passDEF, passDDF, passDStpF, passDStrtF>{
       std::move(d)};
 }
-template <Receiver Data, class DVF>
-    requires !detail::is_v<DVF, on_error_fn> &&
-    !detail::is_v<DVF, on_done_fn>
+PUSHMI_TEMPLATE(class Data, class DVF)
+  (requires Receiver<Data> && !detail::is_v<DVF, on_error_fn> &&
+    !detail::is_v<DVF, on_done_fn>)
 auto make_flow_single(Data d, DVF vf)
          -> flow_single<Data, DVF, passDEF, passDDF, passDStpF, passDStrtF> {
   return {std::move(d), std::move(vf)};
 }
-template <Receiver Data, class... DEFN>
+PUSHMI_TEMPLATE(class Data, class... DEFN)
+  (requires Receiver<Data>)
 auto make_flow_single(Data d, on_error_fn<DEFN...> ef)
     -> flow_single<
         Data,
@@ -375,14 +377,15 @@ auto make_flow_single(Data d, on_error_fn<DEFN...> ef)
         passDStrtF> {
   return {std::move(d), std::move(ef)};
 }
-template <Receiver Data, class DVF, class DEF>
-    requires !detail::is_v<DVF, on_error_fn> && !detail::is_v<DVF, on_done_fn> &&
-    !detail::is_v<DEF, on_done_fn>
+PUSHMI_TEMPLATE(class Data, class DVF, class DEF)
+  (requires Receiver<Data> && !detail::is_v<DVF, on_error_fn> &&
+    !detail::is_v<DVF, on_done_fn> && !detail::is_v<DEF, on_done_fn>)
 auto make_flow_single(Data d, DVF vf, DEF ef)
          -> flow_single<Data, DVF, DEF, passDDF, passDStpF, passDStrtF> {
   return {std::move(d), std::move(vf), std::move(ef)};
 }
-template <Receiver Data, class... DEFN, class DDF>
+PUSHMI_TEMPLATE(class Data, class... DEFN, class DDF)
+  (requires Receiver<Data>)
 auto make_flow_single(Data d, on_error_fn<DEFN...> ef, on_done_fn<DDF> df)
     -> flow_single<
         Data,
@@ -393,31 +396,32 @@ auto make_flow_single(Data d, on_error_fn<DEFN...> ef, on_done_fn<DDF> df)
         passDStrtF> {
   return {std::move(d), std::move(ef), std::move(df)};
 }
-template <Receiver Data, class DDF>
+PUSHMI_TEMPLATE(class Data, class DDF)
+  (requires Receiver<Data>)
 auto make_flow_single(Data d, on_done_fn<DDF> df)
     -> flow_single<Data, passDVF, passDEF, on_done_fn<DDF>, passDStpF, passDStrtF> {
   return {std::move(d), std::move(df)};
 }
-template <Receiver Data, class DVF, class DEF, class DDF>
-requires Invocable<DDF&, Data&>
+PUSHMI_TEMPLATE(class Data, class DVF, class DEF, class DDF)
+  (requires Receiver<Data> && Invocable<DDF&, Data&>)
 auto make_flow_single(Data d, DVF vf, DEF ef, DDF df)
     -> flow_single<Data, DVF, DEF, DDF, passDStpF, passDStrtF> {
   return {std::move(d), std::move(vf), std::move(ef), std::move(df)};
 }
-template <Receiver Data, class DVF, class DEF, class DDF, class DStpF>
-requires Invocable<DDF&, Data&>&& Invocable<DStpF&, Data&>
+PUSHMI_TEMPLATE(class Data, class DVF, class DEF, class DDF, class DStpF)
+  (requires Receiver<Data> && Invocable<DDF&, Data&>&& Invocable<DStpF&, Data&>)
 auto make_flow_single(Data d, DVF vf, DEF ef, DDF df, DStpF stpf)
     -> flow_single<Data, DVF, DEF, DDF, DStpF, passDStrtF> {
   return {std::move(d), std::move(vf), std::move(ef), std::move(df), std::move(stpf)};
 }
-template <
-    Receiver Data,
+PUSHMI_TEMPLATE(
+    class Data,
     class DVF,
     class DEF,
     class DDF,
     class DStpF,
-    class DStrtF>
-requires Invocable<DDF&, Data&>&& Invocable<DStpF&, Data&>
+    class DStrtF)
+  (requires Receiver<Data> && Invocable<DDF&, Data&> && Invocable<DStpF&, Data&>)
 auto make_flow_single(Data d, DVF vf, DEF ef, DDF df, DStpF stpf, DStrtF strtf)
     -> flow_single<Data, DVF, DEF, DDF, DStpF, DStrtF> {
   return {std::move(d), std::move(vf), std::move(ef), std::move(df), std::move(stpf), std::move(strtf)};
@@ -428,9 +432,10 @@ auto make_flow_single(Data d, DVF vf, DEF ef, DDF df, DStpF stpf, DStrtF strtf)
 #if __cpp_deduction_guides >= 201703
 flow_single() -> flow_single<>;
 
-template <class VF>
-    requires !Receiver<VF> && !detail::is_v<VF, on_error_fn> &&
-    !detail::is_v<VF, on_done_fn> flow_single(VF)
+PUSHMI_TEMPLATE(class VF)
+  (requires !Receiver<VF> && !detail::is_v<VF, on_error_fn> &&
+    !detail::is_v<VF, on_done_fn>)
+flow_single(VF)
          -> flow_single<VF, abortEF, ignoreDF, ignoreStpF, ignoreStrtF>;
 
 template <class... EFN>
@@ -446,14 +451,16 @@ template <class DF>
 flow_single(on_done_fn<DF>)
     -> flow_single<ignoreVF, abortEF, on_done_fn<DF>, ignoreStpF, ignoreStrtF>;
 
-template <class V, class PE, class E, class Wrapped>
-    requires FlowSingleReceiver<Wrapped, V, PE, E> &&
-    !detail::is_v<Wrapped, none> flow_single(Wrapped) -> flow_single<V, PE, E>;
+PUSHMI_TEMPLATE(class V, class PE, class E, class Wrapped)
+  (requires FlowSingleReceiver<Wrapped, V, PE, E> &&
+    !detail::is_v<Wrapped, none>)
+flow_single(Wrapped) -> flow_single<V, PE, E>;
 
-template <class VF, class EF>
-    requires !Receiver<VF> && !detail::is_v<VF, on_error_fn> &&
+PUSHMI_TEMPLATE(class VF, class EF)
+  (requires !Receiver<VF> && !detail::is_v<VF, on_error_fn> &&
     !detail::is_v<VF, on_done_fn> && !detail::is_v<EF, on_value_fn> &&
-    !detail::is_v<EF, on_done_fn> flow_single(VF, EF)
+    !detail::is_v<EF, on_done_fn>)
+flow_single(VF, EF)
          -> flow_single<VF, EF, ignoreDF, ignoreStpF, ignoreStrtF>;
 
 template <class... EFN, class DF>
@@ -465,28 +472,34 @@ flow_single(on_error_fn<EFN...>, on_done_fn<DF>)
         ignoreStpF,
         ignoreStrtF>;
 
-template <class VF, class EF, class DF>
-requires Invocable<DF&> flow_single(VF, EF, DF)
+PUSHMI_TEMPLATE(class VF, class EF, class DF)
+  (requires Invocable<DF&>)
+flow_single(VF, EF, DF)
     -> flow_single<VF, EF, DF, ignoreStpF, ignoreStrtF>;
 
-template <class VF, class EF, class DF, class StpF>
-requires Invocable<DF&>&& Invocable<StpF&> flow_single(VF, EF, DF, StpF)
+PUSHMI_TEMPLATE(class VF, class EF, class DF, class StpF)
+  (requires Invocable<DF&> && Invocable<StpF&>)
+flow_single(VF, EF, DF, StpF)
     -> flow_single<VF, EF, DF, StpF, ignoreStrtF>;
 
-template <class VF, class EF, class DF, class StpF, class StrtF>
-requires Invocable<DF&>&& Invocable<StpF&> flow_single(VF, EF, DF, StpF, StrtF)
+PUSHMI_TEMPLATE(class VF, class EF, class DF, class StpF, class StrtF)
+  (requires Invocable<DF&> && Invocable<StpF&>)
+flow_single(VF, EF, DF, StpF, StrtF)
     -> flow_single<VF, EF, DF, StpF, StrtF>;
 
-template <Receiver Data>
+PUSHMI_TEMPLATE(class Data)
+  (requires Receiver<Data>)
 flow_single(Data d)
     -> flow_single<Data, passDVF, passDEF, passDDF, passDStpF, passDStrtF>;
 
-template <Receiver Data, class DVF>
-    requires !detail::is_v<DVF, on_error_fn> &&
-    !detail::is_v<DVF, on_done_fn> flow_single(Data d, DVF vf)
+PUSHMI_TEMPLATE(class Data, class DVF)
+  (requires Receiver<Data> && !detail::is_v<DVF, on_error_fn> &&
+    !detail::is_v<DVF, on_done_fn>)
+flow_single(Data d, DVF vf)
          -> flow_single<Data, DVF, passDEF, passDDF, passDStpF, passDStrtF>;
 
-template <Receiver Data, class... DEFN>
+PUSHMI_TEMPLATE(class Data, class... DEFN)
+  (requires Receiver<Data>)
 flow_single(Data d, on_error_fn<DEFN...>)
     -> flow_single<
         Data,
@@ -496,12 +509,14 @@ flow_single(Data d, on_error_fn<DEFN...>)
         passDStpF,
         passDStrtF>;
 
-template <Receiver Data, class DVF, class DEF>
-    requires !detail::is_v<DVF, on_error_fn> && !detail::is_v<DVF, on_done_fn> &&
-    !detail::is_v<DEF, on_done_fn> flow_single(Data d, DVF vf, DEF ef)
+PUSHMI_TEMPLATE(class Data, class DVF, class DEF)
+  (requires Receiver<Data> && !detail::is_v<DVF, on_error_fn> &&
+    !detail::is_v<DVF, on_done_fn> && !detail::is_v<DEF, on_done_fn>)
+flow_single(Data d, DVF vf, DEF ef)
          -> flow_single<Data, DVF, DEF, passDDF, passDStpF, passDStrtF>;
 
-template <Receiver Data, class... DEFN, class DDF>
+PUSHMI_TEMPLATE(class Data, class... DEFN, class DDF)
+  (requires Receiver<Data>)
 flow_single(Data d, on_error_fn<DEFN...>, on_done_fn<DDF>)
     -> flow_single<
         Data,
@@ -511,27 +526,29 @@ flow_single(Data d, on_error_fn<DEFN...>, on_done_fn<DDF>)
         passDStpF,
         passDStrtF>;
 
-template <Receiver Data, class DDF>
+PUSHMI_TEMPLATE(class Data, class DDF)
+  (requires Receiver<Data>)
 flow_single(Data d, on_done_fn<DDF>)
     -> flow_single<Data, passDVF, passDEF, on_done_fn<DDF>, passDStpF, passDStrtF>;
 
-template <Receiver Data, class DVF, class DEF, class DDF>
-requires Invocable<DDF&, Data&> flow_single(Data d, DVF vf, DEF ef, DDF df)
+PUSHMI_TEMPLATE(class Data, class DVF, class DEF, class DDF)
+  (requires Receiver<Data> &&  Invocable<DDF&, Data&>)
+flow_single(Data d, DVF vf, DEF ef, DDF df)
     -> flow_single<Data, DVF, DEF, DDF, passDStpF, passDStrtF>;
 
-template <Receiver Data, class DVF, class DEF, class DDF, class DStpF>
-requires Invocable<DDF&, Data&>&& Invocable<DStpF&, Data&>
+PUSHMI_TEMPLATE(class Data, class DVF, class DEF, class DDF, class DStpF)
+  (requires Receiver<Data> &&  Invocable<DDF&, Data&> && Invocable<DStpF&, Data&>)
 flow_single(Data d, DVF vf, DEF ef, DDF df, DStpF stpf)
     -> flow_single<Data, DVF, DEF, DDF, DStpF, passDStrtF>;
 
-template <
-    Receiver Data,
+PUSHMI_TEMPLATE(
+    class Data,
     class DVF,
     class DEF,
     class DDF,
     class DStpF,
-    class DStrtF>
-requires Invocable<DDF&, Data&>&& Invocable<DStpF&, Data&>
+    class DStrtF)
+  (requires Receiver<Data> && Invocable<DDF&, Data&> && Invocable<DStpF&, Data&>)
 flow_single(Data d, DVF vf, DEF ef, DDF df, DStpF stpf, DStrtF strtf)
     -> flow_single<Data, DVF, DEF, DDF, DStpF, DStrtF>;
 #endif

@@ -109,7 +109,8 @@ template <class V, class E, class TP>
 constexpr typename time_single_deferred<V, E, TP>::vtable const
     time_single_deferred<V, E, TP>::vtable::noop_;
 
-template <class SF, Invocable NF>
+template <class SF, class NF>
+  requires Invocable<NF&>
 class time_single_deferred<SF, NF> {
   SF sf_{};
   NF nf_{};
@@ -133,7 +134,8 @@ class time_single_deferred<SF, NF> {
   }
 };
 
-template <TimeSender<is_single<>> Data, class DSF, Invocable<Data&> DNF>
+template <TimeSender<is_single<>> Data, class DSF, class DNF>
+  requires Invocable<DNF&, Data&>
 class time_single_deferred<Data, DSF, DNF> {
   Data data_{};
   DSF sf_{};
@@ -168,7 +170,8 @@ template <class SF>
 auto make_time_single_deferred(SF sf) -> time_single_deferred<SF, systemNowF> {
   return time_single_deferred<SF, systemNowF>{std::move(sf)};
 }
-template <class SF, Invocable NF>
+template <class SF, class NF>
+  requires Invocable<NF&>
 auto make_time_single_deferred(SF sf, NF nf) -> time_single_deferred<SF, NF> {
   return {std::move(sf), std::move(nf)};
 }
@@ -178,6 +181,7 @@ auto make_time_single_deferred(Data d, DSF sf) ->
   return {std::move(d), std::move(sf)};
 }
 template <TimeSender<is_single<>> Data, class DSF, class DNF>
+  requires Invocable<DNF&, Data&>
 auto make_time_single_deferred(Data d, DSF sf, DNF nf) ->
     time_single_deferred<Data, DSF, DNF> {
   return {std::move(d), std::move(sf), std::move(nf)};
@@ -191,13 +195,15 @@ time_single_deferred() -> time_single_deferred<ignoreSF, systemNowF>;
 template <class SF>
 time_single_deferred(SF) -> time_single_deferred<SF, systemNowF>;
 
-template <class SF, Invocable NF>
+template <class SF, class NF>
+  requires Invocable<NF&>
 time_single_deferred(SF, NF) -> time_single_deferred<SF, NF>;
 
 template <TimeSender<is_single<>> Data, class DSF>
 time_single_deferred(Data, DSF) -> time_single_deferred<Data, DSF, passDNF>;
 
 template <TimeSender<is_single<>> Data, class DSF, class DNF>
+  requires Invocable<DNF&, Data&>
 time_single_deferred(Data, DSF, DNF) -> time_single_deferred<Data, DSF, DNF>;
 #endif
 

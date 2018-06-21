@@ -15,37 +15,35 @@ namespace operators {
 namespace detail {
 
 struct on_fn {
-  template <Invocable ExecutorFactory>
-  auto operator()(ExecutorFactory ef) const;
+  PUSHMI_TEMPLATE(class ExecutorFactory)
+    (requires Invocable<ExecutorFactory&>)
+  auto operator()(ExecutorFactory ef) const {
+    return constrain(lazy::Sender<_1>, [ef = std::move(ef)](auto in) {
+      using In = decltype(in);
+      return ::pushmi::detail::deferred_from<In, single<>>(
+        std::move(in),
+        ::pushmi::detail::submit_transform_out<In>(
+          constrain(lazy::SenderTo<In, _2>, [ef](In& in, auto out) {
+            auto exec = ef();
+            ::pushmi::submit(exec, ::pushmi::now(exec),
+              ::pushmi::make_single([in = in, out = std::move(out)](auto) mutable {
+                ::pushmi::submit(in, std::move(out));
+              })
+            );
+          }),
+          constrain(lazy::TimeSenderTo<In, _3>, [ef](In& in, auto at, auto out) {
+            auto exec = ef();
+            ::pushmi::submit(exec, at,
+              ::pushmi::on_value([in = in, at, out = std::move(out)](auto) mutable {
+                ::pushmi::submit(in, at, std::move(out));
+              })
+            );
+          })
+        )
+      );
+    });
+  }
 };
-
-template <Invocable ExecutorFactory>
-auto on_fn::operator()(ExecutorFactory ef) const {
-  return constrain<mock::Sender<_1>>([ef = std::move(ef)](auto in) {
-    using In = decltype(in);
-    return ::pushmi::detail::deferred_from<In, single<>>(
-      std::move(in),
-      ::pushmi::detail::submit_transform_out<In>(
-        constrain<mock::SenderTo<In, _2>>([ef](In& in, auto out) {
-          auto exec = ef();
-          ::pushmi::submit(exec, ::pushmi::now(exec),
-            ::pushmi::make_single([in = in, out = std::move(out)](auto) mutable {
-              ::pushmi::submit(in, std::move(out));
-            })
-          );
-        }),
-        constrain<mock::TimeSenderTo<In, _3>>([ef](In& in, auto at, auto out) {
-          auto exec = ef();
-          ::pushmi::submit(exec, at,
-            ::pushmi::on_value([in = in, at, out = std::move(out)](auto) mutable {
-              ::pushmi::submit(in, at, std::move(out));
-            })
-          );
-        })
-      )
-    );
-  });
-}
 
 } // namespace detail
 

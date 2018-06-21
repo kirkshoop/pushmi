@@ -144,8 +144,8 @@ public:
   }
 };
 
-template <Receiver<is_none<>> Data, class DEF, class DDF>
-  requires Invocable<DDF&, Data&>
+template <class Data, class DEF, class DDF>
+  requires Receiver<Data, is_none<>> && Invocable<DDF&, Data&>
 class none<Data, DEF, DDF> {
   bool done_ = false;
   Data data_{};
@@ -190,37 +190,41 @@ class none<>
 inline auto make_none() -> none<> {
   return {};
 }
-template <class EF>
+PUSHMI_TEMPLATE(class EF)
+  (requires PUSHMI_BROKEN_SUBSUMPTION(!lazy::Receiver<EF> && !lazy::Invocable<EF&>))
 auto make_none(EF ef) -> none<EF, ignoreDF> {
   return none<EF, ignoreDF>{std::move(ef)};
 }
-template <class DF>
-  requires Invocable<DF&>
+PUSHMI_TEMPLATE(class DF)
+  (requires lazy::Invocable<DF&> PUSHMI_BROKEN_SUBSUMPTION(&& !lazy::Receiver<DF>))
 auto make_none(DF df) -> none<abortEF, DF> {
   return none<abortEF, DF>{std::move(df)};
 }
-template <class EF, class DF>
-  requires Invocable<DF&>
+PUSHMI_TEMPLATE(class EF, class DF)
+  (requires lazy::Invocable<DF&> PUSHMI_BROKEN_SUBSUMPTION(&& !lazy::Receiver<EF>))
 auto make_none(EF ef, DF df) -> none<EF, DF> {
   return {std::move(ef), std::move(df)};
 }
-template <Receiver<is_none<>> Data>
-  requires !Receiver<Data, is_single<>>
+PUSHMI_TEMPLATE(class Data)
+  (requires lazy::Receiver<Data, is_none<>> && !lazy::Receiver<Data, is_single<>>)
 auto make_none(Data d) -> none<Data, passDEF, passDDF> {
   return none<Data, passDEF, passDDF>{std::move(d)};
 }
-template <Receiver<is_none<>> Data, class DEF>
-  requires !Receiver<Data, is_single<>>
+PUSHMI_TEMPLATE(class Data, class DEF)
+  (requires lazy::Receiver<Data, is_none<>> && !lazy::Receiver<Data, is_single<>>
+    PUSHMI_BROKEN_SUBSUMPTION(&& !lazy::Invocable<DEF&, Data&>))
 auto make_none(Data d, DEF ef) -> none<Data, DEF, passDDF> {
   return {std::move(d), std::move(ef)};
 }
-template <Receiver<is_none<>> Data, class DDF>
-  requires Invocable<DDF&, Data&> && !Receiver<Data, is_single<>>
+PUSHMI_TEMPLATE(class Data, class DDF)
+  (requires lazy::Receiver<Data, is_none<>> && !lazy::Receiver<Data, is_single<>> &&
+    lazy::Invocable<DDF&, Data&>)
 auto make_none(Data d, DDF df) -> none<Data, passDEF, DDF> {
   return {std::move(d), std::move(df)};
 }
-template <Receiver<is_none<>> Data, class DEF, class DDF>
-  requires !Receiver<Data, is_single<>>
+PUSHMI_TEMPLATE(class Data, class DEF, class DDF)
+  (requires lazy::Receiver<Data, is_none<>> && !lazy::Receiver<Data, is_single<>> &&
+    lazy::Invocable<DDF&, Data&>)
 auto make_none(Data d, DEF ef, DDF df) -> none<Data, DEF, DDF> {
   return {std::move(d), std::move(ef), std::move(df)};
 }
@@ -230,31 +234,35 @@ auto make_none(Data d, DEF ef, DDF df) -> none<Data, DEF, DDF> {
 #if __cpp_deduction_guides >= 201703
 none() -> none<>;
 
-template <class EF>
+PUSHMI_TEMPLATE(class EF)
+  (requires PUSHMI_BROKEN_SUBSUMPTION(!lazy::Receiver<EF> && !lazy::Invocable<EF&>))
 none(EF) -> none<EF, ignoreDF>;
 
-template <class DF>
-  requires Invocable<DF&>
+PUSHMI_TEMPLATE(class DF)
+  (requires lazy::Invocable<DF&> PUSHMI_BROKEN_SUBSUMPTION(&& !lazy::Receiver<DF>))
 none(DF) -> none<abortEF, DF>;
 
-template <class EF, class DF>
-  requires Invocable<DF&>
+PUSHMI_TEMPLATE(class EF, class DF)
+  (requires lazy::Invocable<DF&> PUSHMI_BROKEN_SUBSUMPTION(&& !lazy::Receiver<EF>))
 none(EF, DF) -> none<EF, DF>;
 
-template <Receiver<is_none<>> Data>
-  requires !Receiver<Data, is_single<>>
+PUSHMI_TEMPLATE(class Data)
+  (requires lazy::Receiver<Data, is_none<>> && !lazy::Receiver<Data, is_single<>>)
 none(Data) -> none<Data, passDEF, passDDF>;
 
-template <Receiver<is_none<>> Data, class DEF>
-  requires !Receiver<Data, is_single<>>
+PUSHMI_TEMPLATE(class Data, class DEF)
+  (requires lazy::Receiver<Data, is_none<>> && !lazy::Receiver<Data, is_single<>>
+    PUSHMI_BROKEN_SUBSUMPTION(&& !lazy::Invocable<DEF&, Data&>))
 none(Data, DEF) -> none<Data, DEF, passDDF>;
 
-template <Receiver<is_none<>> Data, class DDF>
-  requires Invocable<DDF&, Data&> && !Receiver<Data, is_single<>>
+PUSHMI_TEMPLATE(class Data, class DDF)
+  (requires lazy::Receiver<Data, is_none<>> && !lazy::Receiver<Data, is_single<>> &&
+    lazy::Invocable<DDF&, Data&>)
 none(Data, DDF) -> none<Data, passDEF, DDF>;
 
-template <Receiver<is_none<>> Data, class DEF, class DDF>
-  requires !Receiver<Data, is_single<>>
+PUSHMI_TEMPLATE(class Data, class DEF, class DDF)
+  (requires lazy::Receiver<Data, is_none<>> && !lazy::Receiver<Data, is_single<>> &&
+    lazy::Invocable<DDF&, Data&>)
 none(Data, DEF, DDF) -> none<Data, DEF, DDF>;
 #endif
 

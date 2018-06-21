@@ -203,16 +203,20 @@ template <class F, class...As>
 struct invoke_result : meta::defer<invoke_result_t, F, As...> {};
 #endif
 
-template <class F, class... Args>
-concept bool Invocable = requires(F&& f, Args&&... args) {
-  pushmi::invoke((F &&) f, (Args &&) args...);
-};
+PUSHMI_CONCEPT_DEF(
+  template (class F, class... Args)
+  (concept Invocable)(F, Args...),
+    requires(F&& f, Args&&... args) (
+      pushmi::invoke((F &&) f, (Args &&) args...)
+    )
+);
 
 template <class F, class... Args>
 concept bool NothrowInvocable =
-    Invocable<F, Args...> && requires(F&& f, Args&&... args) {
-  { pushmi::invoke((F &&) f, (Args &&) args...) } noexcept;
-};
+  Invocable<F, Args...> &&
+  requires(F&& f, Args&&... args) {
+    { pushmi::invoke((F &&) f, (Args &&) args...) } noexcept;
+  };
 
 namespace detail {
 // is_ taken from meta library
@@ -230,12 +234,5 @@ template <bool B, class T = void>
 using requires_ = std::enable_if_t<B, T>;
 
 } // namespace detail
-
-namespace mock {
-template <class F, class... Args>
-struct Invocable {
-  void operator()() requires pushmi::Invocable<F, Args...> {}
-};
-} // namespace mock
 
 } // namespace pushmi

@@ -103,8 +103,8 @@ class deferred<SF> {
 
   constexpr deferred() = default;
   constexpr explicit deferred(SF sf) : sf_(std::move(sf)) {}
-  template <Receiver<is_none<>> Out>
-    requires Invocable<SF&, Out>
+  PUSHMI_TEMPLATE(class Out)
+    (requires Receiver<Out, is_none<>> && Invocable<SF&, Out>)
   void submit(Out out) {
     sf_(std::move(out));
   }
@@ -124,8 +124,8 @@ class deferred<Data, DSF> {
   constexpr deferred(Data data, DSF sf)
       : data_(std::move(data)), sf_(std::move(sf)) {}
 
-  template <Receiver<is_none<>> Out>
-    requires Invocable<DSF&, Data&, Out>
+  PUSHMI_TEMPLATE(class Out)
+    (requires Receiver<Out, is_none<>> && Invocable<DSF&, Data&, Out>)
   void submit(Out out) {
     sf_(data_, std::move(out));
   }

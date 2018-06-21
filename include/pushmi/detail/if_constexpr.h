@@ -26,7 +26,6 @@
 
 #define PUSHMI_STRIP(...) __VA_ARGS__
 
-
 namespace pushmi {
 namespace detail {
 struct id_fn {
@@ -64,6 +63,8 @@ struct id_fn {
   else {__VA_ARGS__}
 
 #else
+
+#include <type_traits>
 
 #define PUSHMI_IF_CONSTEXPR(LIST)\
   PUSHMI_EVAL(PUSHMI_IF_CONSTEXPR_ELSE_, PUSHMI_IF_CONSTEXPR_IF_ LIST)\

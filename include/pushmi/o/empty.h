@@ -19,7 +19,7 @@ namespace operators {
 template <class V>
 auto empty() {
   return make_single_deferred(
-    constrain<mock::SingleReceiver<_1, V>>([](auto out) mutable {
+    constrain(lazy::SingleReceiver<_1, V>, [](auto out) mutable {
       ::pushmi::set_done(out);
     })
   );
@@ -27,7 +27,7 @@ auto empty() {
 
 inline auto empty() {
   return make_deferred(
-    constrain<mock::NoneReceiver<_1>>([](auto out) mutable {
+    constrain(lazy::NoneReceiver<_1>, [](auto out) mutable {
       ::pushmi::set_done(out);
     })
   );

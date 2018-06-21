@@ -107,8 +107,8 @@ class flow_single_deferred<SF> {
   constexpr explicit flow_single_deferred(SF sf)
       : sf_(std::move(sf)) {}
 
-  template <Receiver<is_flow<>> Out>
-    requires Invocable<SF&, Out>
+  PUSHMI_TEMPLATE(class Out)
+    (requires Receiver<Out, is_flow<>> && Invocable<SF&, Out>)
   void submit(Out out) {
     sf_(std::move(out));
   }

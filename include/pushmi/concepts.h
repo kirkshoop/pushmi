@@ -41,8 +41,11 @@ template<class PS>
 struct is_silent<PS> : property_query<PS, is_silent<>> {};
 template<class PS>
 PUSHMI_INLINE_VAR constexpr bool is_silent_v = is_silent<PS>::value;
-template <class PS>
-concept bool Silent = is_silent_v<PS>;
+PUSHMI_CONCEPT_DEF(
+  template (class PS)
+  concept Silent,
+    is_silent_v<PS>
+);
 
 // None trait and tag
 template<class... TN>
@@ -55,8 +58,11 @@ template<class PS>
 struct is_none<PS> : property_query<PS, is_none<>> {};
 template<class PS>
 PUSHMI_INLINE_VAR constexpr bool is_none_v = is_none<PS>::value;
-template <class PS>
-concept bool None = is_none_v<PS>;
+PUSHMI_CONCEPT_DEF(
+  template (class PS)
+  concept None,
+    Silent<PS> && is_none_v<PS>
+);
 
 // Single trait and tag
 template<class... TN>
@@ -69,8 +75,11 @@ template<class PS>
 struct is_single<PS> : property_query<PS, is_single<>> {};
 template<class PS>
 PUSHMI_INLINE_VAR constexpr bool is_single_v = is_single<PS>::value;
-template <class PS>
-concept bool Single = is_single_v<PS>;
+PUSHMI_CONCEPT_DEF(
+  template (class PS)
+  concept Single,
+    None<PS> && is_single_v<PS>
+);
 
 // Many trait and tag
 template<class... TN>
@@ -83,9 +92,11 @@ template<class PS>
 struct is_many<PS> : property_query<PS, is_many<>> {};
 template<class PS>
 PUSHMI_INLINE_VAR constexpr bool is_many_v = is_many<PS>::value;
-template <class PS>
-concept bool Many = is_many_v<PS>;
-
+PUSHMI_CONCEPT_DEF(
+  template (class PS)
+  concept Many,
+    None<PS> && is_many_v<PS>
+);
 
 // Flow trait and tag
 template<class... TN>
@@ -98,9 +109,11 @@ template<class PS>
 struct is_flow<PS> : property_query<PS, is_flow<>> {};
 template<class PS>
 PUSHMI_INLINE_VAR constexpr bool is_flow_v = is_flow<PS>::value;
-template <class PS>
-concept bool Flow = is_flow_v<PS>;
-
+PUSHMI_CONCEPT_DEF(
+  template (class PS)
+  concept Flow,
+    is_flow_v<PS>
+);
 
 // Receiver trait and tag
 template<class... TN>
@@ -113,9 +126,11 @@ template<class PS>
 struct is_receiver<PS> : property_query<PS, is_receiver<>> {};
 template<class PS>
 PUSHMI_INLINE_VAR constexpr bool is_receiver_v = is_receiver<PS>::value;
-// template <class PS>
-// concept bool Receiver = is_receiver_v<PS>;
-
+// PUSHMI_CONCEPT_DEF(
+//   template (class PS)
+//   concept Receiver,
+//     is_receiver_v<PS>
+// );
 
 // Sender trait and tag
 template<class... TN>
@@ -128,8 +143,11 @@ template<class PS>
 struct is_sender<PS> : property_query<PS, is_sender<>> {};
 template<class PS>
 PUSHMI_INLINE_VAR constexpr bool is_sender_v = is_sender<PS>::value;
-// template <class PS>
-// concept bool Sender = is_sender_v<PS>;
+// PUSHMI_CONCEPT_DEF(
+//   template (class PS)
+//   concept Sender,
+//     is_sender_v<PS>
+// );
 
 // Time trait and tag
 template<class... TN>
@@ -142,8 +160,11 @@ template<class PS>
 struct is_time<PS> : property_query<PS, is_time<>> {};
 template<class PS>
 PUSHMI_INLINE_VAR constexpr bool is_time_v = is_time<PS>::value;
-template <class PS>
-concept bool Time = is_time_v<PS>;
+PUSHMI_CONCEPT_DEF(
+  template (class PS)
+  concept Time,
+    is_time_v<PS>
+);
 
 // Constrained trait and tag
 template<class... TN>
@@ -156,17 +177,22 @@ template<class PS>
 struct is_constrained<PS> : property_query<PS, is_constrained<>> {};
 template<class PS>
 PUSHMI_INLINE_VAR constexpr bool is_constrained_v = is_constrained<PS>::value;
-template <class PS>
-concept bool Constrained = is_constrained_v<PS>;
+PUSHMI_CONCEPT_DEF(
+  template (class PS)
+  concept Constrained,
+    is_constrained_v<PS>
+);
 
-
-template <class S, class... PropertyN>
-concept bool Receiver = SemiMovable<S> && 
-  property_query_v<S, PropertyN...> &&
-  is_receiver_v<S> &&
-  requires (S& s) {
-    ::pushmi::set_done(s);
-  };
+PUSHMI_CONCEPT_DEF(
+  template (class S, class... PropertyN)
+  (concept Receiver)(S, PropertyN...),
+    requires (S& s) (
+      ::pushmi::set_done(s)
+    ) &&
+    SemiMovable<S> &&
+    property_query_v<S, PropertyN...> &&
+    is_receiver_v<S>
+);
 
 template <class N, class E = std::exception_ptr>
 concept bool NoneReceiver = Receiver<N> &&
@@ -328,39 +354,62 @@ using constraint_t = decltype(::pushmi::top(std::declval<D&>()));
 
 // Mock concepts for use with the constrain() function template for
 // constraining generic lambdas.
-namespace mock {
+namespace lazy {
 
-template <class Out, class Tag = is_silent<>>
-struct Receiver {
-  void operator()() requires pushmi::Receiver<Out, Tag> {}
+template <class Out, class E = std::exception_ptr>
+struct NoneReceiver_ {
+  explicit constexpr operator bool() const noexcept {
+    return pushmi::NoneReceiver<Out, E>;
+  }
 };
 template <class Out, class E = std::exception_ptr>
-struct NoneReceiver {
-  void operator()() requires pushmi::NoneReceiver<Out, E> {}
+PUSHMI_INLINE_VAR constexpr auto NoneReceiver = NoneReceiver_<Out, E>{};
+
+template <class Out, class V, class E = std::exception_ptr>
+struct SingleReceiver_ {
+  explicit constexpr operator bool() const noexcept {
+    return pushmi::SingleReceiver<Out, V, E>;
+  }
 };
 template <class Out, class V, class E = std::exception_ptr>
-struct SingleReceiver {
-  void operator()() requires pushmi::SingleReceiver<Out, V, E> {}
-};
+PUSHMI_INLINE_VAR constexpr auto SingleReceiver = SingleReceiver_<Out, V, E>{};
 
 template <class D, class Tag = is_silent<>>
-struct Sender {
-  void operator()() requires pushmi::Sender<D, Tag> {}
+struct Sender_ {
+  explicit constexpr operator bool() const noexcept {
+    return pushmi::Sender<D, Tag>;
+  }
+};
+template <class D, class Tag = is_silent<>>
+PUSHMI_INLINE_VAR constexpr auto Sender = Sender_<D, Tag>{};
+
+template <class D, class S, class Tag = is_silent<>>
+struct SenderTo_ {
+  explicit constexpr operator bool() const noexcept {
+    return pushmi::SenderTo<D, S, Tag>;
+  }
 };
 template <class D, class S, class Tag = is_silent<>>
-struct SenderTo {
-  void operator()() requires pushmi::SenderTo<D, S, Tag> {}
-};
+PUSHMI_INLINE_VAR constexpr auto SenderTo = SenderTo_<D, S, Tag>{};
 
 template <class D, class Tag = is_silent<>>
-struct TimeSender {
-  void operator()() requires pushmi::TimeSender<D, Tag> {}
+struct TimeSender_ {
+  explicit constexpr operator bool() const noexcept {
+    return pushmi::TimeSender<D, Tag>;
+  }
+};
+template <class D, class Tag = is_silent<>>
+PUSHMI_INLINE_VAR constexpr auto TimeSender = TimeSender_<D, Tag>{};
+
+template <class D, class S, class Tag = is_silent<>>
+struct TimeSenderTo_ {
+  explicit constexpr operator bool() const noexcept {
+    return pushmi::TimeSenderTo<D, S, Tag>;
+  }
 };
 template <class D, class S, class Tag = is_silent<>>
-struct TimeSenderTo {
-  void operator()() requires pushmi::TimeSenderTo<D, S, Tag> {}
-};
+PUSHMI_INLINE_VAR constexpr auto TimeSenderTo = TimeSenderTo_<D, S, Tag>{};
 
-} // namespace mock
+} // namespace lazy
 
 } // namespace pushmi

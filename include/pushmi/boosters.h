@@ -75,7 +75,8 @@ struct systemNowF {
 };
 
 struct passDVF {
-  template <class V, Receiver Data>
+  PUSHMI_TEMPLATE(class V, class Data)
+    (requires Receiver<Data>)
   requires requires(Data& out, V&& v) {
     ::pushmi::set_value(out, (V&&) v);
   }
@@ -92,21 +93,24 @@ struct passDEF {
 };
 
 struct passDDF {
-  template <Receiver Data>
+  PUSHMI_TEMPLATE(class Data)
+    (requires Receiver<Data>)
   void operator()(Data& out) const {
     ::pushmi::set_done(out);
   }
 };
 
 struct passDStpF {
-  template <Receiver Data>
+  PUSHMI_TEMPLATE(class Data)
+    (requires Receiver<Data>)
   void operator()(Data& out) const {
     ::pushmi::set_stopping(out);
   }
 };
 
 struct passDStrtF {
-  template <class Up, Receiver Data>
+  PUSHMI_TEMPLATE(class Up, class Data)
+    (requires Receiver<Data>)
   requires requires(Data& out, Up& up) {
     ::pushmi::set_starting(out, up);
   }

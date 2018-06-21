@@ -251,16 +251,36 @@ PUSHMI_PP_IGNORE_CXX2A_COMPAT_BEGIN
             (__VA_ARGS__))(~) int>;                                            \
         PUSHMI_PP_IGNORE_CXX2A_COMPAT_END                                      \
         PUSHMI_PP_CAT(PUSHMI_PP_DEF_, TPARAM)                                  \
-        static constexpr decltype(::pushmi::concepts::detail                   \
-            ::gcc_bugs_bugs_bugs(&_concept_requires_<PUSHMI_PP_EXPAND ARGS>))  \
-        is_satisfied_by(int) noexcept { return true; }                         \
-        PUSHMI_PP_CAT(PUSHMI_PP_DEF_, TPARAM)                                  \
-        static constexpr bool is_satisfied_by(long) noexcept { return false; } \
+        struct _is_satisfied_by_ {                                             \
+            template <                                                         \
+                class C_ = Concept,                                            \
+                class = decltype(::pushmi::concepts::detail::gcc_bugs(         \
+                    &C_::template _concept_requires_<PUSHMI_PP_EXPAND ARGS>))> \
+            static constexpr bool impl(int) noexcept { return true; }          \
+            static constexpr bool impl(long) noexcept { return false; }        \
+            explicit constexpr operator bool() const noexcept {                \
+                return _is_satisfied_by_::impl(0);                             \
+            }                                                                  \
+            constexpr auto operator!() const noexcept {                        \
+                return ::pushmi::concepts::detail::Not<_is_satisfied_by_>{};   \
+            }                                                                  \
+            template <class That>                                              \
+            constexpr auto operator&&(That) const noexcept {                   \
+                return ::pushmi::concepts::detail::And<                        \
+                    _is_satisfied_by_, That>{};                                \
+            }                                                                  \
+        };                                                                     \
     };                                                                         \
     PUSHMI_PP_CAT(PUSHMI_PP_DEF_, TPARAM)                                      \
     PUSHMI_INLINE_VAR constexpr bool PUSHMI_PP_CAT(PUSHMI_PP_DEF_, NAME) =     \
-        PUSHMI_PP_CAT(PUSHMI_PP_CAT(PUSHMI_PP_DEF_, NAME), Concept)            \
-            ::is_satisfied_by<PUSHMI_PP_EXPAND ARGS>(0);                       \
+        (bool)PUSHMI_PP_CAT(PUSHMI_PP_CAT(PUSHMI_PP_DEF_, NAME), Concept)      \
+            ::_is_satisfied_by_<PUSHMI_PP_EXPAND ARGS>{};                      \
+    namespace lazy {                                                           \
+        PUSHMI_PP_CAT(PUSHMI_PP_DEF_, TPARAM)                                  \
+        PUSHMI_INLINE_VAR constexpr auto PUSHMI_PP_CAT(PUSHMI_PP_DEF_, NAME) = \
+            PUSHMI_PP_CAT(PUSHMI_PP_CAT(PUSHMI_PP_DEF_, NAME), Concept)        \
+                ::_is_satisfied_by_<PUSHMI_PP_EXPAND ARGS>{};                  \
+    }                                                                          \
     /**/
 
 #define PUSHMI_PP_DEF_DECL_template(...)                                       \
@@ -330,10 +350,12 @@ PUSHMI_PP_IGNORE_CXX2A_COMPAT_BEGIN
 #define PUSHMI_TEMPLATE(...)                                                   \
     template<__VA_ARGS__ PUSHMI_TEMPLATE_AUX_
 #define PUSHMI_TEMPLATE_AUX_(...) ,                                            \
-    int (*_pushmi_concept_unique_)[PUSHMI_COUNTER] = nullptr,                  \
-    std::enable_if_t<_pushmi_concept_unique_ ||                                \
+    int (*PUSHMI_PP_CAT(_pushmi_concept_unique_, __LINE__))[PUSHMI_COUNTER] = nullptr,                  \
+    std::enable_if_t<PUSHMI_PP_CAT(_pushmi_concept_unique_, __LINE__) ||                                \
         bool(PUSHMI_PP_CAT(PUSHMI_TEMPLATE_AUX_3_, __VA_ARGS__)), int> = 0>
 #define PUSHMI_TEMPLATE_AUX_3_requires
+
+#define PUSHMI_BROKEN_SUBSUMPTION(...) __VA_ARGS__
 
 namespace pushmi {
 namespace concepts {
@@ -343,9 +365,39 @@ inline constexpr bool requires_() {
   return true;
 }
 template<typename T>
-bool gcc_bugs_bugs_bugs(T);
-}
-}
+bool gcc_bugs(T);
+template <class T, class U>
+struct And;
+template <class T>
+struct Not {
+    explicit constexpr operator bool() const noexcept {
+        return !(bool) T{};
+    }
+    constexpr auto operator!() const noexcept {
+        return T{};
+    }
+    template <class That>
+    constexpr auto operator&&(That) const noexcept {
+        return And<Not, That>{};
+    }
+};
+template <class T, class U>
+struct And {
+    static constexpr bool impl(std::false_type) noexcept { return false; }
+    static constexpr bool impl(std::true_type) noexcept { return (bool) U{}; }
+    explicit constexpr operator bool() const noexcept {
+        return And::impl(std::integral_constant<bool, (bool) T{}>{});
+    }
+    constexpr auto operator!() const noexcept {
+        return Not<And>{};
+    }
+    template <class That>
+    constexpr auto operator&&(That) const noexcept {
+        return detail::And<And, That>{};
+    }
+};
+} // namespace detail
+} // namespace concepts
 template <class T>
 PUSHMI_INLINE_VAR constexpr bool typename_ = true;
 template <class T>
@@ -354,6 +406,6 @@ constexpr bool implicitly_convertible_to(T) {
 }
 template <bool B>
 PUSHMI_INLINE_VAR constexpr std::enable_if_t<B, bool> requires_ = true;
-}
+} // namespace pushmi
 
 PUSHMI_PP_IGNORE_CXX2A_COMPAT_END
