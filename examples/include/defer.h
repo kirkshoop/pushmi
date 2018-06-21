@@ -18,10 +18,10 @@ PUSHMI_TEMPLATE(class F)
   (requires Invocable<F>)
 auto defer(F f) {
   return make_single_deferred(
-    constrain<mock::Receiver<_1>>(
+    constrain(lazy::Receiver<_1>, 
       [f = std::move(f)](auto out) mutable {
         auto sender = f();
-        PUSHMI_IF_CONSTEXPR_RETURN( ((bool)TimeSender<decltype(sender)>) (
+        PUSHMI_IF_CONSTEXPR( ((bool)TimeSender<decltype(sender)>) (
           ::pushmi::submit(sender, ::pushmi::now(id(sender)), std::move(out));
         ) else (
           ::pushmi::submit(sender, std::move(out));

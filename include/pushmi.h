@@ -5324,7 +5324,7 @@ PUSHMI_CONCEPT_DEF(
     requires (S& s) (
       ::pushmi::set_done(s)
     ) &&
-    SemiMovable<S> && 
+    SemiMovable<S> &&
     property_query_v<S, PropertyN...> &&
     is_receiver_v<S>
 );
@@ -9126,16 +9126,16 @@ struct tap_ {
   using properties = properties_t<Out>;
 
   PUSHMI_TEMPLATE(class V, class UV = std::remove_reference_t<V>)
-    (requires 
-      // SingleReceiver<SideEffects, const UV&> && 
+    (requires
+      // SingleReceiver<SideEffects, const UV&> &&
       SingleReceiver<Out, V>)
   void value(V&& v) {
     ::pushmi::set_value(sideEffects, as_const(v));
     ::pushmi::set_value(out, (V&&) v);
   }
   PUSHMI_TEMPLATE(class E)
-    (requires 
-      // NoneReceiver<SideEffects, const E&> && 
+    (requires
+      // NoneReceiver<SideEffects, const E&> &&
       NoneReceiver<Out, E>)
   void error(E e) noexcept {
     ::pushmi::set_error(sideEffects, as_const(e));
