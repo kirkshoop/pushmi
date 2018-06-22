@@ -32,6 +32,12 @@ int main()
     op::tap([](int v){ printf("cpu pool processing, %d\n", v); }) |
     op::submit();
 
+  // when the caller is not going to process the result (only side-effect matters)
+  // or the caller is just going to push the result into a queue.
+  // provide a way to skip the transition to a different executor and make it 
+  // stand out so that it has to be justified in code reviews.
+  mi::via_cast<mi::is_sender<>>(io_operation(io)) | op::submit();
+
   ioPool.wait();
   cpuPool.wait();
 
