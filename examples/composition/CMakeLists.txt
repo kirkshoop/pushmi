@@ -11,4 +11,10 @@ add_executable(composition_3 composition_3.cpp)
     pushmi
     examples
     Threads::Threads)
+
+add_executable(composition_4 composition_4.cpp)
+  target_link_libraries(composition_4
+    pushmi
+    examples
+    Threads::Threads)
   
