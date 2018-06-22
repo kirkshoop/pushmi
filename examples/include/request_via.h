@@ -42,4 +42,16 @@ PUSHMI_INLINE_VAR constexpr detail::request_via_fn request_via{};
 
 } // namespace operators
 
+PUSHMI_TEMPLATE(class To, class In)
+  (requires Same<To, is_sender<>> && Sender<_1>)
+auto via_cast(In in) {
+  return in;
+}
+
+PUSHMI_TEMPLATE(class To, class In)
+  (requires Same<To, is_sender<>>)
+auto via_cast(detail::request_via_fn::semisender<In> ss) {
+  return ss.in;
+}
+
 } // namespace pushmi
