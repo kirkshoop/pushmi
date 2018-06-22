@@ -101,11 +101,8 @@ int main()
   sugar(cpuPool.executor(), ioPool.executor());
   pipe(cpuPool.executor(), ioPool.executor());
 
-  std::cout << "OK" << std::endl;
-
-  ioPool.stop();
-  cpuPool.stop();
-
   ioPool.wait();
   cpuPool.wait();
+
+  std::cout << "OK" << std::endl;
 }
