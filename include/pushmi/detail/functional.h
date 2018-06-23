@@ -19,42 +19,22 @@ namespace detail {
 
 struct placeholder;
 
-template <class T, class>
-struct replace {
+template <class T, class Args, class = void>
+struct substitute {
   using type = T;
 };
 template <std::size_t I, class Args>
-struct replace<placeholder[I], Args>
+struct substitute<placeholder[I], Args>
   : meta::lazy::let<
       meta::defer<std::decay_t, meta::lazy::at<Args, meta::size_t<I-1>>>> {
 };
 template <std::size_t I, class Args>
-struct replace<placeholder(&&)[I], Args>
+struct substitute<placeholder(&&)[I], Args>
   : meta::lazy::at<Args, meta::size_t<I-1>> {
 };
-
-template <class Requirement, class Args>
-struct substitute {
-};
 template <template <class...> class R, class... Ts, class Args>
-  requires requires { typename R<meta::_t<replace<Ts, Args>>...>; }
-struct substitute<R<Ts...>, Args> {
-  using type = R<meta::_t<replace<Ts, Args>>...>;
-};
-template <class T, class Args>
-  requires requires { typename meta::_t<substitute<T, Args>>; }
-struct substitute<pushmi::concepts::detail::Not<T>, Args> {
-  using type = pushmi::concepts::detail::Not<meta::_t<substitute<T, Args>>>;
-};
-template <class T, class U, class Args>
-  requires requires {
-    typename meta::_t<substitute<T, Args>>;
-    typename meta::_t<substitute<U, Args>>;
-  }
-struct substitute<pushmi::concepts::detail::And<T, U>, Args> {
-  using type = pushmi::concepts::detail::And<
-    meta::_t<substitute<T, Args>>,
-    meta::_t<substitute<U, Args>>>;
+struct substitute<R<Ts...>, Args, meta::void_<R<meta::_t<substitute<Ts, Args>>...>>> {
+  using type = R<meta::_t<substitute<Ts, Args>>...>;
 };
 
 template <class Fn, class Requirements>
@@ -62,15 +42,15 @@ struct constrained_fn : Fn {
   constrained_fn() = default;
   constrained_fn(Fn fn) : Fn(std::move(fn)) {}
 
-  template <class... Ts>
-    requires Invocable<Fn&, Ts...> &&
-      (bool)meta::_t<substitute<Requirements, meta::list<Ts...>>>{}
+  PUSHMI_TEMPLATE (class... Ts)
+    (requires Invocable<Fn&, Ts...> &&
+      (bool)meta::_t<substitute<Requirements, meta::list<Ts...>>>{})
   decltype(auto) operator()(Ts&&... ts) noexcept(noexcept(std::declval<Fn&>()((Ts&&) ts...))) {
     return static_cast<Fn&>(*this)((Ts&&) ts...);
   }
-  template <class... Ts>
-    requires Invocable<const Fn&, Ts...> &&
-      (bool)meta::_t<substitute<Requirements, meta::list<Ts...>>>{}
+  PUSHMI_TEMPLATE (class... Ts)
+    (requires Invocable<const Fn&, Ts...> &&
+      (bool)meta::_t<substitute<Requirements, meta::list<Ts...>>>{})
   decltype(auto) operator()(Ts&&... ts) const noexcept(noexcept(std::declval<const Fn&>()((Ts&&) ts...))) {
     return static_cast<const Fn&>(*this)((Ts&&) ts...);
   }

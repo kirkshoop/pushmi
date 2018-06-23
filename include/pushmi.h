@@ -3691,6 +3691,8 @@ struct select<false> {
 // This source code is licensed under the MIT license found in the
 // LICENSE file in the root directory of this source tree.
 
+//#include <type_traits>
+
 // disable buggy compatibility warning about "requires" and "concept" being
 // C++20 keywords.
 #if defined(__clang__)
@@ -3938,11 +3940,10 @@ PUSHMI_PP_IGNORE_CXX2A_COMPAT_BEGIN
         PUSHMI_PP_IGNORE_CXX2A_COMPAT_END                                      \
         PUSHMI_PP_CAT(PUSHMI_PP_DEF_, TPARAM)                                  \
         struct _is_satisfied_by_ {                                             \
-            template <                                                         \
-                class C_ = Concept,                                            \
-                class = decltype(::pushmi::concepts::detail::gcc_bugs(         \
-                    &C_::template _concept_requires_<PUSHMI_PP_EXPAND ARGS>))> \
-            static constexpr bool impl(int) noexcept { return true; }          \
+            template <class C_ = Concept>                                      \
+            static constexpr decltype(                                         \
+                !&C_::template _concept_requires_<PUSHMI_PP_EXPAND ARGS>)      \
+            impl(int) noexcept { return true; }                                \
             static constexpr bool impl(long) noexcept { return false; }        \
             explicit constexpr operator bool() const noexcept {                \
                 return _is_satisfied_by_::impl(0);                             \
@@ -4038,8 +4039,22 @@ PUSHMI_PP_IGNORE_CXX2A_COMPAT_BEGIN
 #define PUSHMI_TEMPLATE_AUX_(...) ,                                            \
     int (*PUSHMI_PP_CAT(_pushmi_concept_unique_, __LINE__))[PUSHMI_COUNTER] = nullptr,                  \
     std::enable_if_t<PUSHMI_PP_CAT(_pushmi_concept_unique_, __LINE__) ||                                \
-        bool(PUSHMI_PP_CAT(PUSHMI_TEMPLATE_AUX_3_, __VA_ARGS__)), int> = 0>
+        bool(PUSHMI_TEMPLATE_AUX_4(PUSHMI_PP_CAT(PUSHMI_TEMPLATE_AUX_3_, __VA_ARGS__))), int> = 0>
 #define PUSHMI_TEMPLATE_AUX_3_requires
+#define PUSHMI_TEMPLATE_AUX_4(...) \
+    PUSHMI_PP_EVAL(\
+        PUSHMI_PP_CAT,\
+        PUSHMI_TEMPLATE_AUX_5_, \
+        PUSHMI_PP_IS_EQUAL(\
+            PUSHMI_PP_EVAL2(PUSHMI_PP_COUNT, PUSHMI_PP_CAT2(PUSHMI_TEMPLATE_AUX_5_, __VA_ARGS__)),\
+            PUSHMI_PP_EVAL2(PUSHMI_PP_COUNT, __VA_ARGS__)))(__VA_ARGS__)
+#define PUSHMI_TEMPLATE_AUX_5_requires ~,
+#define PUSHMI_TEMPLATE_AUX_5_0(...) \
+    PUSHMI_PP_CAT(PUSHMI_TEMPLATE_AUX_6_, __VA_ARGS__)
+#define PUSHMI_TEMPLATE_AUX_5_1(...) \
+    __VA_ARGS__
+#define PUSHMI_TEMPLATE_AUX_6_requires(...)\
+    ::pushmi::concepts::detail::requires_<decltype(__VA_ARGS__)>()
 
 #define PUSHMI_BROKEN_SUBSUMPTION(...) __VA_ARGS__
 
@@ -4050,8 +4065,6 @@ template <class>
 inline constexpr bool requires_() {
   return true;
 }
-template<typename T>
-bool gcc_bugs(T);
 template <class T, class U>
 struct And;
 template <class T>
@@ -4363,42 +4376,22 @@ namespace detail {
 
 struct placeholder;
 
-template <class T, class>
-struct replace {
+template <class T, class Args, class = void>
+struct substitute {
   using type = T;
 };
 template <std::size_t I, class Args>
-struct replace<placeholder[I], Args>
+struct substitute<placeholder[I], Args>
   : meta::lazy::let<
       meta::defer<std::decay_t, meta::lazy::at<Args, meta::size_t<I-1>>>> {
 };
 template <std::size_t I, class Args>
-struct replace<placeholder(&&)[I], Args>
+struct substitute<placeholder(&&)[I], Args>
   : meta::lazy::at<Args, meta::size_t<I-1>> {
 };
-
-template <class Requirement, class Args>
-struct substitute {
-};
 template <template <class...> class R, class... Ts, class Args>
-  requires requires { typename R<meta::_t<replace<Ts, Args>>...>; }
-struct substitute<R<Ts...>, Args> {
-  using type = R<meta::_t<replace<Ts, Args>>...>;
-};
-template <class T, class Args>
-  requires requires { typename meta::_t<substitute<T, Args>>; }
-struct substitute<pushmi::concepts::detail::Not<T>, Args> {
-  using type = pushmi::concepts::detail::Not<meta::_t<substitute<T, Args>>>;
-};
-template <class T, class U, class Args>
-  requires requires {
-    typename meta::_t<substitute<T, Args>>;
-    typename meta::_t<substitute<U, Args>>;
-  }
-struct substitute<pushmi::concepts::detail::And<T, U>, Args> {
-  using type = pushmi::concepts::detail::And<
-    meta::_t<substitute<T, Args>>,
-    meta::_t<substitute<U, Args>>>;
+struct substitute<R<Ts...>, Args, meta::void_<R<meta::_t<substitute<Ts, Args>>...>>> {
+  using type = R<meta::_t<substitute<Ts, Args>>...>;
 };
 
 template <class Fn, class Requirements>
@@ -4406,15 +4399,15 @@ struct constrained_fn : Fn {
   constrained_fn() = default;
   constrained_fn(Fn fn) : Fn(std::move(fn)) {}
 
-  template <class... Ts>
-    requires Invocable<Fn&, Ts...> &&
-      (bool)meta::_t<substitute<Requirements, meta::list<Ts...>>>{}
+  PUSHMI_TEMPLATE (class... Ts)
+    (requires Invocable<Fn&, Ts...> &&
+      (bool)meta::_t<substitute<Requirements, meta::list<Ts...>>>{})
   decltype(auto) operator()(Ts&&... ts) noexcept(noexcept(std::declval<Fn&>()((Ts&&) ts...))) {
     return static_cast<Fn&>(*this)((Ts&&) ts...);
   }
-  template <class... Ts>
-    requires Invocable<const Fn&, Ts...> &&
-      (bool)meta::_t<substitute<Requirements, meta::list<Ts...>>>{}
+  PUSHMI_TEMPLATE (class... Ts)
+    (requires Invocable<const Fn&, Ts...> &&
+      (bool)meta::_t<substitute<Requirements, meta::list<Ts...>>>{})
   decltype(auto) operator()(Ts&&... ts) const noexcept(noexcept(std::declval<const Fn&>()((Ts&&) ts...))) {
     return static_cast<const Fn&>(*this)((Ts&&) ts...);
   }
@@ -4661,64 +4654,51 @@ namespace aliases {
 
 namespace pushmi {
 namespace __adl {
-template <class S>
-requires requires(S& s) {
-  s.done();
-}
+PUSHMI_TEMPLATE (class S)
+  (requires requires (std::declval<S&>().done()))
 void set_done(S& s) noexcept(noexcept(s.done())) {
   s.done();
 }
-template <class S, class E>
-requires requires(S& s, E e) {
-  s.error(std::move(e));
-}
+PUSHMI_TEMPLATE (class S, class E)
+  (requires requires (std::declval<S&>().error(std::declval<E>())))
 void set_error(S& s, E e) noexcept(noexcept(s.error(std::move(e)))) {
   s.error(std::move(e));
 }
-template <class S, class V>
-requires requires(S& s, V&& v) {
-  s.value((V&&) v);
-}
+PUSHMI_TEMPLATE (class S, class V)
+  (requires requires (std::declval<S&>().value(std::declval<V>())))
 void set_value(S& s, V&& v) noexcept(noexcept(s.value((V&&) v))) {
   s.value((V&&) v);
 }
 
-template <class S>
-requires requires(S& s) {
-  s.stopping();
-}
+PUSHMI_TEMPLATE (class S)
+  (requires requires (std::declval<S&>().stopping()))
 void set_stopping(S& s) noexcept(noexcept(s.stopping())) {
   s.stopping();
 }
-template <class S, class Up>
-requires requires(S& s, Up& up) {
-  s.starting(up);
-}
+PUSHMI_TEMPLATE (class S, class Up)
+  (requires requires (std::declval<S&>().starting(std::declval<Up&>())))
 void set_starting(S& s, Up& up) noexcept(noexcept(s.starting(up))) {
   s.starting(up);
 }
 
-template <class SD, class Out>
-requires requires(SD& sd, Out out) {
-  sd.submit(std::move(out));
-}
+PUSHMI_TEMPLATE (class SD, class Out)
+  (requires requires (std::declval<SD&>().submit(std::declval<Out>())))
 void submit(SD& sd, Out out) noexcept(noexcept(sd.submit(std::move(out)))) {
   sd.submit(std::move(out));
 }
 
-template <class SD>
-requires requires(SD& sd) {
-  sd.now();
-}
+PUSHMI_TEMPLATE (class SD)
+  (requires requires (std::declval<SD&>().now()))
 auto now(SD& sd) noexcept(noexcept(sd.now())) {
   return sd.now();
 }
 
-template <class SD, class TP, class Out>
-requires requires(SD& sd, TP tp, Out out) {
-  { sd.now() } -> TP;
-  sd.submit(std::move(tp), std::move(out));
-}
+PUSHMI_TEMPLATE (class SD, class TP, class Out)
+  (requires requires (
+    std::declval<SD&>().submit(
+        std::declval<TP(&)(TP)>()(std::declval<SD&>().now()),
+        std::declval<Out>())
+  ))
 void submit(SD& sd, TP tp, Out out)
   noexcept(noexcept(sd.submit(std::move(tp), std::move(out)))) {
   sd.submit(std::move(tp), std::move(out));
@@ -4742,55 +4722,57 @@ void set_error(std::promise<T>& s, E e) noexcept {
   s.set_exception(std::make_exception_ptr(std::move(e)));
 }
 template <class T>
-requires !Same<T, void>
 void set_value(std::promise<T>& s, T t) {
   s.set_value(std::move(t));
 }
 
-template <class S>
-requires requires (S& s) { set_done(s); }
+PUSHMI_TEMPLATE (class S)
+  (requires requires ( set_done(std::declval<S&>()) ))
 void set_done(std::reference_wrapper<S> s) noexcept(
   noexcept(set_done(s.get()))) {
   set_done(s.get());
 }
-template <class S, class E>
-requires requires (S& s, E e) { set_error(s, std::move(e)); }
+PUSHMI_TEMPLATE (class S, class E)
+  (requires requires ( set_error(std::declval<S&>(), std::declval<E>()) ))
 void set_error(std::reference_wrapper<S> s, E e) noexcept {
   set_error(s.get(), std::move(e));
 }
-template <class S, class V>
-requires requires (S& s, V&& v) { set_value(s, (V&&) v); }
+PUSHMI_TEMPLATE (class S, class V)
+  (requires requires ( set_value(std::declval<S&>(), std::declval<V>()) ))
 void set_value(std::reference_wrapper<S> s, V&& v) noexcept(
   noexcept(set_value(s.get(), (V&&) v))) {
   set_value(s.get(), (V&&) v);
 }
-template <class S>
-requires requires(S& s) { set_stopping(s); }
+PUSHMI_TEMPLATE (class S)
+  (requires requires ( set_stopping(std::declval<S&>()) ))
 void set_stopping(std::reference_wrapper<S> s) noexcept(
   noexcept(set_stopping(s.get()))) {
   set_stopping(s.get());
 }
-template <class S, class Up>
-requires requires(S& s, Up& up) { set_starting(s, up); }
+PUSHMI_TEMPLATE (class S, class Up)
+  (requires requires ( set_starting(std::declval<S&>(), std::declval<Up&>()) ))
 void set_starting(std::reference_wrapper<S> s, Up& up) noexcept(
   noexcept(set_starting(s.get(), up))) {
   set_starting(s.get(), up);
 }
-template <class SD, class Out>
-requires requires(SD& sd, Out out) { submit(sd, std::move(out)); }
+PUSHMI_TEMPLATE (class SD, class Out)
+  (requires requires ( submit(std::declval<SD&>(), std::declval<Out>()) ))
 void submit(std::reference_wrapper<SD> sd, Out out) noexcept(
   noexcept(submit(sd.get(), std::move(out)))) {
   submit(sd.get(), std::move(out));
 }
-template <class SD>
-requires requires(SD& sd) { now(sd); }
+PUSHMI_TEMPLATE (class SD)
+  (requires requires ( now(std::declval<SD&>()) ))
 auto now(std::reference_wrapper<SD> sd) noexcept(noexcept(now(sd.get()))) {
   return now(sd.get());
 }
-template <class SD, class TP, class Out>
-requires requires(SD& sd, TP tp, Out out) {
-  submit(sd, std::move(tp), std::move(out));
-}
+PUSHMI_TEMPLATE (class SD, class TP, class Out)
+  (requires requires (
+    submit(
+      std::declval<SD&>(),
+      std::declval<TP(&)(TP)>()(now(std::declval<SD&>())),
+      std::declval<Out>())
+  ))
 void submit(std::reference_wrapper<SD> sd, TP tp, Out out)
   noexcept(noexcept(submit(sd.get(), std::move(tp), std::move(out)))) {
   submit(sd.get(), std::move(tp), std::move(out));
@@ -4798,11 +4780,11 @@ void submit(std::reference_wrapper<SD> sd, TP tp, Out out)
 
 
 struct set_done_fn {
-  template <class S>
-  requires requires(S& s) {
-    set_done(s);
-    set_error(s, std::current_exception());
-  }
+  PUSHMI_TEMPLATE (class S)
+    (requires requires (
+      set_done(std::declval<S&>()),
+      set_error(std::declval<S&>(), std::current_exception())
+    ))
   void operator()(S&& s) const noexcept(noexcept(set_done(s))) {
     try {
       set_done(s);
@@ -4812,21 +4794,21 @@ struct set_done_fn {
   }
 };
 struct set_error_fn {
-  template <class S, class E>
-  requires requires(S& s, E e) {
-    { set_error(s, std::move(e)) } noexcept;
-  }
+  PUSHMI_TEMPLATE (class S, class E)
+    (requires requires (
+      set_error(std::declval<S&>(), std::declval<E>())
+    ))
   void operator()(S&& s, E e) const
       noexcept(noexcept(set_error(s, std::move(e)))) {
     set_error(s, std::move(e));
   }
 };
 struct set_value_fn {
-  template <class S, class V>
-  requires requires(S& s, V&& v) {
-    set_value(s, (V&&) v);
-    set_error(s, std::current_exception());
-  }
+  PUSHMI_TEMPLATE (class S, class V)
+    (requires requires (
+      set_value(std::declval<S&>(), std::declval<V>()),
+      set_error(std::declval<S&>(), std::current_exception())
+    ))
   void operator()(S&& s, V&& v) const
       noexcept(noexcept(set_value(s, (V&&) v))) {
     try {
@@ -4838,20 +4820,20 @@ struct set_value_fn {
 };
 
 struct set_stopping_fn {
-  template <class S>
-  requires requires(S& s) {
-    set_stopping(s);
-  }
+  PUSHMI_TEMPLATE (class S)
+    (requires requires (
+      set_stopping(std::declval<S&>())
+    ))
   void operator()(S&& s) const noexcept(noexcept(set_stopping(s))) {
     set_stopping(s);
   }
 };
 struct set_starting_fn {
-  template <class S, class Up>
-  requires requires(S& s, Up& up) {
-    set_starting(s, up);
-    set_error(s, std::current_exception());
-  }
+  PUSHMI_TEMPLATE (class S, class Up)
+    (requires requires (
+      set_starting(std::declval<S&>(), std::declval<Up&>()),
+      set_error(std::declval<S&>(), std::current_exception())
+    ))
   void operator()(S&& s, Up& up) const
       noexcept(noexcept(set_starting(s, up))) {
     try {
@@ -4863,19 +4845,22 @@ struct set_starting_fn {
 };
 
 struct do_submit_fn {
-  template <class SD, class Out>
-  requires requires(SD& s, Out out) {
-    submit(s, std::move(out));
-  }
+  PUSHMI_TEMPLATE (class SD, class Out)
+    (requires requires (
+      submit(std::declval<SD&>(), std::declval<Out>())
+    ))
   void operator()(SD&& s, Out out) const
       noexcept(noexcept(submit(s, std::move(out)))) {
     submit(s, std::move(out));
   }
 
-  template <class SD, class TP, class Out>
-  requires requires(SD& s, TP tp, Out out) {
-    submit(s, std::move(tp), std::move(out));
-  }
+  PUSHMI_TEMPLATE (class SD, class TP, class Out)
+    (requires requires (
+      submit(
+        std::declval<SD&>(),
+        std::declval<TP>(),
+        std::declval<Out>())
+    ))
   void operator()(SD&& s, TP tp, Out out) const
       noexcept(noexcept(submit(s, std::move(tp), std::move(out)))) {
     submit(s, std::move(tp), std::move(out));
@@ -4883,10 +4868,10 @@ struct do_submit_fn {
 };
 
 struct get_now_fn {
-  template <class SD>
-  requires requires(SD& sd) {
-    now(sd);
-  }
+  PUSHMI_TEMPLATE (class SD)
+    (requires requires (
+      now(std::declval<SD&>())
+    ))
   auto operator()(SD&& sd) const noexcept(noexcept(now(sd))) {
     return now(sd);
   }
@@ -5019,16 +5004,16 @@ template<class PS, class P>
 struct property_from_category<PS, P> : property_from_category<properties_t<PS>, property_category_t<P>> {};
 
 template<class... PN, class Category>
-  requires And<Property<PN>...> && !Property<Category>
+  requires And<Property<PN>...> && not Property<Category>
 struct property_from_category<property_set<PN...>, Category> : property_from_category<PN, property_category_t<PN>, Category>... {};
 
 template<class P, class Category>
-  requires Property<P> && !Property<Category>
+  requires Property<P> && not Property<Category>
 struct property_from_category<P, Category, Category> {
   using type = P;
 };
 template<class P, class Category, class Expected>
-  requires Property<P> && !Property<Category> && !Property<Expected>
+  requires Property<P> && not Property<Category> && not Property<Expected>
 struct property_from_category<P, Category, Expected> {};
 
 template<class PS, class C>
@@ -5044,37 +5029,37 @@ template<class PS, class P>
 struct remove_property_from_category<PS, P> : remove_property_from_category<properties_t<PS>, property_category_t<P>> {};
 
 template<class P0, class... PN, class Category>
-  requires Property<P0> && And<Property<PN>...> && !Property<Category>
+  requires Property<P0> && And<Property<PN>...> && not Property<Category>
 struct remove_property_from_category<property_set<P0, PN...>, Category> {
   using type = typename remove_property_from_category<property_set<>, Category, P0, PN...>::type;
 };
 
 template<class Category>
-  requires !Property<Category>
+  requires not Property<Category>
 struct remove_property_from_category<property_set<>, Category> {
   using type = property_set<>;
 };
 
 template<class... PN, class Category, class R0, class... RN>
-  requires And<Property<PN>...> && !Property<Category> && !Same<property_category_t<R0>, Category>
+  requires And<Property<PN>...> && not Property<Category> && not Same<property_category_t<R0>, Category>
 struct remove_property_from_category<property_set<PN...>, Category, R0, RN...> {
   using type = typename remove_property_from_category<property_set<PN..., R0>, Category, RN...>::type;
 };
 
 template<class... PN, class Category, class R0, class... RN>
-  requires And<Property<PN>...> && !Property<Category> && Same<property_category_t<R0>, Category>
+  requires And<Property<PN>...> && not Property<Category> && Same<property_category_t<R0>, Category>
 struct remove_property_from_category<property_set<PN...>, Category, R0, RN...> {
   using type = typename remove_property_from_category<property_set<PN...>, Category, RN...>::type;
 };
 
 template<class... PN, class Category, class R0>
-  requires And<Property<PN>...> && !Property<Category> && !Same<property_category_t<R0>, Category>
+  requires And<Property<PN>...> && not Property<Category> && not Same<property_category_t<R0>, Category>
 struct remove_property_from_category<property_set<PN...>, Category, R0> {
   using type = property_set<PN..., R0>;
 };
 
 template<class... PN, class Category, class R0>
-  requires And<Property<PN>...> && !Property<Category> && Same<property_category_t<R0>, Category>
+  requires And<Property<PN>...> && not Property<Category> && Same<property_category_t<R0>, Category>
 struct remove_property_from_category<property_set<PN...>, Category, R0> {
   using type = property_set<PN...>;
 };
@@ -5092,7 +5077,7 @@ template<class PropertySet0, class... PropertySetN>
 struct property_set_insert;
 
 template<class... Properties0, class Property0, class... PropertyN>
-  requires Property<Property0> && And<!Same<property_category_t<Properties0>, property_category_t<Property0>>...>
+  requires Property<Property0> && And<not Same<property_category_t<Properties0>, property_category_t<Property0>>...>
 struct property_set_insert<property_set<Properties0...>, Property0, PropertyN...> {
   using type = typename property_set_insert<property_set<Properties0..., Property0>, PropertyN...>::type;
 };
@@ -5552,13 +5537,12 @@ namespace pushmi {
 
 template<class T>
 struct construct {
-  template<class... AN>
-    requires Constructible<T, AN...>
+  PUSHMI_TEMPLATE(class... AN)
+    (requires Constructible<T, AN...>)
   auto operator()(AN&&... an) const {
     return T{std::forward<AN>(an)...};
   }
 };
-
 
 template<template <class...> class T>
 struct construct_deduced;
@@ -5611,10 +5595,9 @@ struct systemNowF {
 
 struct passDVF {
   PUSHMI_TEMPLATE(class V, class Data)
-    (requires Receiver<Data>)
-  requires requires(Data& out, V&& v) {
-    ::pushmi::set_value(out, (V&&) v);
-  }
+    (requires requires (
+      ::pushmi::set_value(std::declval<Data&>(), std::declval<V>())
+    ) && Receiver<Data>)
   void operator()(Data& out, V&& v) const {
     ::pushmi::set_value(out, (V&&) v);
   }
@@ -5646,10 +5629,9 @@ struct passDStpF {
 
 struct passDStrtF {
   PUSHMI_TEMPLATE(class Up, class Data)
-    (requires Receiver<Data>)
-  requires requires(Data& out, Up& up) {
-    ::pushmi::set_starting(out, up);
-  }
+    (requires requires (
+      ::pushmi::set_starting(std::declval<Data&>(), std::declval<Up&>())
+    ) && Receiver<Data>)
   void operator()(Data& out, Up& up) const {
     ::pushmi::set_starting(out, up);
   }
@@ -5678,7 +5660,9 @@ struct passDNF {
 // inspired by Ovrld - shown in a presentation by Nicolai Josuttis
 #if __cpp_variadic_using >= 201611
 template <PUSHMI_TYPE_CONSTRAINT(SemiMovable)... Fns>
+#if __cpp_concepts
   requires sizeof...(Fns) > 0
+#endif
 struct overload_fn : Fns... {
   constexpr overload_fn() = default;
   constexpr explicit overload_fn(Fns... fns) requires sizeof...(Fns) == 1
@@ -5689,7 +5673,9 @@ struct overload_fn : Fns... {
 };
 #else
 template <PUSHMI_TYPE_CONSTRAINT(SemiMovable)... Fns>
+#if __cpp_concepts
   requires sizeof...(Fns) > 0
+#endif
 struct overload_fn;
 template <class Fn>
 struct overload_fn<Fn> : Fn {
@@ -6011,39 +5997,39 @@ inline auto make_none() -> none<> {
   return {};
 }
 PUSHMI_TEMPLATE(class EF)
-  (requires PUSHMI_BROKEN_SUBSUMPTION(!lazy::Receiver<EF> && !lazy::Invocable<EF&>))
+  (requires PUSHMI_BROKEN_SUBSUMPTION(not lazy::Receiver<EF> && not lazy::Invocable<EF&>))
 auto make_none(EF ef) -> none<EF, ignoreDF> {
   return none<EF, ignoreDF>{std::move(ef)};
 }
 PUSHMI_TEMPLATE(class DF)
-  (requires lazy::Invocable<DF&> PUSHMI_BROKEN_SUBSUMPTION(&& !lazy::Receiver<DF>))
+  (requires lazy::Invocable<DF&> PUSHMI_BROKEN_SUBSUMPTION(&& not lazy::Receiver<DF>))
 auto make_none(DF df) -> none<abortEF, DF> {
   return none<abortEF, DF>{std::move(df)};
 }
 PUSHMI_TEMPLATE(class EF, class DF)
-  (requires lazy::Invocable<DF&> PUSHMI_BROKEN_SUBSUMPTION(&& !lazy::Receiver<EF>))
+  (requires lazy::Invocable<DF&> PUSHMI_BROKEN_SUBSUMPTION(&& not lazy::Receiver<EF>))
 auto make_none(EF ef, DF df) -> none<EF, DF> {
   return {std::move(ef), std::move(df)};
 }
 PUSHMI_TEMPLATE(class Data)
-  (requires lazy::Receiver<Data, is_none<>> && !lazy::Receiver<Data, is_single<>>)
+  (requires lazy::Receiver<Data, is_none<>> && not lazy::Receiver<Data, is_single<>>)
 auto make_none(Data d) -> none<Data, passDEF, passDDF> {
   return none<Data, passDEF, passDDF>{std::move(d)};
 }
 PUSHMI_TEMPLATE(class Data, class DEF)
-  (requires lazy::Receiver<Data, is_none<>> && !lazy::Receiver<Data, is_single<>>
-    PUSHMI_BROKEN_SUBSUMPTION(&& !lazy::Invocable<DEF&, Data&>))
+  (requires lazy::Receiver<Data, is_none<>> && not lazy::Receiver<Data, is_single<>>
+    PUSHMI_BROKEN_SUBSUMPTION(&& not lazy::Invocable<DEF&, Data&>))
 auto make_none(Data d, DEF ef) -> none<Data, DEF, passDDF> {
   return {std::move(d), std::move(ef)};
 }
 PUSHMI_TEMPLATE(class Data, class DDF)
-  (requires lazy::Receiver<Data, is_none<>> && !lazy::Receiver<Data, is_single<>> &&
+  (requires lazy::Receiver<Data, is_none<>> && not lazy::Receiver<Data, is_single<>> &&
     lazy::Invocable<DDF&, Data&>)
 auto make_none(Data d, DDF df) -> none<Data, passDEF, DDF> {
   return {std::move(d), std::move(df)};
 }
 PUSHMI_TEMPLATE(class Data, class DEF, class DDF)
-  (requires lazy::Receiver<Data, is_none<>> && !lazy::Receiver<Data, is_single<>> &&
+  (requires lazy::Receiver<Data, is_none<>> && not lazy::Receiver<Data, is_single<>> &&
     lazy::Invocable<DDF&, Data&>)
 auto make_none(Data d, DEF ef, DDF df) -> none<Data, DEF, DDF> {
   return {std::move(d), std::move(ef), std::move(df)};
@@ -6055,33 +6041,33 @@ auto make_none(Data d, DEF ef, DDF df) -> none<Data, DEF, DDF> {
 none() -> none<>;
 
 PUSHMI_TEMPLATE(class EF)
-  (requires PUSHMI_BROKEN_SUBSUMPTION(!lazy::Receiver<EF> && !lazy::Invocable<EF&>))
+  (requires PUSHMI_BROKEN_SUBSUMPTION(not lazy::Receiver<EF> && not lazy::Invocable<EF&>))
 none(EF) -> none<EF, ignoreDF>;
 
 PUSHMI_TEMPLATE(class DF)
-  (requires lazy::Invocable<DF&> PUSHMI_BROKEN_SUBSUMPTION(&& !lazy::Receiver<DF>))
+  (requires lazy::Invocable<DF&> PUSHMI_BROKEN_SUBSUMPTION(&& not lazy::Receiver<DF>))
 none(DF) -> none<abortEF, DF>;
 
 PUSHMI_TEMPLATE(class EF, class DF)
-  (requires lazy::Invocable<DF&> PUSHMI_BROKEN_SUBSUMPTION(&& !lazy::Receiver<EF>))
+  (requires lazy::Invocable<DF&> PUSHMI_BROKEN_SUBSUMPTION(&& not lazy::Receiver<EF>))
 none(EF, DF) -> none<EF, DF>;
 
 PUSHMI_TEMPLATE(class Data)
-  (requires lazy::Receiver<Data, is_none<>> && !lazy::Receiver<Data, is_single<>>)
+  (requires lazy::Receiver<Data, is_none<>> && not lazy::Receiver<Data, is_single<>>)
 none(Data) -> none<Data, passDEF, passDDF>;
 
 PUSHMI_TEMPLATE(class Data, class DEF)
-  (requires lazy::Receiver<Data, is_none<>> && !lazy::Receiver<Data, is_single<>>
-    PUSHMI_BROKEN_SUBSUMPTION(&& !lazy::Invocable<DEF&, Data&>))
+  (requires lazy::Receiver<Data, is_none<>> && not lazy::Receiver<Data, is_single<>>
+    PUSHMI_BROKEN_SUBSUMPTION(&& not lazy::Invocable<DEF&, Data&>))
 none(Data, DEF) -> none<Data, DEF, passDDF>;
 
 PUSHMI_TEMPLATE(class Data, class DDF)
-  (requires lazy::Receiver<Data, is_none<>> && !lazy::Receiver<Data, is_single<>> &&
+  (requires lazy::Receiver<Data, is_none<>> && not lazy::Receiver<Data, is_single<>> &&
     lazy::Invocable<DDF&, Data&>)
 none(Data, DDF) -> none<Data, passDEF, DDF>;
 
 PUSHMI_TEMPLATE(class Data, class DEF, class DDF)
-  (requires lazy::Receiver<Data, is_none<>> && !lazy::Receiver<Data, is_single<>> &&
+  (requires lazy::Receiver<Data, is_none<>> && not lazy::Receiver<Data, is_single<>> &&
     lazy::Invocable<DDF&, Data&>)
 none(Data, DEF, DDF) -> none<Data, DEF, DDF>;
 #endif
@@ -6236,10 +6222,14 @@ class deferred<SF> {
 };
 
 template <class Data, class DSF>
+#if __cpp_concepts
   requires Sender<Data, is_none<>>
+#endif
 class deferred<Data, DSF> {
   Data data_{};
   DSF sf_{};
+  static_assert(Sender<Data, is_none<>>, "The Data template parameter "
+    "must satisfy the Sender concept.");
 
  public:
   using properties = property_set<is_sender<>, is_none<>>;
@@ -6590,7 +6580,7 @@ inline auto make_single() -> single<> {
   return {};
 }
 PUSHMI_TEMPLATE(class VF)
-  (requires PUSHMI_BROKEN_SUBSUMPTION(!lazy::Receiver<VF> && !lazy::Invocable<VF&>))
+  (requires PUSHMI_BROKEN_SUBSUMPTION(not lazy::Receiver<VF> && not lazy::Invocable<VF&>))
 auto make_single(VF vf) -> single<VF, abortEF, ignoreDF> {
   return single<VF, abortEF, ignoreDF>{std::move(vf)};
 }
@@ -6599,22 +6589,22 @@ auto make_single(on_error_fn<EFN...> ef) -> single<ignoreVF, on_error_fn<EFN...>
   return single<ignoreVF, on_error_fn<EFN...>, ignoreDF>{std::move(ef)};
 }
 PUSHMI_TEMPLATE(class DF)
-  (requires lazy::Invocable<DF&> PUSHMI_BROKEN_SUBSUMPTION(&& !lazy::Receiver<DF>))
+  (requires lazy::Invocable<DF&> PUSHMI_BROKEN_SUBSUMPTION(&& not lazy::Receiver<DF>))
 auto make_single(DF df) -> single<ignoreVF, abortEF, DF> {
   return single<ignoreVF, abortEF, DF>{std::move(df)};
 }
 PUSHMI_TEMPLATE(class VF, class EF)
-  (requires PUSHMI_BROKEN_SUBSUMPTION(!lazy::Receiver<VF> && !lazy::Invocable<EF&>))
+  (requires PUSHMI_BROKEN_SUBSUMPTION(not lazy::Receiver<VF> && not lazy::Invocable<EF&>))
 auto make_single(VF vf, EF ef) -> single<VF, EF, ignoreDF> {
   return {std::move(vf), std::move(ef)};
 }
 PUSHMI_TEMPLATE(class EF, class DF)
-  (requires lazy::Invocable<DF&> PUSHMI_BROKEN_SUBSUMPTION(&& !lazy::Receiver<EF>))
+  (requires lazy::Invocable<DF&> PUSHMI_BROKEN_SUBSUMPTION(&& not lazy::Receiver<EF>))
 auto make_single(EF ef, DF df) -> single<ignoreVF, EF, DF> {
   return {std::move(ef), std::move(df)};
 }
 PUSHMI_TEMPLATE(class VF, class EF, class DF)
-  (requires lazy::Invocable<DF&> PUSHMI_BROKEN_SUBSUMPTION(&& !lazy::Receiver<VF>))
+  (requires lazy::Invocable<DF&> PUSHMI_BROKEN_SUBSUMPTION(&& not lazy::Receiver<VF>))
 auto make_single(VF vf, EF ef, DF df) -> single<VF, EF, DF> {
   return {std::move(vf), std::move(ef), std::move(df)};
 }
@@ -6624,7 +6614,7 @@ auto make_single(Data d) -> single<Data, passDVF, passDEF, passDDF> {
   return single<Data, passDVF, passDEF, passDDF>{std::move(d)};
 }
 PUSHMI_TEMPLATE(class Data, class DVF)
-  (requires lazy::Receiver<Data, is_single<>> PUSHMI_BROKEN_SUBSUMPTION(&& !lazy::Invocable<DVF&, Data&>))
+  (requires lazy::Receiver<Data, is_single<>> PUSHMI_BROKEN_SUBSUMPTION(&& not lazy::Invocable<DVF&, Data&>))
 auto make_single(Data d, DVF vf) -> single<Data, DVF, passDEF, passDDF> {
   return {std::move(d), std::move(vf)};
 }
@@ -6640,7 +6630,7 @@ auto make_single(Data d, DDF df) -> single<Data, passDVF, passDEF, DDF> {
   return {std::move(d), std::move(df)};
 }
 PUSHMI_TEMPLATE(class Data, class DVF, class DEF)
-  (requires lazy::Receiver<Data, is_single<>> PUSHMI_BROKEN_SUBSUMPTION(&& !lazy::Invocable<DEF&, Data&>))
+  (requires lazy::Receiver<Data, is_single<>> PUSHMI_BROKEN_SUBSUMPTION(&& not lazy::Invocable<DEF&, Data&>))
 auto make_single(Data d, DVF vf, DEF ef) -> single<Data, DVF, DEF, passDDF> {
   return {std::move(d), std::move(vf), std::move(ef)};
 }
@@ -6661,26 +6651,26 @@ auto make_single(Data d, DVF vf, DEF ef, DDF df) -> single<Data, DVF, DEF, DDF> 
 single() -> single<>;
 
 PUSHMI_TEMPLATE(class VF)
-  (requires PUSHMI_BROKEN_SUBSUMPTION(!lazy::Receiver<VF> && !lazy::Invocable<VF&>))
+  (requires PUSHMI_BROKEN_SUBSUMPTION(not lazy::Receiver<VF> && not lazy::Invocable<VF&>))
 single(VF) -> single<VF, abortEF, ignoreDF>;
 
 template <class... EFN>
 single(on_error_fn<EFN...>) -> single<ignoreVF, on_error_fn<EFN...>, ignoreDF>;
 
 PUSHMI_TEMPLATE(class DF)
-  (requires lazy::Invocable<DF&> PUSHMI_BROKEN_SUBSUMPTION(&& !lazy::Receiver<DF>))
+  (requires lazy::Invocable<DF&> PUSHMI_BROKEN_SUBSUMPTION(&& not lazy::Receiver<DF>))
 single(DF) -> single<ignoreVF, abortEF, DF>;
 
 PUSHMI_TEMPLATE(class VF, class EF)
-  (requires PUSHMI_BROKEN_SUBSUMPTION(!lazy::Receiver<VF> && !lazy::Invocable<EF&>))
+  (requires PUSHMI_BROKEN_SUBSUMPTION(not lazy::Receiver<VF> && not lazy::Invocable<EF&>))
 single(VF, EF) -> single<VF, EF, ignoreDF>;
 
 PUSHMI_TEMPLATE(class EF, class DF)
-  (requires lazy::Invocable<DF&> PUSHMI_BROKEN_SUBSUMPTION(&& !lazy::Receiver<EF>))
+  (requires lazy::Invocable<DF&> PUSHMI_BROKEN_SUBSUMPTION(&& not lazy::Receiver<EF>))
 single(EF, DF) -> single<ignoreVF, EF, DF>;
 
 PUSHMI_TEMPLATE(class VF, class EF, class DF)
-  (requires lazy::Invocable<DF&> PUSHMI_BROKEN_SUBSUMPTION(&& !lazy::Receiver<VF>))
+  (requires lazy::Invocable<DF&> PUSHMI_BROKEN_SUBSUMPTION(&& not lazy::Receiver<VF>))
 single(VF, EF, DF) -> single<VF, EF, DF>;
 
 PUSHMI_TEMPLATE(class Data)
@@ -6688,7 +6678,7 @@ PUSHMI_TEMPLATE(class Data)
 single(Data d) -> single<Data, passDVF, passDEF, passDDF>;
 
 PUSHMI_TEMPLATE(class Data, class DVF)
-  (requires lazy::Receiver<Data, is_single<>> PUSHMI_BROKEN_SUBSUMPTION(&& !lazy::Invocable<DVF&, Data&>))
+  (requires lazy::Receiver<Data, is_single<>> PUSHMI_BROKEN_SUBSUMPTION(&& not lazy::Invocable<DVF&, Data&>))
 single(Data d, DVF vf) -> single<Data, DVF, passDEF, passDDF>;
 
 PUSHMI_TEMPLATE(class Data, class... DEFN)
@@ -6701,7 +6691,7 @@ PUSHMI_TEMPLATE(class Data, class DDF)
 single(Data d, DDF) -> single<Data, passDVF, passDEF, DDF>;
 
 PUSHMI_TEMPLATE(class Data, class DVF, class DEF)
-  (requires lazy::Receiver<Data, is_single<>> PUSHMI_BROKEN_SUBSUMPTION(&& !lazy::Invocable<DEF&, Data&>))
+  (requires lazy::Receiver<Data, is_single<>> PUSHMI_BROKEN_SUBSUMPTION(&& not lazy::Invocable<DEF&, Data&>))
 single(Data d, DVF vf, DEF ef) -> single<Data, DVF, DEF, passDDF>;
 
 PUSHMI_TEMPLATE(class Data, class DEF, class DDF)
@@ -7592,7 +7582,7 @@ inline auto make_flow_single() -> flow_single<> {
   return flow_single<>{};
 }
 template <class VF>
-    requires !Receiver<VF> && !detail::is_v<VF, on_error_fn> &&
+    requires not Receiver<VF> && !detail::is_v<VF, on_error_fn> &&
     !detail::is_v<VF, on_done_fn>
 auto make_flow_single(VF vf)
          -> flow_single<VF, abortEF, ignoreDF, ignoreStpF, ignoreStrtF> {
@@ -7626,7 +7616,7 @@ auto make_flow_single(Wrapped w) -> flow_single<V, PE, E> {
   return flow_single<V, PE, E>{std::move(w)};
 }
 template <class VF, class EF>
-    requires !Receiver<VF> && !detail::is_v<VF, on_error_fn> &&
+    requires not Receiver<VF> && !detail::is_v<VF, on_error_fn> &&
     !detail::is_v<VF, on_done_fn> && !detail::is_v<EF, on_value_fn> &&
     !detail::is_v<EF, on_done_fn>
 auto make_flow_single(VF vf, EF ef)
@@ -7743,7 +7733,7 @@ auto make_flow_single(Data d, DVF vf, DEF ef, DDF df, DStpF stpf, DStrtF strtf)
 flow_single() -> flow_single<>;
 
 PUSHMI_TEMPLATE(class VF)
-  (requires !Receiver<VF> && !detail::is_v<VF, on_error_fn> &&
+  (requires not Receiver<VF> && !detail::is_v<VF, on_error_fn> &&
     !detail::is_v<VF, on_done_fn>)
 flow_single(VF)
          -> flow_single<VF, abortEF, ignoreDF, ignoreStpF, ignoreStrtF>;
@@ -7767,7 +7757,7 @@ PUSHMI_TEMPLATE(class V, class PE, class E, class Wrapped)
 flow_single(Wrapped) -> flow_single<V, PE, E>;
 
 PUSHMI_TEMPLATE(class VF, class EF)
-  (requires !Receiver<VF> && !detail::is_v<VF, on_error_fn> &&
+  (requires not Receiver<VF> && !detail::is_v<VF, on_error_fn> &&
     !detail::is_v<VF, on_done_fn> && !detail::is_v<EF, on_value_fn> &&
     !detail::is_v<EF, on_done_fn>)
 flow_single(VF, EF)
@@ -8101,11 +8091,11 @@ class trampoline {
   }
 
   template <class SingleReceiver>
-    requires !Same<SingleReceiver, recurse_t>
+    requires not Same<SingleReceiver, recurse_t>
   static void submit(ownordelegate_t, time_point awhen, SingleReceiver awhat);
 
   template <class SingleReceiver>
-    requires !Same<SingleReceiver, recurse_t>
+    requires not Same<SingleReceiver, recurse_t>
   static void submit(ownornest_t, time_point awhen, SingleReceiver awhat);
 };
 
@@ -8147,7 +8137,7 @@ class nester {
 
 template <class E>
 template <class SingleReceiver>
-  requires !Same<SingleReceiver, recurse_t>
+  requires not Same<SingleReceiver, recurse_t>
 // static
 void trampoline<E>::submit(
     ownordelegate_t,
@@ -8211,7 +8201,7 @@ void trampoline<E>::submit(
 
 template <class E>
 template <class SingleReceiver>
-  requires !Same<SingleReceiver, recurse_t>
+  requires not Same<SingleReceiver, recurse_t>
 // static
 void trampoline<E>::submit(
     ownornest_t,

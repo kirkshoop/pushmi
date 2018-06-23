@@ -113,10 +113,14 @@ class deferred<SF> {
 };
 
 template <class Data, class DSF>
+#if __cpp_concepts
   requires Sender<Data, is_none<>>
+#endif
 class deferred<Data, DSF> {
   Data data_{};
   DSF sf_{};
+  static_assert(Sender<Data, is_none<>>, "The Data template parameter "
+    "must satisfy the Sender concept.");
 
  public:
   using properties = property_set<is_sender<>, is_none<>>;

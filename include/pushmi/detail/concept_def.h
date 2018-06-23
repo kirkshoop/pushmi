@@ -5,6 +5,8 @@
 // This source code is licensed under the MIT license found in the
 // LICENSE file in the root directory of this source tree.
 
+#include <type_traits>
+
 // disable buggy compatibility warning about "requires" and "concept" being
 // C++20 keywords.
 #if defined(__clang__)
@@ -252,11 +254,10 @@ PUSHMI_PP_IGNORE_CXX2A_COMPAT_BEGIN
         PUSHMI_PP_IGNORE_CXX2A_COMPAT_END                                      \
         PUSHMI_PP_CAT(PUSHMI_PP_DEF_, TPARAM)                                  \
         struct _is_satisfied_by_ {                                             \
-            template <                                                         \
-                class C_ = Concept,                                            \
-                class = decltype(::pushmi::concepts::detail::gcc_bugs(         \
-                    &C_::template _concept_requires_<PUSHMI_PP_EXPAND ARGS>))> \
-            static constexpr bool impl(int) noexcept { return true; }          \
+            template <class C_ = Concept>                                      \
+            static constexpr decltype(                                         \
+                !&C_::template _concept_requires_<PUSHMI_PP_EXPAND ARGS>)      \
+            impl(int) noexcept { return true; }                                \
             static constexpr bool impl(long) noexcept { return false; }        \
             explicit constexpr operator bool() const noexcept {                \
                 return _is_satisfied_by_::impl(0);                             \
@@ -352,8 +353,22 @@ PUSHMI_PP_IGNORE_CXX2A_COMPAT_BEGIN
 #define PUSHMI_TEMPLATE_AUX_(...) ,                                            \
     int (*PUSHMI_PP_CAT(_pushmi_concept_unique_, __LINE__))[PUSHMI_COUNTER] = nullptr,                  \
     std::enable_if_t<PUSHMI_PP_CAT(_pushmi_concept_unique_, __LINE__) ||                                \
-        bool(PUSHMI_PP_CAT(PUSHMI_TEMPLATE_AUX_3_, __VA_ARGS__)), int> = 0>
+        bool(PUSHMI_TEMPLATE_AUX_4(PUSHMI_PP_CAT(PUSHMI_TEMPLATE_AUX_3_, __VA_ARGS__))), int> = 0>
 #define PUSHMI_TEMPLATE_AUX_3_requires
+#define PUSHMI_TEMPLATE_AUX_4(...) \
+    PUSHMI_PP_EVAL(\
+        PUSHMI_PP_CAT,\
+        PUSHMI_TEMPLATE_AUX_5_, \
+        PUSHMI_PP_IS_EQUAL(\
+            PUSHMI_PP_EVAL2(PUSHMI_PP_COUNT, PUSHMI_PP_CAT2(PUSHMI_TEMPLATE_AUX_5_, __VA_ARGS__)),\
+            PUSHMI_PP_EVAL2(PUSHMI_PP_COUNT, __VA_ARGS__)))(__VA_ARGS__)
+#define PUSHMI_TEMPLATE_AUX_5_requires ~,
+#define PUSHMI_TEMPLATE_AUX_5_0(...) \
+    PUSHMI_PP_CAT(PUSHMI_TEMPLATE_AUX_6_, __VA_ARGS__)
+#define PUSHMI_TEMPLATE_AUX_5_1(...) \
+    __VA_ARGS__
+#define PUSHMI_TEMPLATE_AUX_6_requires(...)\
+    ::pushmi::concepts::detail::requires_<decltype(__VA_ARGS__)>()
 
 #define PUSHMI_BROKEN_SUBSUMPTION(...) __VA_ARGS__
 
@@ -364,8 +379,6 @@ template <class>
 inline constexpr bool requires_() {
   return true;
 }
-template<typename T>
-bool gcc_bugs(T);
 template <class T, class U>
 struct And;
 template <class T>

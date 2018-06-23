@@ -82,11 +82,11 @@ class trampoline {
   }
 
   template <class SingleReceiver>
-    requires !Same<SingleReceiver, recurse_t>
+    requires not Same<SingleReceiver, recurse_t>
   static void submit(ownordelegate_t, time_point awhen, SingleReceiver awhat);
 
   template <class SingleReceiver>
-    requires !Same<SingleReceiver, recurse_t>
+    requires not Same<SingleReceiver, recurse_t>
   static void submit(ownornest_t, time_point awhen, SingleReceiver awhat);
 };
 
@@ -128,7 +128,7 @@ class nester {
 
 template <class E>
 template <class SingleReceiver>
-  requires !Same<SingleReceiver, recurse_t>
+  requires not Same<SingleReceiver, recurse_t>
 // static
 void trampoline<E>::submit(
     ownordelegate_t,
@@ -192,7 +192,7 @@ void trampoline<E>::submit(
 
 template <class E>
 template <class SingleReceiver>
-  requires !Same<SingleReceiver, recurse_t>
+  requires not Same<SingleReceiver, recurse_t>
 // static
 void trampoline<E>::submit(
     ownornest_t,

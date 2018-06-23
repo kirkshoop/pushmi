@@ -104,16 +104,16 @@ template<class PS, class P>
 struct property_from_category<PS, P> : property_from_category<properties_t<PS>, property_category_t<P>> {};
 
 template<class... PN, class Category>
-  requires And<Property<PN>...> && !Property<Category>
+  requires And<Property<PN>...> && not Property<Category>
 struct property_from_category<property_set<PN...>, Category> : property_from_category<PN, property_category_t<PN>, Category>... {};
 
 template<class P, class Category>
-  requires Property<P> && !Property<Category>
+  requires Property<P> && not Property<Category>
 struct property_from_category<P, Category, Category> {
   using type = P;
 };
 template<class P, class Category, class Expected>
-  requires Property<P> && !Property<Category> && !Property<Expected>
+  requires Property<P> && not Property<Category> && not Property<Expected>
 struct property_from_category<P, Category, Expected> {};
 
 template<class PS, class C>
@@ -129,37 +129,37 @@ template<class PS, class P>
 struct remove_property_from_category<PS, P> : remove_property_from_category<properties_t<PS>, property_category_t<P>> {};
 
 template<class P0, class... PN, class Category>
-  requires Property<P0> && And<Property<PN>...> && !Property<Category>
+  requires Property<P0> && And<Property<PN>...> && not Property<Category>
 struct remove_property_from_category<property_set<P0, PN...>, Category> {
   using type = typename remove_property_from_category<property_set<>, Category, P0, PN...>::type;
 };
 
 template<class Category>
-  requires !Property<Category>
+  requires not Property<Category>
 struct remove_property_from_category<property_set<>, Category> {
   using type = property_set<>;
 };
 
 template<class... PN, class Category, class R0, class... RN>
-  requires And<Property<PN>...> && !Property<Category> && !Same<property_category_t<R0>, Category>
+  requires And<Property<PN>...> && not Property<Category> && not Same<property_category_t<R0>, Category>
 struct remove_property_from_category<property_set<PN...>, Category, R0, RN...> {
   using type = typename remove_property_from_category<property_set<PN..., R0>, Category, RN...>::type;
 };
 
 template<class... PN, class Category, class R0, class... RN>
-  requires And<Property<PN>...> && !Property<Category> && Same<property_category_t<R0>, Category>
+  requires And<Property<PN>...> && not Property<Category> && Same<property_category_t<R0>, Category>
 struct remove_property_from_category<property_set<PN...>, Category, R0, RN...> {
   using type = typename remove_property_from_category<property_set<PN...>, Category, RN...>::type;
 };
 
 template<class... PN, class Category, class R0>
-  requires And<Property<PN>...> && !Property<Category> && !Same<property_category_t<R0>, Category>
+  requires And<Property<PN>...> && not Property<Category> && not Same<property_category_t<R0>, Category>
 struct remove_property_from_category<property_set<PN...>, Category, R0> {
   using type = property_set<PN..., R0>;
 };
 
 template<class... PN, class Category, class R0>
-  requires And<Property<PN>...> && !Property<Category> && Same<property_category_t<R0>, Category>
+  requires And<Property<PN>...> && not Property<Category> && Same<property_category_t<R0>, Category>
 struct remove_property_from_category<property_set<PN...>, Category, R0> {
   using type = property_set<PN...>;
 };
@@ -177,7 +177,7 @@ template<class PropertySet0, class... PropertySetN>
 struct property_set_insert;
 
 template<class... Properties0, class Property0, class... PropertyN>
-  requires Property<Property0> && And<!Same<property_category_t<Properties0>, property_category_t<Property0>>...>
+  requires Property<Property0> && And<not Same<property_category_t<Properties0>, property_category_t<Property0>>...>
 struct property_set_insert<property_set<Properties0...>, Property0, PropertyN...> {
   using type = typename property_set_insert<property_set<Properties0..., Property0>, PropertyN...>::type;
 };

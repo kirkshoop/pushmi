@@ -284,7 +284,7 @@ inline auto make_flow_single() -> flow_single<> {
   return flow_single<>{};
 }
 template <class VF>
-    requires !Receiver<VF> && !detail::is_v<VF, on_error_fn> &&
+    requires not Receiver<VF> && !detail::is_v<VF, on_error_fn> &&
     !detail::is_v<VF, on_done_fn>
 auto make_flow_single(VF vf)
          -> flow_single<VF, abortEF, ignoreDF, ignoreStpF, ignoreStrtF> {
@@ -318,7 +318,7 @@ auto make_flow_single(Wrapped w) -> flow_single<V, PE, E> {
   return flow_single<V, PE, E>{std::move(w)};
 }
 template <class VF, class EF>
-    requires !Receiver<VF> && !detail::is_v<VF, on_error_fn> &&
+    requires not Receiver<VF> && !detail::is_v<VF, on_error_fn> &&
     !detail::is_v<VF, on_done_fn> && !detail::is_v<EF, on_value_fn> &&
     !detail::is_v<EF, on_done_fn>
 auto make_flow_single(VF vf, EF ef)
@@ -435,7 +435,7 @@ auto make_flow_single(Data d, DVF vf, DEF ef, DDF df, DStpF stpf, DStrtF strtf)
 flow_single() -> flow_single<>;
 
 PUSHMI_TEMPLATE(class VF)
-  (requires !Receiver<VF> && !detail::is_v<VF, on_error_fn> &&
+  (requires not Receiver<VF> && !detail::is_v<VF, on_error_fn> &&
     !detail::is_v<VF, on_done_fn>)
 flow_single(VF)
          -> flow_single<VF, abortEF, ignoreDF, ignoreStpF, ignoreStrtF>;
@@ -459,7 +459,7 @@ PUSHMI_TEMPLATE(class V, class PE, class E, class Wrapped)
 flow_single(Wrapped) -> flow_single<V, PE, E>;
 
 PUSHMI_TEMPLATE(class VF, class EF)
-  (requires !Receiver<VF> && !detail::is_v<VF, on_error_fn> &&
+  (requires not Receiver<VF> && !detail::is_v<VF, on_error_fn> &&
     !detail::is_v<VF, on_done_fn> && !detail::is_v<EF, on_value_fn> &&
     !detail::is_v<EF, on_done_fn>)
 flow_single(VF, EF)

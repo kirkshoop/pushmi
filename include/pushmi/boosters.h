@@ -17,13 +17,12 @@ namespace pushmi {
 
 template<class T>
 struct construct {
-  template<class... AN>
-    requires Constructible<T, AN...>
+  PUSHMI_TEMPLATE(class... AN)
+    (requires Constructible<T, AN...>)
   auto operator()(AN&&... an) const {
     return T{std::forward<AN>(an)...};
   }
 };
-
 
 template<template <class...> class T>
 struct construct_deduced;
@@ -76,10 +75,9 @@ struct systemNowF {
 
 struct passDVF {
   PUSHMI_TEMPLATE(class V, class Data)
-    (requires Receiver<Data>)
-  requires requires(Data& out, V&& v) {
-    ::pushmi::set_value(out, (V&&) v);
-  }
+    (requires requires (
+      ::pushmi::set_value(std::declval<Data&>(), std::declval<V>())
+    ) && Receiver<Data>)
   void operator()(Data& out, V&& v) const {
     ::pushmi::set_value(out, (V&&) v);
   }
@@ -111,10 +109,9 @@ struct passDStpF {
 
 struct passDStrtF {
   PUSHMI_TEMPLATE(class Up, class Data)
-    (requires Receiver<Data>)
-  requires requires(Data& out, Up& up) {
-    ::pushmi::set_starting(out, up);
-  }
+    (requires requires (
+      ::pushmi::set_starting(std::declval<Data&>(), std::declval<Up&>())
+    ) && Receiver<Data>)
   void operator()(Data& out, Up& up) const {
     ::pushmi::set_starting(out, up);
   }
@@ -143,7 +140,9 @@ struct passDNF {
 // inspired by Ovrld - shown in a presentation by Nicolai Josuttis
 #if __cpp_variadic_using >= 201611
 template <PUSHMI_TYPE_CONSTRAINT(SemiMovable)... Fns>
+#if __cpp_concepts
   requires sizeof...(Fns) > 0
+#endif
 struct overload_fn : Fns... {
   constexpr overload_fn() = default;
   constexpr explicit overload_fn(Fns... fns) requires sizeof...(Fns) == 1
@@ -154,7 +153,9 @@ struct overload_fn : Fns... {
 };
 #else
 template <PUSHMI_TYPE_CONSTRAINT(SemiMovable)... Fns>
+#if __cpp_concepts
   requires sizeof...(Fns) > 0
+#endif
 struct overload_fn;
 template <class Fn>
 struct overload_fn<Fn> : Fn {
