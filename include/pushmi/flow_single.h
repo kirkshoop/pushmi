@@ -140,7 +140,9 @@ constexpr typename flow_single<V, PE, E>::vtable const
     flow_single<V, PE, E>::vtable::noop_;
 
 template <class VF, class EF, class DF, class StpF, class StrtF>
+#if __cpp_concepts
   requires Invocable<DF&>
+#endif
 class flow_single<VF, EF, DF, StpF, StrtF> {
   VF vf_;
   EF ef_;
@@ -178,13 +180,13 @@ class flow_single<VF, EF, DF, StpF, StrtF> {
         df_(std::move(df)),
         stpf_(std::move(stpf)),
         strtf_(std::move(strtf)) {}
-  template <class V>
-  requires Invocable<VF&, V>
+  PUSHMI_TEMPLATE (class V)
+    (requires Invocable<VF&, V>)
   void value(V v) {
     vf_(v);
   }
-  template <class E>
-    requires Invocable<EF&, E>
+  PUSHMI_TEMPLATE (class E)
+    (requires Invocable<EF&, E>)
   void error(E e) noexcept {
     static_assert(NothrowInvocable<EF&, E>, "error function must be noexcept");
     ef_(std::move(e));
@@ -203,13 +205,15 @@ class flow_single<VF, EF, DF, StpF, StrtF> {
 };
 
 template<
-    class Data,
+    PUSHMI_TYPE_CONSTRAINT(Receiver) Data,
     class DVF,
     class DEF,
     class DDF,
     class DStpF,
     class DStrtF>
-  requires Receiver<Data> && Invocable<DDF&, Data&>
+#if __cpp_concepts
+  requires Invocable<DDF&, Data&>
+#endif
 class flow_single<Data, DVF, DEF, DDF, DStpF, DStrtF> {
   Data data_;
   DVF vf_;
@@ -247,12 +251,14 @@ class flow_single<Data, DVF, DEF, DDF, DStpF, DStrtF> {
         df_(df),
         stpf_(std::move(stpf)),
         strtf_(std::move(strtf)) {}
-  template <class V>
-  requires Invocable<DVF&, Data&, V> void value(V v) {
+  PUSHMI_TEMPLATE (class V)
+    (requires Invocable<DVF&, Data&, V>)
+  void value(V v) {
     vf_(data_, v);
   }
-  template <class E>
-  requires Invocable<DEF&, Data&, E> void error(E e) noexcept {
+  PUSHMI_TEMPLATE (class E)
+    (requires Invocable<DEF&, Data&, E>)
+  void error(E e) noexcept {
     static_assert(
         NothrowInvocable<DEF&, Data&, E>, "error function must be noexcept");
     ef_(data_, e);
@@ -263,8 +269,8 @@ class flow_single<Data, DVF, DEF, DDF, DStpF, DStrtF> {
   void stopping() noexcept {
     stpf_(data_);
   }
-  template <class Up>
-  requires Invocable<DStrtF&, Data&, Up&>
+  PUSHMI_TEMPLATE (class Up)
+    (requires Invocable<DStrtF&, Data&, Up&>)
   void starting(Up& up) {
     strtf_(data_, up);
   }
@@ -283,9 +289,9 @@ class flow_single<>
 inline auto make_flow_single() -> flow_single<> {
   return flow_single<>{};
 }
-template <class VF>
-    requires not Receiver<VF> && !detail::is_v<VF, on_error_fn> &&
-    !detail::is_v<VF, on_done_fn>
+PUSHMI_TEMPLATE (class VF)
+  (requires not Receiver<VF> && !detail::is_v<VF, on_error_fn> &&
+    !detail::is_v<VF, on_done_fn>)
 auto make_flow_single(VF vf)
          -> flow_single<VF, abortEF, ignoreDF, ignoreStpF, ignoreStrtF> {
   return flow_single<VF, abortEF, ignoreDF, ignoreStpF, ignoreStrtF>{std::move(vf)};
@@ -311,16 +317,16 @@ auto make_flow_single(on_done_fn<DF> df)
   return flow_single<ignoreVF, abortEF, on_done_fn<DF>, ignoreStpF, ignoreStrtF>{
       std::move(df)};
 }
-template <class V, class PE, class E, class Wrapped>
-    requires FlowSingleReceiver<Wrapped, V, PE, E> &&
-    !detail::is_v<Wrapped, none>
+PUSHMI_TEMPLATE (class V, class PE, class E, class Wrapped)
+  (requires FlowSingleReceiver<Wrapped, V, PE, E> &&
+    !detail::is_v<Wrapped, none>)
 auto make_flow_single(Wrapped w) -> flow_single<V, PE, E> {
   return flow_single<V, PE, E>{std::move(w)};
 }
-template <class VF, class EF>
-    requires not Receiver<VF> && !detail::is_v<VF, on_error_fn> &&
+PUSHMI_TEMPLATE (class VF, class EF)
+  (requires not Receiver<VF> && !detail::is_v<VF, on_error_fn> &&
     !detail::is_v<VF, on_done_fn> && !detail::is_v<EF, on_value_fn> &&
-    !detail::is_v<EF, on_done_fn>
+    !detail::is_v<EF, on_done_fn>)
 auto make_flow_single(VF vf, EF ef)
          -> flow_single<VF, EF, ignoreDF, ignoreStpF, ignoreStrtF> {
   return {std::move(vf), std::move(ef)};
@@ -335,20 +341,20 @@ auto make_flow_single(on_error_fn<EFN...> ef, on_done_fn<DF> df)
         ignoreStrtF> {
   return {std::move(ef), std::move(df)};
 }
-template <class VF, class EF, class DF>
-requires Invocable<DF&>
+PUSHMI_TEMPLATE (class VF, class EF, class DF)
+  (requires Invocable<DF&>)
 auto make_flow_single(VF vf, EF ef, DF df)
     -> flow_single<VF, EF, DF, ignoreStpF, ignoreStrtF> {
   return {std::move(vf), std::move(ef), std::move(df)};
 }
-template <class VF, class EF, class DF, class StpF>
-requires Invocable<DF&>&& Invocable<StpF&>
+PUSHMI_TEMPLATE (class VF, class EF, class DF, class StpF)
+  (requires Invocable<DF&>&& Invocable<StpF&>)
 auto make_flow_single(VF vf, EF ef, DF df, StpF stpf)
     -> flow_single<VF, EF, DF, StpF, ignoreStrtF> {
   return {std::move(vf), std::move(ef), std::move(df), std::move(stpf)};
 }
-template <class VF, class EF, class DF, class StpF, class StrtF>
-requires Invocable<DF&>&& Invocable<StpF&>
+PUSHMI_TEMPLATE (class VF, class EF, class DF, class StpF, class StrtF)
+  (requires Invocable<DF&>&& Invocable<StpF&>)
 auto make_flow_single(VF vf, EF ef, DF df, StpF stpf, StrtF strtf)
     -> flow_single<VF, EF, DF, StpF, StrtF> {
   return {std::move(vf), std::move(ef), std::move(df), std::move(stpf), std::move(strtf)};

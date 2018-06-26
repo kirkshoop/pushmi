@@ -15,7 +15,7 @@ struct subject;
 template<class T, class PS>
 struct subject<T, PS> {
 
-  using properties = property_insert_t<property_set<is_sender<>, is_single<>>, PS>;
+  using properties = property_set_insert_t<property_set<is_sender<>, is_single<>>, PS>;
 
   struct subject_shared {
     bool done_ = false;
@@ -59,7 +59,7 @@ struct subject<T, PS> {
   // need a template overload of none/deferred and the rest that stores a 'ptr' with its own lifetime management
   struct subject_receiver {
 
-    using properties = property_insert_t<property_set<is_receiver<>, is_single<>>, PS>;
+    using properties = property_set_insert_t<property_set<is_receiver<>, is_single<>>, PS>;
 
     std::shared_ptr<subject_shared> s;
 

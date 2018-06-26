@@ -56,10 +56,10 @@ template <class T>
 using remove_cvref_t = std::remove_cv_t<std::remove_reference_t<T>>;
 
 PUSHMI_CONCEPT_DEF(
-  template(class T, template<class> class C)
-  (concept Valid)(T, C),
+  template(class T, template<class...> class C, class... Args)
+  (concept Valid)(T, C, Args...),
     requires () (
-      typename_<C<T>>
+      typename_<C<T, Args...>>
     )
 );
 
@@ -183,15 +183,18 @@ using std::invoke;
 using std::invoke_result;
 using std::invoke_result_t;
 #else
-template <class F, class...As>
-  requires requires (F&& f, As&&...as) { ((F&&) f)((As&&) as...); }
+PUSHMI_TEMPLATE (class F, class...As)
+  (requires requires (
+    std::declval<F>()(std::declval<As>()...)
+  ))
 decltype(auto) invoke(F&& f, As&&...as)
     noexcept(noexcept(((F&&) f)((As&&) as...))) {
   return ((F&&) f)((As&&) as...);
 }
-template <class F, class...As>
-  requires Satisfies<F, std::is_member_pointer> &&
-    requires (F f, As&&...as) { std::mem_fn(f)((As&&) as...); }
+PUSHMI_TEMPLATE (class F, class...As)
+  (requires requires (
+    std::mem_fn(std::declval<F>())(std::declval<As>()...)
+  ))
 decltype(auto) invoke(F f, As&&...as)
     noexcept(noexcept(std::mem_fn(f)((As&&) as...))) {
   return std::mem_fn(f)((As&&) as...);

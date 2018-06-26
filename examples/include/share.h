@@ -30,7 +30,7 @@ auto share_fn<T>::operator()() const {
     PUSHMI_IF_CONSTEXPR( ((bool)TimeSender<In>) (
       ::pushmi::submit(in, ::pushmi::now(id(in)), sub.receiver());
     ) else (
-      ::pushmi::submit(in, sub.receiver());
+      ::pushmi::submit(id(in), sub.receiver());
     ));
 
     return sub;

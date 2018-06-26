@@ -108,7 +108,9 @@ template <class E>
 constexpr typename none<E>::vtable const none<E>::vtable::noop_;
 
 template <class EF, class DF>
+#if __cpp_concepts
   requires Invocable<DF&>
+#endif
 class none<EF, DF> {
   static_assert(!detail::is_v<EF, on_value_fn> && !detail::is_v<EF, single>);
   bool done_ = false;
@@ -126,8 +128,8 @@ public:
   constexpr none(EF ef, DF df)
       : done_(false), ef_(std::move(ef)), df_(std::move(df)) {}
 
-  template <class E>
-    requires Invocable<EF&, E>
+  PUSHMI_TEMPLATE (class E)
+    (requires Invocable<EF&, E>)
   void error(E e) noexcept {
     static_assert(
         noexcept(ef_(std::move(e))),
@@ -145,8 +147,10 @@ public:
   }
 };
 
-template <class Data, class DEF, class DDF>
-  requires Receiver<Data, is_none<>> && Invocable<DDF&, Data&>
+template <PUSHMI_TYPE_CONSTRAINT(Receiver<is_none<>>) Data, class DEF, class DDF>
+#if __cpp_concepts
+  requires Invocable<DDF&, Data&>
+#endif
 class none<Data, DEF, DDF> {
   bool done_ = false;
   Data data_{};
@@ -163,8 +167,8 @@ public:
   constexpr none(Data d, DEF ef, DDF df = DDF{})
       : done_(false), data_(std::move(d)), ef_(std::move(ef)),
         df_(std::move(df)) {}
-  template <class E>
-    requires Invocable<DEF&, Data&, E>
+  PUSHMI_TEMPLATE (class E)
+    (requires Invocable<DEF&, Data&, E>)
   void error(E e) noexcept {
     static_assert(
         noexcept(ef_(data_, std::move(e))), "error function must be noexcept");

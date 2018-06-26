@@ -4166,10 +4166,10 @@ template <class T>
 using remove_cvref_t = std::remove_cv_t<std::remove_reference_t<T>>;
 
 PUSHMI_CONCEPT_DEF(
-  template(class T, template<class> class C)
-  (concept Valid)(T, C),
+  template(class T, template<class...> class C, class... Args)
+  (concept Valid)(T, C, Args...),
     requires () (
-      typename_<C<T>>
+      typename_<C<T, Args...>>
     )
 );
 
@@ -4293,15 +4293,18 @@ using std::invoke;
 using std::invoke_result;
 using std::invoke_result_t;
 #else
-template <class F, class...As>
-  requires requires (F&& f, As&&...as) { ((F&&) f)((As&&) as...); }
+PUSHMI_TEMPLATE (class F, class...As)
+  (requires requires (
+    std::declval<F>()(std::declval<As>()...)
+  ))
 decltype(auto) invoke(F&& f, As&&...as)
     noexcept(noexcept(((F&&) f)((As&&) as...))) {
   return ((F&&) f)((As&&) as...);
 }
-template <class F, class...As>
-  requires Satisfies<F, std::is_member_pointer> &&
-    requires (F f, As&&...as) { std::mem_fn(f)((As&&) as...); }
+PUSHMI_TEMPLATE (class F, class...As)
+  (requires requires (
+    std::mem_fn(std::declval<F>())(std::declval<As>()...)
+  ))
 decltype(auto) invoke(F f, As&&...as)
     noexcept(noexcept(std::mem_fn(f)((As&&) as...))) {
   return std::mem_fn(f)((As&&) as...);
@@ -4569,7 +4572,7 @@ namespace pushmi {
 
 // property_set
 
-template <class T>
+template <class T, class = void>
 struct property_traits;
 
 template <class T>
@@ -4916,16 +4919,16 @@ namespace pushmi {
 template <class T>
 using __property_category_t = typename T::property_category;
 
-template <class T>
+template <class T, class>
 struct property_traits : property_traits<std::decay_t<T>> {
 };
 template <class T>
-  requires Decayed<T>
-struct property_traits<T> {
+struct property_traits<T,
+    std::enable_if_t<Decayed<T> && not Valid<T, __property_category_t>>> {
 };
 template <class T>
-  requires Decayed<T> && Valid<T, __property_category_t>
-struct property_traits<T> {
+struct property_traits<T,
+    std::enable_if_t<Decayed<T> && Valid<T, __property_category_t>>> {
   using property_category = __property_category_t<T>;
 };
 
@@ -4953,12 +4956,17 @@ PUSHMI_CONCEPT_DEF(
     And<Property<PropertyN>...>
 );
 
+namespace detail {
+template <PUSHMI_TYPE_CONSTRAINT(Property) P, class = property_category_t<P>>
+struct property_set_element {};
+}
+
 template<class... PropertyN>
-struct property_set {
+struct property_set : detail::property_set_element<PropertyN>... {
   static_assert(all_true_v<Property<PropertyN>...>, "property_set only supports types that match the Property concept");
   static_assert(UniqueCategory<PropertyN...>, "property_set has multiple properties from the same category");
+  using properties = property_set;
 };
-
 
 PUSHMI_CONCEPT_DEF(
   template (class T)
@@ -4971,22 +4979,30 @@ PUSHMI_CONCEPT_DEF(
 template <class T>
 using __properties_t = typename T::properties;
 
-template <class T>
-struct property_set_traits : property_traits<std::decay_t<T>> {
+namespace detail {
+template <class T, class = void>
+struct property_set_traits_impl : property_traits<std::decay_t<T>> {
 };
 template <class T>
-  requires Decayed<T>
-struct property_set_traits<T> {
+struct property_set_traits_impl<T,
+    std::enable_if_t<Decayed<T> && not Valid<T, __properties_t>>> {
 };
 template <class T>
-  requires Decayed<T> && Valid<T, __properties_t>
-struct property_set_traits<T> {
+struct property_set_traits_impl<T,
+    std::enable_if_t<Decayed<T> && Valid<T, __properties_t>>> {
   using properties = __properties_t<T>;
+};
+} // namespace detail
+
+template <class T>
+struct property_set_traits : detail::property_set_traits_impl<T> {
 };
 
 template <class T>
-  requires PropertySet<__properties_t<property_set_traits<T>>>
-using properties_t = __properties_t<property_set_traits<T>>;
+using properties_t =
+    std::enable_if_t<
+        PropertySet<__properties_t<property_set_traits<T>>>,
+        __properties_t<property_set_traits<T>>>;
 
 PUSHMI_CONCEPT_DEF(
   template (class T)
@@ -4995,134 +5011,63 @@ PUSHMI_CONCEPT_DEF(
 );
 
 // find property in the specified set that matches the category of the property specified.
+namespace detail {
 
-template<class... TN>
-struct property_from_category;
+template <class PIn, class POut>
+POut __property_set_index_fn(property_set_element<POut, property_category_t<PIn>>);
 
-template<class PS, class P>
-  requires Properties<PS> && Property<P>
-struct property_from_category<PS, P> : property_from_category<properties_t<PS>, property_category_t<P>> {};
+template <class PIn, class POut, class...Ps>
+meta::apply<meta::quote<property_set>, meta::replace<meta::list<Ps...>, POut, PIn>>
+__property_set_insert_fn(property_set<Ps...>, property_set_element<POut, property_category_t<PIn>>);
 
-template<class... PN, class Category>
-  requires And<Property<PN>...> && not Property<Category>
-struct property_from_category<property_set<PN...>, Category> : property_from_category<PN, property_category_t<PN>, Category>... {};
+template <class PIn, class...Ps>
+property_set<Ps..., PIn> __property_set_insert_fn(property_set<Ps...>, ...);
 
-template<class P, class Category>
-  requires Property<P> && not Property<Category>
-struct property_from_category<P, Category, Category> {
-  using type = P;
-};
-template<class P, class Category, class Expected>
-  requires Property<P> && not Property<Category> && not Property<Expected>
-struct property_from_category<P, Category, Expected> {};
+template <class PS, class P>
+using property_set_insert_one_t =
+  decltype(detail::__property_set_insert_fn<P>(PS{}, PS{}));
 
-template<class PS, class C>
-using property_from_category_t = typename property_from_category<PS, C>::type;
+} // namespace detail
 
-// remove property in the specified set that matches the category of the property specified.
+template <class PS, class P>
+using property_set_index_t =
+  std::enable_if_t<
+    PropertySet<PS> && Property<P>,
+    decltype(detail::__property_set_index_fn<P>(PS{}))>;
 
-template<class... TN>
-struct remove_property_from_category;
-
-template<class PS, class P>
-  requires Properties<PS> && Property<P>
-struct remove_property_from_category<PS, P> : remove_property_from_category<properties_t<PS>, property_category_t<P>> {};
-
-template<class P0, class... PN, class Category>
-  requires Property<P0> && And<Property<PN>...> && not Property<Category>
-struct remove_property_from_category<property_set<P0, PN...>, Category> {
-  using type = typename remove_property_from_category<property_set<>, Category, P0, PN...>::type;
-};
-
-template<class Category>
-  requires not Property<Category>
-struct remove_property_from_category<property_set<>, Category> {
-  using type = property_set<>;
-};
-
-template<class... PN, class Category, class R0, class... RN>
-  requires And<Property<PN>...> && not Property<Category> && not Same<property_category_t<R0>, Category>
-struct remove_property_from_category<property_set<PN...>, Category, R0, RN...> {
-  using type = typename remove_property_from_category<property_set<PN..., R0>, Category, RN...>::type;
-};
-
-template<class... PN, class Category, class R0, class... RN>
-  requires And<Property<PN>...> && not Property<Category> && Same<property_category_t<R0>, Category>
-struct remove_property_from_category<property_set<PN...>, Category, R0, RN...> {
-  using type = typename remove_property_from_category<property_set<PN...>, Category, RN...>::type;
-};
-
-template<class... PN, class Category, class R0>
-  requires And<Property<PN>...> && not Property<Category> && not Same<property_category_t<R0>, Category>
-struct remove_property_from_category<property_set<PN...>, Category, R0> {
-  using type = property_set<PN..., R0>;
-};
-
-template<class... PN, class Category, class R0>
-  requires And<Property<PN>...> && not Property<Category> && Same<property_category_t<R0>, Category>
-struct remove_property_from_category<property_set<PN...>, Category, R0> {
-  using type = property_set<PN...>;
-};
-
-template<class PS, class C>
-using remove_property_from_category_t = typename remove_property_from_category<PS, C>::type;
-
-// insert
-// insert will replace the property in the left set with the property in the 
-// right set that matches on the category-type and add the properties from the 
-// right set that do not match on the category-type of any of the properties
-// in the left set.
-
-template<class PropertySet0, class... PropertySetN>
-struct property_set_insert;
-
-template<class... Properties0, class Property0, class... PropertyN>
-  requires Property<Property0> && And<not Same<property_category_t<Properties0>, property_category_t<Property0>>...>
-struct property_set_insert<property_set<Properties0...>, Property0, PropertyN...> {
-  using type = typename property_set_insert<property_set<Properties0..., Property0>, PropertyN...>::type;
-};
-
-template<class... Properties0, class Property0, class... PropertyN>
-  requires Property<Property0> && Or<Same<property_category_t<Properties0>, property_category_t<Property0>>...>
-struct property_set_insert<property_set<Properties0...>, Property0, PropertyN...> {
-  using type = typename property_set_insert<remove_property_from_category_t<property_set<Properties0...>, property_category_t<Property0>>, Property0, PropertyN...>::type;
-};
-
-template<class... Properties0, class... Properties1, class... PropertySetN>
-struct property_set_insert<property_set<Properties0...>, property_set<Properties1...>, PropertySetN...> {
-  using type = typename property_set_insert<property_set<Properties0...>, Properties1..., PropertySetN...>::type;
-};
-
-template<class... Properties0>
-struct property_set_insert<property_set<Properties0...>> {
-  using type = property_set<Properties0...>;
-};
-
-template<class PS0, class PS1>
-using property_insert_t = typename property_set_insert<PS0, PS1>::type;
+template <class PS0, class PS1>
+using property_set_insert_t =
+  std::enable_if_t<
+    PropertySet<PS0> && PropertySet<PS1>,
+    meta::apply<
+      meta::quote<property_set>,
+      meta::fold<
+        meta::apply<meta::quote<meta::list>, PS1>,
+        PS0,
+        meta::quote<detail::property_set_insert_one_t>>>>;
 
 // query for properties on types with properties.
 
-template<class Expected, class... TN>
-struct found_base : 
-  std::integral_constant<bool, any_true_v<std::is_base_of<Expected, TN>::value...>> {};
-template<class Expected, class... TN>
-constexpr bool found_base_v = found_base<Expected, TN...>::value;
+namespace detail {
+template<class PIn, class POut>
+std::is_base_of<PIn, POut>
+property_query_fn(property_set_element<POut, property_category_t<PIn>>*);
+template<class PIn>
+std::false_type property_query_fn(void*);
 
 template<class PS, class... ExpectedN>
-struct property_query : std::false_type {};
+struct property_query_impl :
+  meta::and_c<decltype(property_query_fn<ExpectedN>((properties_t<PS>*)nullptr))::value...> {};
+} //namespace detail
 
-template<class PS, class... ExpectedN>
-  requires Properties<PS>
-struct property_query<PS, ExpectedN...> : property_query<properties_t<PS>, ExpectedN...> {};
+template<PUSHMI_TYPE_CONSTRAINT(Properties) PS, PUSHMI_TYPE_CONSTRAINT(Property)... ExpectedN>
+struct property_query
+  : meta::if_c<
+      Properties<PS> && And<Property<ExpectedN>...>,
+      detail::property_query_impl<PS, ExpectedN...>,
+      std::false_type> {};
 
-template<class... PropertyN, class... ExpectedN>
-  requires And<Property<PropertyN>...> &&
-  And<Property<ExpectedN>...>
-struct property_query<property_set<PropertyN...>, ExpectedN...> : 
-  std::integral_constant<bool, all_true_v<found_base_v<ExpectedN, PropertyN...>...>> {};
-
-template<class PS, class... ExpectedN>
+template<PUSHMI_TYPE_CONSTRAINT(Properties) PS, PUSHMI_TYPE_CONSTRAINT(Property)... ExpectedN>
 PUSHMI_INLINE_VAR constexpr bool property_query_v = property_query<PS, ExpectedN...>::value;
 
 } // namespace pushmi
@@ -5478,8 +5423,8 @@ PUSHMI_CONCEPT_DEF(
 );
 
 template <class D>
-  requires TimeSender<D>
-using time_point_t = decltype(::pushmi::now(std::declval<D&>()));
+using time_point_t =
+  std::enable_if_t<TimeSender<D>, decltype(::pushmi::now(std::declval<D&>()))>;
 
 
 // this is a more general form where the constraint could be time or priority
@@ -5514,8 +5459,10 @@ PUSHMI_CONCEPT_DEF(
 );
 
 template <class D>
-  requires ConstrainedSender<D>
-using constraint_t = decltype(::pushmi::top(std::declval<D&>()));
+using constraint_t =
+  std::enable_if_t<
+    ConstrainedSender<D>,
+    decltype(::pushmi::top(std::declval<D&>()))>;
 
 } // namespace pushmi
 //#pragma once
@@ -5658,11 +5605,9 @@ struct passDNF {
 };
 
 // inspired by Ovrld - shown in a presentation by Nicolai Josuttis
-#if __cpp_variadic_using >= 201611
+#if __cpp_variadic_using >= 201611 && __cpp_concepts
 template <PUSHMI_TYPE_CONSTRAINT(SemiMovable)... Fns>
-#if __cpp_concepts
   requires sizeof...(Fns) > 0
-#endif
 struct overload_fn : Fns... {
   constexpr overload_fn() = default;
   constexpr explicit overload_fn(Fns... fns) requires sizeof...(Fns) == 1
@@ -5776,8 +5721,8 @@ auto on_submit(Fns... fns) -> on_submit_fn<Fns...> {
 
 //#include "traits.h"
 
-template <class In, class Op>
-  requires pushmi::Invocable<Op&, In>
+PUSHMI_TEMPLATE (class In, class Op)
+  (requires pushmi::Invocable<Op&, In>)
 decltype(auto) operator|(In&& in, Op op) {
   return op((In&&) in);
 }
@@ -5913,7 +5858,9 @@ template <class E>
 constexpr typename none<E>::vtable const none<E>::vtable::noop_;
 
 template <class EF, class DF>
+#if __cpp_concepts
   requires Invocable<DF&>
+#endif
 class none<EF, DF> {
   static_assert(!detail::is_v<EF, on_value_fn> && !detail::is_v<EF, single>);
   bool done_ = false;
@@ -5931,8 +5878,8 @@ public:
   constexpr none(EF ef, DF df)
       : done_(false), ef_(std::move(ef)), df_(std::move(df)) {}
 
-  template <class E>
-    requires Invocable<EF&, E>
+  PUSHMI_TEMPLATE (class E)
+    (requires Invocable<EF&, E>)
   void error(E e) noexcept {
     static_assert(
         noexcept(ef_(std::move(e))),
@@ -5950,8 +5897,10 @@ public:
   }
 };
 
-template <class Data, class DEF, class DDF>
-  requires Receiver<Data, is_none<>> && Invocable<DDF&, Data&>
+template <PUSHMI_TYPE_CONSTRAINT(Receiver<is_none<>>) Data, class DEF, class DDF>
+#if __cpp_concepts
+  requires Invocable<DDF&, Data&>
+#endif
 class none<Data, DEF, DDF> {
   bool done_ = false;
   Data data_{};
@@ -5968,8 +5917,8 @@ public:
   constexpr none(Data d, DEF ef, DDF df = DDF{})
       : done_(false), data_(std::move(d)), ef_(std::move(ef)),
         df_(std::move(df)) {}
-  template <class E>
-    requires Invocable<DEF&, Data&, E>
+  PUSHMI_TEMPLATE (class E)
+    (requires Invocable<DEF&, Data&, E>)
   void error(E e) noexcept {
     static_assert(
         noexcept(ef_(data_, std::move(e))), "error function must be noexcept");
@@ -6221,10 +6170,7 @@ class deferred<SF> {
   }
 };
 
-template <class Data, class DSF>
-#if __cpp_concepts
-  requires Sender<Data, is_none<>>
-#endif
+template <PUSHMI_TYPE_CONSTRAINT(Sender<is_none<>>) Data, class DSF>
 class deferred<Data, DSF> {
   Data data_{};
   DSF sf_{};
@@ -6423,16 +6369,16 @@ public:
     new ((void*)this) single(std::move(that));
     return *this;
   }
-  template<class T>
-  requires ConvertibleTo<T&&, V&&>
+  PUSHMI_TEMPLATE (class T)
+    (requires ConvertibleTo<T&&, V&&>)
   void value(T&& t) {
     if (!done_) {
       done_ = true;
       vptr_->rvalue_(data_, (T&&) t);
     }
   }
-  template<class T>
-  requires ConvertibleTo<T&, V&>
+  PUSHMI_TEMPLATE (class T)
+    (requires ConvertibleTo<T&, V&>)
   void value(T& t) {
     if (!done_) {
       done_ = true;
@@ -6458,7 +6404,9 @@ template <class V, class E>
 constexpr typename single<V, E>::vtable const single<V, E>::vtable::noop_;
 
 template <class VF, class EF, class DF>
+#if __cpp_concepts
   requires Invocable<DF&>
+#endif
 class single<VF, EF, DF> {
   bool done_ = false;
   VF vf_{};
@@ -6487,15 +6435,15 @@ class single<VF, EF, DF> {
       : done_(false), vf_(std::move(vf)), ef_(std::move(ef)), df_(std::move(df))
   {}
 
-  template <class V>
-  requires Invocable<VF&, V>
+  PUSHMI_TEMPLATE (class V)
+    (requires Invocable<VF&, V>)
   void value(V&& v) {
     if (done_) {return;}
     done_ = true;
     vf_((V&&) v);
   }
-  template <class E>
-  requires Invocable<EF&, E>
+  PUSHMI_TEMPLATE (class E)
+    (requires Invocable<EF&, E>)
   void error(E e) noexcept {
     static_assert(NothrowInvocable<EF&, E>, "error function must be noexcept");
     if (!done_) {
@@ -6511,8 +6459,10 @@ class single<VF, EF, DF> {
   }
 };
 
-template <class Data, class DVF, class DEF, class DDF>
-  requires Receiver<Data> && Invocable<DDF&, Data&>
+template <PUSHMI_TYPE_CONSTRAINT(Receiver) Data, class DVF, class DEF, class DDF>
+#if __cpp_concepts
+  requires Invocable<DDF&, Data&>
+#endif
 class single<Data, DVF, DEF, DDF> {
   bool done_ = false;
   Data data_{};
@@ -6541,16 +6491,16 @@ class single<Data, DVF, DEF, DDF> {
   constexpr single(Data d, DVF vf, DEF ef = DEF{}, DDF df = DDF{})
       : done_(false), data_(std::move(d)), vf_(vf), ef_(ef), df_(df) {}
 
-  template <class V>
-  requires Invocable<DVF&, Data&, V>
+  PUSHMI_TEMPLATE(class V)
+    (requires Invocable<DVF&, Data&, V>)
   void value(V&& v) {
     if (!done_) {
       done_ = true;
       vf_(data_, (V&&) v);
     }
   }
-  template <class E>
-  requires Invocable<DEF&, Data&, E>
+  PUSHMI_TEMPLATE(class E)
+    (requires Invocable<DEF&, Data&, E>)
   void error(E e) noexcept {
     static_assert(
         NothrowInvocable<DEF&, Data&, E>, "error function must be noexcept");
@@ -6740,8 +6690,8 @@ std::future<T> future_from(Out singleSender) {
 
 namespace pushmi {
 
-template <class V, class E>
-class single_deferred<V, E> {
+template <class V, class E = std::exception_ptr>
+class any_single_deferred {
   union data {
     void* pobj_ = nullptr;
     char buffer_[sizeof(V)]; // can hold a V in-situ
@@ -6760,12 +6710,12 @@ class single_deferred<V, E> {
   } const* vptr_ = &vtable::noop_;
   template <class T, class U = std::decay_t<T>>
   using wrapped_t =
-    std::enable_if_t<!std::is_same<U, single_deferred>::value, U>;
+    std::enable_if_t<!std::is_same<U, any_single_deferred>::value, U>;
  public:
   using properties = property_set<is_sender<>, is_single<>>;
 
-  single_deferred() = default;
-  single_deferred(single_deferred&& that) noexcept : single_deferred() {
+  any_single_deferred() = default;
+  any_single_deferred(any_single_deferred&& that) noexcept : any_single_deferred() {
     that.vptr_->op_(that.data_, &data_);
     std::swap(that.vptr_, vptr_);
   }
@@ -6773,7 +6723,7 @@ class single_deferred<V, E> {
   PUSHMI_TEMPLATE(class Wrapped)
     (requires SenderTo<wrapped_t<Wrapped>, single<V, E>, is_single<>>
       PUSHMI_BROKEN_SUBSUMPTION(&& !insitu<Wrapped>()))
-  explicit single_deferred(Wrapped obj) : single_deferred() {
+  explicit any_single_deferred(Wrapped obj) : any_single_deferred() {
     struct s {
       static void op(data& src, data* dst) {
         if (dst)
@@ -6791,7 +6741,7 @@ class single_deferred<V, E> {
   PUSHMI_TEMPLATE(class Wrapped)
     (requires SenderTo<wrapped_t<Wrapped>, single<V, E>, is_single<>>
       && insitu<Wrapped>())
-  explicit single_deferred(Wrapped obj) noexcept : single_deferred() {
+  explicit any_single_deferred(Wrapped obj) noexcept : any_single_deferred() {
     struct s {
       static void op(data& src, data* dst) {
         if (dst)
@@ -6808,12 +6758,12 @@ class single_deferred<V, E> {
     new (data_.buffer_) Wrapped(std::move(obj));
     vptr_ = &vtbl;
   }
-  ~single_deferred() {
+  ~any_single_deferred() {
     vptr_->op_(data_, nullptr);
   }
-  single_deferred& operator=(single_deferred&& that) noexcept {
-    this->~single_deferred();
-    new ((void*)this) single_deferred(std::move(that));
+  any_single_deferred& operator=(any_single_deferred&& that) noexcept {
+    this->~any_single_deferred();
+    new ((void*)this) any_single_deferred(std::move(that));
     return *this;
   }
   void submit(single<V, E> out) {
@@ -6823,12 +6773,12 @@ class single_deferred<V, E> {
 
 // Class static definitions:
 template <class V, class E>
-constexpr typename single_deferred<V, E>::vtable const
-    single_deferred<V, E>::vtable::noop_;
+constexpr typename any_single_deferred<V, E>::vtable const
+    any_single_deferred<V, E>::vtable::noop_;
 
 template <class SF>
 class single_deferred<SF> {
-  SF sf_;
+  SF sf_{};
 
  public:
   using properties = property_set<is_sender<>, is_single<>>;
@@ -6844,19 +6794,19 @@ class single_deferred<SF> {
   }
 };
 
-template <class Data, class DSF>
-  requires Sender<Data, is_single<>>
-class single_deferred<Data, DSF> {
-  Data data_;
-  DSF sf_;
+namespace detail {
+template <PUSHMI_TYPE_CONSTRAINT(Sender<is_single<>>) Data, class DSF>
+class single_deferred_2 {
+  Data data_{};
+  DSF sf_{};
 
  public:
   using properties = property_set<is_sender<>, is_single<>>;
 
-  constexpr single_deferred() = default;
-  constexpr explicit single_deferred(Data data)
+  constexpr single_deferred_2() = default;
+  constexpr explicit single_deferred_2(Data data)
       : data_(std::move(data)) {}
-  constexpr single_deferred(Data data, DSF sf)
+  constexpr single_deferred_2(Data data, DSF sf)
       : data_(std::move(data)), sf_(std::move(sf)) {}
   PUSHMI_TEMPLATE(class Out)
     (requires lazy::Receiver<Out, is_single<>> && lazy::Invocable<DSF&, Data&, Out>)
@@ -6865,12 +6815,28 @@ class single_deferred<Data, DSF> {
   }
 };
 
+template <class A, class B>
+using single_deferred_base =
+  meta::if_c<
+    Sender<A, is_single<>>,
+    single_deferred_2<A, B>,
+    any_single_deferred<A, B>>;
+} // namespace detail
+
+template <class A, class B>
+struct single_deferred<A, B>
+  : detail::single_deferred_base<A, B> {
+  constexpr single_deferred() = default;
+  using detail::single_deferred_base<A, B>::single_deferred_base;
+};
+
 ////////////////////////////////////////////////////////////////////////////////
 // make_single_deferred
 inline auto make_single_deferred() -> single_deferred<ignoreSF> {
   return {};
 }
-template <class SF>
+PUSHMI_TEMPLATE(class SF)
+  (requires PUSHMI_BROKEN_SUBSUMPTION(not Sender<SF>))
 auto make_single_deferred(SF sf) -> single_deferred<SF> {
   return single_deferred<SF>{std::move(sf)};
 }
@@ -6890,7 +6856,8 @@ auto make_single_deferred(Data d, DSF sf) -> single_deferred<Data, DSF> {
 #if __cpp_deduction_guides >= 201703
 single_deferred() -> single_deferred<ignoreSF>;
 
-template <class SF>
+PUSHMI_TEMPLATE(class SF)
+  (requires PUSHMI_BROKEN_SUBSUMPTION(not Sender<SF>))
 single_deferred(SF) -> single_deferred<SF>;
 
 PUSHMI_TEMPLATE(class Data)
@@ -6901,9 +6868,6 @@ PUSHMI_TEMPLATE(class Data, class DSF)
   (requires Sender<Data, is_single<>>)
 single_deferred(Data, DSF) -> single_deferred<Data, DSF>;
 #endif
-
-template <class V, class E = std::exception_ptr>
-using any_single_deferred = single_deferred<V, E>;
 
 // template <
 //     class V,
@@ -6924,8 +6888,11 @@ using any_single_deferred = single_deferred<V, E>;
 
 namespace pushmi {
 
-template <class V, class E, class TP>
-class time_single_deferred<V, E, TP> {
+template <
+    class V,
+    class E = std::exception_ptr,
+    class TP = std::chrono::system_clock::time_point>
+class any_time_single_deferred {
   union data {
     void* pobj_ = nullptr;
     char buffer_[sizeof(std::promise<int>)]; // can hold a V in-situ
@@ -6946,21 +6913,21 @@ class time_single_deferred<V, E, TP> {
   } const* vptr_ = &vtable::noop_;
   template <class T, class U = std::decay_t<T>>
   using wrapped_t =
-    std::enable_if_t<!std::is_same<U, time_single_deferred>::value, U>;
+    std::enable_if_t<!std::is_same<U, any_time_single_deferred>::value, U>;
 
  public:
   using properties = property_set<is_time<>, is_single<>>;
 
-  time_single_deferred() = default;
-  time_single_deferred(time_single_deferred&& that) noexcept
-      : time_single_deferred() {
+  any_time_single_deferred() = default;
+  any_time_single_deferred(any_time_single_deferred&& that) noexcept
+      : any_time_single_deferred() {
     that.vptr_->op_(that.data_, &data_);
     std::swap(that.vptr_, vptr_);
   }
   PUSHMI_TEMPLATE (class Wrapped)
     (requires TimeSenderTo<wrapped_t<Wrapped>, single<V, E>>
       PUSHMI_BROKEN_SUBSUMPTION(&& !insitu<Wrapped>()))
-  explicit time_single_deferred(Wrapped obj) : time_single_deferred() {
+  explicit any_time_single_deferred(Wrapped obj) : any_time_single_deferred() {
     struct s {
       static void op(data& src, data* dst) {
         if (dst)
@@ -6984,7 +6951,7 @@ class time_single_deferred<V, E, TP> {
   PUSHMI_TEMPLATE (class Wrapped)
     (requires TimeSenderTo<wrapped_t<Wrapped>, single<V, E>> &&
       insitu<Wrapped>())
-  explicit time_single_deferred(Wrapped obj) noexcept : time_single_deferred() {
+  explicit any_time_single_deferred(Wrapped obj) noexcept : any_time_single_deferred() {
     struct s {
       static void op(data& src, data* dst) {
         if (dst)
@@ -7006,12 +6973,12 @@ class time_single_deferred<V, E, TP> {
     new (data_.buffer_) Wrapped(std::move(obj));
     vptr_ = &vtbl;
   }
-  ~time_single_deferred() {
+  ~any_time_single_deferred() {
     vptr_->op_(data_, nullptr);
   }
-  time_single_deferred& operator=(time_single_deferred&& that) noexcept {
-    this->~time_single_deferred();
-    new ((void*)this) time_single_deferred(std::move(that));
+  any_time_single_deferred& operator=(any_time_single_deferred&& that) noexcept {
+    this->~any_time_single_deferred();
+    new ((void*)this) any_time_single_deferred(std::move(that));
     return *this;
   }
   TP now() {
@@ -7024,11 +6991,13 @@ class time_single_deferred<V, E, TP> {
 
 // Class static definitions:
 template <class V, class E, class TP>
-constexpr typename time_single_deferred<V, E, TP>::vtable const
-    time_single_deferred<V, E, TP>::vtable::noop_;
+constexpr typename any_time_single_deferred<V, E, TP>::vtable const
+    any_time_single_deferred<V, E, TP>::vtable::noop_;
 
 template <class SF, class NF>
+#if __cpp_concepts
   requires Invocable<NF&>
+#endif
 class time_single_deferred<SF, NF> {
   SF sf_{};
   NF nf_{};
@@ -7052,9 +7021,12 @@ class time_single_deferred<SF, NF> {
   }
 };
 
-template <class Data, class DSF, class DNF>
-  requires TimeSender<Data, is_single<>> && Invocable<DNF&, Data&>
-class time_single_deferred<Data, DSF, DNF> {
+namespace detail {
+template <PUSHMI_TYPE_CONSTRAINT(TimeSender<is_single<>>) Data, class DSF, class DNF>
+#if __cpp_concepts
+  requires Invocable<DNF&, Data&>
+#endif
+class time_single_deferred_2 {
   Data data_{};
   DSF sf_{};
   DNF nf_{};
@@ -7062,10 +7034,10 @@ class time_single_deferred<Data, DSF, DNF> {
  public:
   using properties = property_set<is_time<>, is_single<>>;
 
-  constexpr time_single_deferred() = default;
-  constexpr explicit time_single_deferred(Data data)
+  constexpr time_single_deferred_2() = default;
+  constexpr explicit time_single_deferred_2(Data data)
       : data_(std::move(data)) {}
-  constexpr time_single_deferred(Data data, DSF sf, DNF nf = DNF{})
+  constexpr time_single_deferred_2(Data data, DSF sf, DNF nf = DNF{})
       : data_(std::move(data)), sf_(std::move(sf)), nf_(std::move(nf)) {}
   auto now() {
     return nf_(data_);
@@ -7076,6 +7048,21 @@ class time_single_deferred<Data, DSF, DNF> {
   void submit(TP tp, Out out) {
     sf_(data_, std::move(tp), std::move(out));
   }
+};
+
+template <class A, class B, class C>
+using time_single_deferred_base =
+  meta::if_c<
+    TimeSender<A, is_single<>>,
+    time_single_deferred_2<A, B, C>,
+    any_time_single_deferred<A, B, C>>;
+} // namespace detail
+
+template <class A, class B, class C>
+struct time_single_deferred<A, B, C>
+  : detail::time_single_deferred_base<A, B, C> {
+  constexpr time_single_deferred() = default;
+  using detail::time_single_deferred_base<A, B, C>::time_single_deferred_base;
 };
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -7126,12 +7113,6 @@ PUSHMI_TEMPLATE (class Data, class DSF, class DNF)
   (requires TimeSender<Data, is_single<>> && Invocable<DNF&, Data&>)
 time_single_deferred(Data, DSF, DNF) -> time_single_deferred<Data, DSF, DNF>;
 #endif
-
-template <
-    class V,
-    class E = std::exception_ptr,
-    class TP = std::chrono::system_clock::time_point>
-using any_time_single_deferred = time_single_deferred<V, E, TP>;
 
 // template <
 //     class V,
@@ -7438,7 +7419,9 @@ constexpr typename flow_single<V, PE, E>::vtable const
     flow_single<V, PE, E>::vtable::noop_;
 
 template <class VF, class EF, class DF, class StpF, class StrtF>
+#if __cpp_concepts
   requires Invocable<DF&>
+#endif
 class flow_single<VF, EF, DF, StpF, StrtF> {
   VF vf_;
   EF ef_;
@@ -7476,13 +7459,13 @@ class flow_single<VF, EF, DF, StpF, StrtF> {
         df_(std::move(df)),
         stpf_(std::move(stpf)),
         strtf_(std::move(strtf)) {}
-  template <class V>
-  requires Invocable<VF&, V>
+  PUSHMI_TEMPLATE (class V)
+    (requires Invocable<VF&, V>)
   void value(V v) {
     vf_(v);
   }
-  template <class E>
-    requires Invocable<EF&, E>
+  PUSHMI_TEMPLATE (class E)
+    (requires Invocable<EF&, E>)
   void error(E e) noexcept {
     static_assert(NothrowInvocable<EF&, E>, "error function must be noexcept");
     ef_(std::move(e));
@@ -7501,13 +7484,15 @@ class flow_single<VF, EF, DF, StpF, StrtF> {
 };
 
 template<
-    class Data,
+    PUSHMI_TYPE_CONSTRAINT(Receiver) Data,
     class DVF,
     class DEF,
     class DDF,
     class DStpF,
     class DStrtF>
-  requires Receiver<Data> && Invocable<DDF&, Data&>
+#if __cpp_concepts
+  requires Invocable<DDF&, Data&>
+#endif
 class flow_single<Data, DVF, DEF, DDF, DStpF, DStrtF> {
   Data data_;
   DVF vf_;
@@ -7545,12 +7530,14 @@ class flow_single<Data, DVF, DEF, DDF, DStpF, DStrtF> {
         df_(df),
         stpf_(std::move(stpf)),
         strtf_(std::move(strtf)) {}
-  template <class V>
-  requires Invocable<DVF&, Data&, V> void value(V v) {
+  PUSHMI_TEMPLATE (class V)
+    (requires Invocable<DVF&, Data&, V>)
+  void value(V v) {
     vf_(data_, v);
   }
-  template <class E>
-  requires Invocable<DEF&, Data&, E> void error(E e) noexcept {
+  PUSHMI_TEMPLATE (class E)
+    (requires Invocable<DEF&, Data&, E>)
+  void error(E e) noexcept {
     static_assert(
         NothrowInvocable<DEF&, Data&, E>, "error function must be noexcept");
     ef_(data_, e);
@@ -7561,8 +7548,8 @@ class flow_single<Data, DVF, DEF, DDF, DStpF, DStrtF> {
   void stopping() noexcept {
     stpf_(data_);
   }
-  template <class Up>
-  requires Invocable<DStrtF&, Data&, Up&>
+  PUSHMI_TEMPLATE (class Up)
+    (requires Invocable<DStrtF&, Data&, Up&>)
   void starting(Up& up) {
     strtf_(data_, up);
   }
@@ -7581,9 +7568,9 @@ class flow_single<>
 inline auto make_flow_single() -> flow_single<> {
   return flow_single<>{};
 }
-template <class VF>
-    requires not Receiver<VF> && !detail::is_v<VF, on_error_fn> &&
-    !detail::is_v<VF, on_done_fn>
+PUSHMI_TEMPLATE (class VF)
+  (requires not Receiver<VF> && !detail::is_v<VF, on_error_fn> &&
+    !detail::is_v<VF, on_done_fn>)
 auto make_flow_single(VF vf)
          -> flow_single<VF, abortEF, ignoreDF, ignoreStpF, ignoreStrtF> {
   return flow_single<VF, abortEF, ignoreDF, ignoreStpF, ignoreStrtF>{std::move(vf)};
@@ -7609,16 +7596,16 @@ auto make_flow_single(on_done_fn<DF> df)
   return flow_single<ignoreVF, abortEF, on_done_fn<DF>, ignoreStpF, ignoreStrtF>{
       std::move(df)};
 }
-template <class V, class PE, class E, class Wrapped>
-    requires FlowSingleReceiver<Wrapped, V, PE, E> &&
-    !detail::is_v<Wrapped, none>
+PUSHMI_TEMPLATE (class V, class PE, class E, class Wrapped)
+  (requires FlowSingleReceiver<Wrapped, V, PE, E> &&
+    !detail::is_v<Wrapped, none>)
 auto make_flow_single(Wrapped w) -> flow_single<V, PE, E> {
   return flow_single<V, PE, E>{std::move(w)};
 }
-template <class VF, class EF>
-    requires not Receiver<VF> && !detail::is_v<VF, on_error_fn> &&
+PUSHMI_TEMPLATE (class VF, class EF)
+  (requires not Receiver<VF> && !detail::is_v<VF, on_error_fn> &&
     !detail::is_v<VF, on_done_fn> && !detail::is_v<EF, on_value_fn> &&
-    !detail::is_v<EF, on_done_fn>
+    !detail::is_v<EF, on_done_fn>)
 auto make_flow_single(VF vf, EF ef)
          -> flow_single<VF, EF, ignoreDF, ignoreStpF, ignoreStrtF> {
   return {std::move(vf), std::move(ef)};
@@ -7633,20 +7620,20 @@ auto make_flow_single(on_error_fn<EFN...> ef, on_done_fn<DF> df)
         ignoreStrtF> {
   return {std::move(ef), std::move(df)};
 }
-template <class VF, class EF, class DF>
-requires Invocable<DF&>
+PUSHMI_TEMPLATE (class VF, class EF, class DF)
+  (requires Invocable<DF&>)
 auto make_flow_single(VF vf, EF ef, DF df)
     -> flow_single<VF, EF, DF, ignoreStpF, ignoreStrtF> {
   return {std::move(vf), std::move(ef), std::move(df)};
 }
-template <class VF, class EF, class DF, class StpF>
-requires Invocable<DF&>&& Invocable<StpF&>
+PUSHMI_TEMPLATE (class VF, class EF, class DF, class StpF)
+  (requires Invocable<DF&>&& Invocable<StpF&>)
 auto make_flow_single(VF vf, EF ef, DF df, StpF stpf)
     -> flow_single<VF, EF, DF, StpF, ignoreStrtF> {
   return {std::move(vf), std::move(ef), std::move(df), std::move(stpf)};
 }
-template <class VF, class EF, class DF, class StpF, class StrtF>
-requires Invocable<DF&>&& Invocable<StpF&>
+PUSHMI_TEMPLATE (class VF, class EF, class DF, class StpF, class StrtF)
+  (requires Invocable<DF&>&& Invocable<StpF&>)
 auto make_flow_single(VF vf, EF ef, DF df, StpF stpf, StrtF strtf)
     -> flow_single<VF, EF, DF, StpF, StrtF> {
   return {std::move(vf), std::move(ef), std::move(df), std::move(stpf), std::move(strtf)};
@@ -8041,6 +8028,45 @@ class trampoline_id {
 };
 
 template <class E = std::exception_ptr>
+class trampoline;
+
+template <class E = std::exception_ptr>
+class delegator {
+  using time_point = typename trampoline<E>::time_point;
+
+ public:
+  using properties = property_set<is_time<>, is_single<>>;
+
+  time_point now() {
+    return trampoline<E>::now();
+  }
+
+  PUSHMI_TEMPLATE (class SingleReceiver)
+    (requires Receiver<remove_cvref_t<SingleReceiver>, is_single<>>)
+  void submit(time_point when, SingleReceiver&& what) {
+    trampoline<E>::submit(
+        ownordelegate, when, std::forward<SingleReceiver>(what));
+  }
+};
+
+template <class E = std::exception_ptr>
+class nester {
+  using time_point = typename trampoline<E>::time_point;
+
+ public:
+  using properties = property_set<is_time<>, is_single<>>;
+
+  time_point now() {
+    return trampoline<E>::now();
+  }
+
+  template <class SingleReceiver>
+  void submit(time_point when, SingleReceiver&& what) {
+    trampoline<E>::submit(ownornest, when, std::forward<SingleReceiver>(what));
+  }
+};
+
+template <class E>
 class trampoline {
  public:
   using time_point = std::chrono::system_clock::time_point;
@@ -8090,171 +8116,115 @@ class trampoline {
     next(*owner()) = awhen;
   }
 
-  template <class SingleReceiver>
-    requires not Same<SingleReceiver, recurse_t>
-  static void submit(ownordelegate_t, time_point awhen, SingleReceiver awhat);
+  PUSHMI_TEMPLATE (class SingleReceiver)
+    (requires not Same<SingleReceiver, recurse_t>)
+  static void submit(ownordelegate_t, time_point awhen, SingleReceiver awhat) {
+    delegator<E> that;
 
-  template <class SingleReceiver>
-    requires not Same<SingleReceiver, recurse_t>
-  static void submit(ownornest_t, time_point awhen, SingleReceiver awhat);
-};
+    if (is_owned()) {
+      // thread already owned
 
-template <class E = std::exception_ptr>
-class delegator {
-  using time_point = typename trampoline<E>::time_point;
+      // poor mans scope guard
+      try {
+        if (++depth(*owner()) > 100 || awhen > trampoline<E>::now()) {
+          // defer work to owner
+          pending(*owner()).push_back(
+              std::make_tuple(awhen, work_type{std::move(awhat)}));
+        } else {
+          // dynamic recursion - optimization to balance queueing and
+          // stack usage and value interleaving on the same thread.
+          ::pushmi::set_value(awhat, that);
+        }
+      } catch(...) {
+        --depth(*owner());
+        throw;
+      }
+      --depth(*owner());
+      return;
+    }
 
- public:
-  using properties = property_set<is_time<>, is_single<>>;
+    // take over the thread
 
-  time_point now() {
-    return trampoline<E>::now();
-  }
-
-  template <class SingleReceiver>
-    requires Receiver<remove_cvref_t<SingleReceiver>, is_single<>>
-  void submit(time_point when, SingleReceiver&& what) {
-    trampoline<E>::submit(
-        ownordelegate, when, std::forward<SingleReceiver>(what));
-  }
-};
-
-template <class E = std::exception_ptr>
-class nester {
-  using time_point = typename trampoline<E>::time_point;
-
- public:
-  using properties = property_set<is_time<>, is_single<>>;
-
-  time_point now() {
-    return trampoline<E>::now();
-  }
-
-  template <class SingleReceiver>
-  void submit(time_point when, SingleReceiver&& what) {
-    trampoline<E>::submit(ownornest, when, std::forward<SingleReceiver>(what));
-  }
-};
-
-template <class E>
-template <class SingleReceiver>
-  requires not Same<SingleReceiver, recurse_t>
-// static
-void trampoline<E>::submit(
-    ownordelegate_t,
-    time_point awhen,
-    SingleReceiver awhat) {
-
-  delegator<E> that;
-
-  if (is_owned()) {
-    // thread already owned
-
+    pending_type pending_store;
+    owner() = &pending_store;
+    depth(pending_store) = 0;
     // poor mans scope guard
     try {
-      if (++depth(*owner()) > 100 || awhen > trampoline<E>::now()) {
-        // defer work to owner
-        pending(*owner()).push_back(
-            std::make_tuple(awhen, work_type{std::move(awhat)}));
-      } else {
-        // dynamic recursion - optimization to balance queueing and
-        // stack usage and value interleaving on the same thread.
-        ::pushmi::set_value(awhat, that);
-      }
+      trampoline<E>::submit(ownornest, awhen, std::move(awhat));
     } catch(...) {
-      --depth(*owner());
+
+      // ignore exceptions while delivering the exception
+      try {
+        ::pushmi::set_error(awhat, std::current_exception());
+        for (auto& item : pending(pending_store)) {
+          auto& what = std::get<1>(item);
+          ::pushmi::set_error(what, std::current_exception());
+        }
+      } catch (...) {
+      }
+      pending(pending_store).clear();
+
+      if(!is_owned()) { std::abort(); }
+      if(!pending(pending_store).empty()) { std::abort(); }
+      owner() = nullptr;
       throw;
     }
-    --depth(*owner());
-    return;
-  }
-
-  // take over the thread
-
-  pending_type pending_store;
-  owner() = &pending_store;
-  depth(pending_store) = 0;
-  // poor mans scope guard
-  try {
-    trampoline<E>::submit(ownornest, awhen, std::move(awhat));
-  } catch(...) {
-
-    // ignore exceptions while delivering the exception
-    try {
-      ::pushmi::set_error(awhat, std::current_exception());
-      for (auto& item : pending(pending_store)) {
-        auto& what = std::get<1>(item);
-        ::pushmi::set_error(what, std::current_exception());
-      }
-    } catch (...) {
-    }
-    pending(pending_store).clear();
-
     if(!is_owned()) { std::abort(); }
     if(!pending(pending_store).empty()) { std::abort(); }
     owner() = nullptr;
-    throw;
   }
-  if(!is_owned()) { std::abort(); }
-  if(!pending(pending_store).empty()) { std::abort(); }
-  owner() = nullptr;
-}
 
-template <class E>
-template <class SingleReceiver>
-  requires not Same<SingleReceiver, recurse_t>
-// static
-void trampoline<E>::submit(
-    ownornest_t,
-    time_point awhen,
-    SingleReceiver awhat) {
-
+  PUSHMI_TEMPLATE (class SingleReceiver)
+    (requires not Same<SingleReceiver, recurse_t>)
+  static void submit(ownornest_t, time_point awhen, SingleReceiver awhat) {
     delegator<E> that;
 
-  if (!is_owned()) {
-    trampoline<E>::submit(ownordelegate, awhen, std::move(awhat));
-    return;
-  }
-
-  auto& pending_store = *owner();
-
-  // static recursion - tail call optimization
-  if (pending(pending_store).empty()) {
-    auto when = awhen;
-    while (when != time_point{}) {
-      if (when > trampoline<E>::now()) {
-        std::this_thread::sleep_until(when);
-      }
-      next(pending_store) = time_point{};
-      ::pushmi::set_value(awhat, that);
-      when = next(pending_store);
+    if (!is_owned()) {
+      trampoline<E>::submit(ownordelegate, awhen, std::move(awhat));
+      return;
     }
-  } else {
-    // ensure work is sorted by time
-    pending(pending_store)
-        .push_back(std::make_tuple(awhen, work_type{std::move(awhat)}));
-  }
 
-  if (pending(pending_store).empty()) {
-    return;
-  }
+    auto& pending_store = *owner();
 
-  while (!pending(pending_store).empty()) {
-    std::stable_sort(
-        pending(pending_store).begin(),
-        pending(pending_store).end(),
-        [](auto& lhs, auto& rhs) {
-          auto& lwhen = std::get<0>(lhs);
-          auto& rwhen = std::get<0>(rhs);
-          return lwhen < rwhen;
-        });
-    auto item = std::move(pending(pending_store).front());
-    pending(pending_store).pop_front();
-    auto& when = std::get<0>(item);
-    auto& what = std::get<1>(item);
-    any_time_executor_ref<error_type, time_point> anythis{that};
-    ::pushmi::set_value(what, anythis);
+    // static recursion - tail call optimization
+    if (pending(pending_store).empty()) {
+      auto when = awhen;
+      while (when != time_point{}) {
+        if (when > trampoline<E>::now()) {
+          std::this_thread::sleep_until(when);
+        }
+        next(pending_store) = time_point{};
+        ::pushmi::set_value(awhat, that);
+        when = next(pending_store);
+      }
+    } else {
+      // ensure work is sorted by time
+      pending(pending_store)
+          .push_back(std::make_tuple(awhen, work_type{std::move(awhat)}));
+    }
+
+    if (pending(pending_store).empty()) {
+      return;
+    }
+
+    while (!pending(pending_store).empty()) {
+      std::stable_sort(
+          pending(pending_store).begin(),
+          pending(pending_store).end(),
+          [](auto& lhs, auto& rhs) {
+            auto& lwhen = std::get<0>(lhs);
+            auto& rwhen = std::get<0>(rhs);
+            return lwhen < rwhen;
+          });
+      auto item = std::move(pending(pending_store).front());
+      pending(pending_store).pop_front();
+      auto& when = std::get<0>(item);
+      auto& what = std::get<1>(item);
+      any_time_executor_ref<error_type, time_point> anythis{that};
+      ::pushmi::set_value(what, anythis);
+    }
   }
-}
+};
 
 } // namespace detail
 
@@ -8280,8 +8250,8 @@ inline detail::nester<E> nested_trampoline() {
 
 namespace detail {
 
-template <class E>
-  requires TimeSenderTo<delegator<E>, recurse_t>
+PUSHMI_TEMPLATE (class E)
+  (requires TimeSenderTo<delegator<E>, recurse_t>)
 decltype(auto) repeat(delegator<E>& exec) {
   ::pushmi::submit(exec, ::pushmi::now(exec), recurse);
 }
@@ -8387,10 +8357,10 @@ namespace pushmi {
 using std::apply;
 #else
 namespace detail {
-  template <class F, class Tuple, std::size_t... Is>
-    requires requires (F&& f, Tuple&& t) {
-      pushmi::invoke((F&&) f, std::get<Is>((Tuple&&) t)...);
-    }
+  PUSHMI_TEMPLATE (class F, class Tuple, std::size_t... Is)
+    (requires requires (
+      pushmi::invoke(std::declval<F>(), std::get<Is>(std::declval<Tuple>())...)
+    ))
   constexpr decltype(auto) apply_impl(F&& f, Tuple&& t, std::index_sequence<Is...>) {
     return pushmi::invoke((F&&) f, std::get<Is>((Tuple&&) t)...);
   }
@@ -8398,10 +8368,10 @@ namespace detail {
   using tupidxs = std::make_index_sequence<std::tuple_size<Tuple>::value>;
 } // namespace detail
 
-template <class F, class Tuple>
-  requires requires (F&& f, Tuple&& t) {
-    detail::apply_impl((F&&) f, (Tuple&&) t, detail::tupidxs<Tuple>{});
-  }
+PUSHMI_TEMPLATE (class F, class Tuple)
+  (requires requires (
+    detail::apply_impl(std::declval<F>(), std::declval<Tuple>(), detail::tupidxs<Tuple>{})
+  ))
 constexpr decltype(auto) apply(F&& f, Tuple&& t) {
   return detail::apply_impl((F&&) f, (Tuple&&) t, detail::tupidxs<Tuple>{});
 }
@@ -8416,21 +8386,20 @@ struct make_receiver<is_none<>> : construct_deduced<none> {};
 template <>
 struct make_receiver<is_single<>> : construct_deduced<single> {};
 
-template <class In>
-  requires Sender<In>
+template <PUSHMI_TYPE_CONSTRAINT(Sender) In>
 struct out_from_fn {
-  using Cardinality = property_from_category_t<In, is_silent<>>;
+  using Cardinality = property_set_index_t<properties_t<In>, is_silent<>>;
   using Make = make_receiver<Cardinality>;
-  template <class... Ts>
-   requires Invocable<Make, Ts...>
+  PUSHMI_TEMPLATE (class... Ts)
+   (requires Invocable<Make, Ts...>)
   auto operator()(std::tuple<Ts...> args) const {
     return pushmi::apply(Make(), std::move(args));
   }
-  template <class... Ts, class... Fns,
-    class This = std::enable_if_t<sizeof...(Fns) != 0, out_from_fn>>
-    requires And<SemiMovable<Fns>...> &&
+  PUSHMI_TEMPLATE (class... Ts, class... Fns,
+    class This = std::enable_if_t<sizeof...(Fns) != 0, out_from_fn>)
+    (requires And<SemiMovable<Fns>...> &&
       Invocable<Make, std::tuple<Ts...>> &&
-      Invocable<This, pushmi::invoke_result_t<Make, std::tuple<Ts...>>, Fns...>
+      Invocable<This, pushmi::invoke_result_t<Make, std::tuple<Ts...>>, Fns...>)
   auto operator()(std::tuple<Ts...> args, Fns...fns) const {
     return This()(This()(std::move(args)), std::move(fns)...);
   }
@@ -8894,7 +8863,7 @@ namespace submit_detail {
 template <PUSHMI_TYPE_CONSTRAINT(Sender) In, class ...AN>
 using receiver_type_t =
     pushmi::invoke_result_t<
-        pushmi::detail::make_receiver<property_from_category_t<In, is_silent<>>>,
+        pushmi::detail::make_receiver<property_set_index_t<properties_t<In>, is_silent<>>>,
         AN...>;
 
 PUSHMI_CONCEPT_DEF(
@@ -9151,7 +9120,7 @@ struct tap_ {
 
 PUSHMI_TEMPLATE(class SideEffects, class Out)
   (requires Receiver<SideEffects> && Receiver<Out> &&
-    Receiver<tap_<SideEffects, Out>, property_from_category_t<Out, is_silent<>>>)
+    Receiver<tap_<SideEffects, Out>, property_set_index_t<properties_t<Out>, is_silent<>>>)
 auto make_tap(SideEffects se, Out out) -> tap_<SideEffects, Out> {
   return {std::move(se), std::move(out)};
 }

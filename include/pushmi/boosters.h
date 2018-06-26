@@ -138,11 +138,9 @@ struct passDNF {
 };
 
 // inspired by Ovrld - shown in a presentation by Nicolai Josuttis
-#if __cpp_variadic_using >= 201611
+#if __cpp_variadic_using >= 201611 && __cpp_concepts
 template <PUSHMI_TYPE_CONSTRAINT(SemiMovable)... Fns>
-#if __cpp_concepts
   requires sizeof...(Fns) > 0
-#endif
 struct overload_fn : Fns... {
   constexpr overload_fn() = default;
   constexpr explicit overload_fn(Fns... fns) requires sizeof...(Fns) == 1

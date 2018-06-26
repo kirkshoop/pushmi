@@ -16,16 +16,16 @@ namespace pushmi {
 template <class T>
 using __property_category_t = typename T::property_category;
 
-template <class T>
+template <class T, class>
 struct property_traits : property_traits<std::decay_t<T>> {
 };
 template <class T>
-  requires Decayed<T>
-struct property_traits<T> {
+struct property_traits<T,
+    std::enable_if_t<Decayed<T> && not Valid<T, __property_category_t>>> {
 };
 template <class T>
-  requires Decayed<T> && Valid<T, __property_category_t>
-struct property_traits<T> {
+struct property_traits<T,
+    std::enable_if_t<Decayed<T> && Valid<T, __property_category_t>>> {
   using property_category = __property_category_t<T>;
 };
 
@@ -53,12 +53,17 @@ PUSHMI_CONCEPT_DEF(
     And<Property<PropertyN>...>
 );
 
+namespace detail {
+template <PUSHMI_TYPE_CONSTRAINT(Property) P, class = property_category_t<P>>
+struct property_set_element {};
+}
+
 template<class... PropertyN>
-struct property_set {
+struct property_set : detail::property_set_element<PropertyN>... {
   static_assert(all_true_v<Property<PropertyN>...>, "property_set only supports types that match the Property concept");
   static_assert(UniqueCategory<PropertyN...>, "property_set has multiple properties from the same category");
+  using properties = property_set;
 };
-
 
 PUSHMI_CONCEPT_DEF(
   template (class T)
@@ -71,22 +76,30 @@ PUSHMI_CONCEPT_DEF(
 template <class T>
 using __properties_t = typename T::properties;
 
-template <class T>
-struct property_set_traits : property_traits<std::decay_t<T>> {
+namespace detail {
+template <class T, class = void>
+struct property_set_traits_impl : property_traits<std::decay_t<T>> {
 };
 template <class T>
-  requires Decayed<T>
-struct property_set_traits<T> {
+struct property_set_traits_impl<T,
+    std::enable_if_t<Decayed<T> && not Valid<T, __properties_t>>> {
 };
 template <class T>
-  requires Decayed<T> && Valid<T, __properties_t>
-struct property_set_traits<T> {
+struct property_set_traits_impl<T,
+    std::enable_if_t<Decayed<T> && Valid<T, __properties_t>>> {
   using properties = __properties_t<T>;
+};
+} // namespace detail
+
+template <class T>
+struct property_set_traits : detail::property_set_traits_impl<T> {
 };
 
 template <class T>
-  requires PropertySet<__properties_t<property_set_traits<T>>>
-using properties_t = __properties_t<property_set_traits<T>>;
+using properties_t =
+    std::enable_if_t<
+        PropertySet<__properties_t<property_set_traits<T>>>,
+        __properties_t<property_set_traits<T>>>;
 
 PUSHMI_CONCEPT_DEF(
   template (class T)
@@ -95,134 +108,63 @@ PUSHMI_CONCEPT_DEF(
 );
 
 // find property in the specified set that matches the category of the property specified.
+namespace detail {
 
-template<class... TN>
-struct property_from_category;
+template <class PIn, class POut>
+POut __property_set_index_fn(property_set_element<POut, property_category_t<PIn>>);
 
-template<class PS, class P>
-  requires Properties<PS> && Property<P>
-struct property_from_category<PS, P> : property_from_category<properties_t<PS>, property_category_t<P>> {};
+template <class PIn, class POut, class...Ps>
+meta::apply<meta::quote<property_set>, meta::replace<meta::list<Ps...>, POut, PIn>>
+__property_set_insert_fn(property_set<Ps...>, property_set_element<POut, property_category_t<PIn>>);
 
-template<class... PN, class Category>
-  requires And<Property<PN>...> && not Property<Category>
-struct property_from_category<property_set<PN...>, Category> : property_from_category<PN, property_category_t<PN>, Category>... {};
+template <class PIn, class...Ps>
+property_set<Ps..., PIn> __property_set_insert_fn(property_set<Ps...>, ...);
 
-template<class P, class Category>
-  requires Property<P> && not Property<Category>
-struct property_from_category<P, Category, Category> {
-  using type = P;
-};
-template<class P, class Category, class Expected>
-  requires Property<P> && not Property<Category> && not Property<Expected>
-struct property_from_category<P, Category, Expected> {};
+template <class PS, class P>
+using property_set_insert_one_t =
+  decltype(detail::__property_set_insert_fn<P>(PS{}, PS{}));
 
-template<class PS, class C>
-using property_from_category_t = typename property_from_category<PS, C>::type;
+} // namespace detail
 
-// remove property in the specified set that matches the category of the property specified.
+template <class PS, class P>
+using property_set_index_t =
+  std::enable_if_t<
+    PropertySet<PS> && Property<P>,
+    decltype(detail::__property_set_index_fn<P>(PS{}))>;
 
-template<class... TN>
-struct remove_property_from_category;
-
-template<class PS, class P>
-  requires Properties<PS> && Property<P>
-struct remove_property_from_category<PS, P> : remove_property_from_category<properties_t<PS>, property_category_t<P>> {};
-
-template<class P0, class... PN, class Category>
-  requires Property<P0> && And<Property<PN>...> && not Property<Category>
-struct remove_property_from_category<property_set<P0, PN...>, Category> {
-  using type = typename remove_property_from_category<property_set<>, Category, P0, PN...>::type;
-};
-
-template<class Category>
-  requires not Property<Category>
-struct remove_property_from_category<property_set<>, Category> {
-  using type = property_set<>;
-};
-
-template<class... PN, class Category, class R0, class... RN>
-  requires And<Property<PN>...> && not Property<Category> && not Same<property_category_t<R0>, Category>
-struct remove_property_from_category<property_set<PN...>, Category, R0, RN...> {
-  using type = typename remove_property_from_category<property_set<PN..., R0>, Category, RN...>::type;
-};
-
-template<class... PN, class Category, class R0, class... RN>
-  requires And<Property<PN>...> && not Property<Category> && Same<property_category_t<R0>, Category>
-struct remove_property_from_category<property_set<PN...>, Category, R0, RN...> {
-  using type = typename remove_property_from_category<property_set<PN...>, Category, RN...>::type;
-};
-
-template<class... PN, class Category, class R0>
-  requires And<Property<PN>...> && not Property<Category> && not Same<property_category_t<R0>, Category>
-struct remove_property_from_category<property_set<PN...>, Category, R0> {
-  using type = property_set<PN..., R0>;
-};
-
-template<class... PN, class Category, class R0>
-  requires And<Property<PN>...> && not Property<Category> && Same<property_category_t<R0>, Category>
-struct remove_property_from_category<property_set<PN...>, Category, R0> {
-  using type = property_set<PN...>;
-};
-
-template<class PS, class C>
-using remove_property_from_category_t = typename remove_property_from_category<PS, C>::type;
-
-// insert
-// insert will replace the property in the left set with the property in the 
-// right set that matches on the category-type and add the properties from the 
-// right set that do not match on the category-type of any of the properties
-// in the left set.
-
-template<class PropertySet0, class... PropertySetN>
-struct property_set_insert;
-
-template<class... Properties0, class Property0, class... PropertyN>
-  requires Property<Property0> && And<not Same<property_category_t<Properties0>, property_category_t<Property0>>...>
-struct property_set_insert<property_set<Properties0...>, Property0, PropertyN...> {
-  using type = typename property_set_insert<property_set<Properties0..., Property0>, PropertyN...>::type;
-};
-
-template<class... Properties0, class Property0, class... PropertyN>
-  requires Property<Property0> && Or<Same<property_category_t<Properties0>, property_category_t<Property0>>...>
-struct property_set_insert<property_set<Properties0...>, Property0, PropertyN...> {
-  using type = typename property_set_insert<remove_property_from_category_t<property_set<Properties0...>, property_category_t<Property0>>, Property0, PropertyN...>::type;
-};
-
-template<class... Properties0, class... Properties1, class... PropertySetN>
-struct property_set_insert<property_set<Properties0...>, property_set<Properties1...>, PropertySetN...> {
-  using type = typename property_set_insert<property_set<Properties0...>, Properties1..., PropertySetN...>::type;
-};
-
-template<class... Properties0>
-struct property_set_insert<property_set<Properties0...>> {
-  using type = property_set<Properties0...>;
-};
-
-template<class PS0, class PS1>
-using property_insert_t = typename property_set_insert<PS0, PS1>::type;
+template <class PS0, class PS1>
+using property_set_insert_t =
+  std::enable_if_t<
+    PropertySet<PS0> && PropertySet<PS1>,
+    meta::apply<
+      meta::quote<property_set>,
+      meta::fold<
+        meta::apply<meta::quote<meta::list>, PS1>,
+        PS0,
+        meta::quote<detail::property_set_insert_one_t>>>>;
 
 // query for properties on types with properties.
 
-template<class Expected, class... TN>
-struct found_base : 
-  std::integral_constant<bool, any_true_v<std::is_base_of<Expected, TN>::value...>> {};
-template<class Expected, class... TN>
-constexpr bool found_base_v = found_base<Expected, TN...>::value;
+namespace detail {
+template<class PIn, class POut>
+std::is_base_of<PIn, POut>
+property_query_fn(property_set_element<POut, property_category_t<PIn>>*);
+template<class PIn>
+std::false_type property_query_fn(void*);
 
 template<class PS, class... ExpectedN>
-struct property_query : std::false_type {};
+struct property_query_impl :
+  meta::and_c<decltype(property_query_fn<ExpectedN>((properties_t<PS>*)nullptr))::value...> {};
+} //namespace detail
 
-template<class PS, class... ExpectedN>
-  requires Properties<PS>
-struct property_query<PS, ExpectedN...> : property_query<properties_t<PS>, ExpectedN...> {};
+template<PUSHMI_TYPE_CONSTRAINT(Properties) PS, PUSHMI_TYPE_CONSTRAINT(Property)... ExpectedN>
+struct property_query
+  : meta::if_c<
+      Properties<PS> && And<Property<ExpectedN>...>,
+      detail::property_query_impl<PS, ExpectedN...>,
+      std::false_type> {};
 
-template<class... PropertyN, class... ExpectedN>
-  requires And<Property<PropertyN>...> &&
-  And<Property<ExpectedN>...>
-struct property_query<property_set<PropertyN...>, ExpectedN...> : 
-  std::integral_constant<bool, all_true_v<found_base_v<ExpectedN, PropertyN...>...>> {};
-
-template<class PS, class... ExpectedN>
+template<PUSHMI_TYPE_CONSTRAINT(Properties) PS, PUSHMI_TYPE_CONSTRAINT(Property)... ExpectedN>
 PUSHMI_INLINE_VAR constexpr bool property_query_v = property_query<PS, ExpectedN...>::value;
 
 } // namespace pushmi

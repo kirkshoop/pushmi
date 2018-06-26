@@ -8,8 +8,11 @@
 
 namespace pushmi {
 
-template <class V, class E, class TP>
-class time_single_deferred<V, E, TP> {
+template <
+    class V,
+    class E = std::exception_ptr,
+    class TP = std::chrono::system_clock::time_point>
+class any_time_single_deferred {
   union data {
     void* pobj_ = nullptr;
     char buffer_[sizeof(std::promise<int>)]; // can hold a V in-situ
@@ -30,21 +33,21 @@ class time_single_deferred<V, E, TP> {
   } const* vptr_ = &vtable::noop_;
   template <class T, class U = std::decay_t<T>>
   using wrapped_t =
-    std::enable_if_t<!std::is_same<U, time_single_deferred>::value, U>;
+    std::enable_if_t<!std::is_same<U, any_time_single_deferred>::value, U>;
 
  public:
   using properties = property_set<is_time<>, is_single<>>;
 
-  time_single_deferred() = default;
-  time_single_deferred(time_single_deferred&& that) noexcept
-      : time_single_deferred() {
+  any_time_single_deferred() = default;
+  any_time_single_deferred(any_time_single_deferred&& that) noexcept
+      : any_time_single_deferred() {
     that.vptr_->op_(that.data_, &data_);
     std::swap(that.vptr_, vptr_);
   }
   PUSHMI_TEMPLATE (class Wrapped)
     (requires TimeSenderTo<wrapped_t<Wrapped>, single<V, E>>
       PUSHMI_BROKEN_SUBSUMPTION(&& !insitu<Wrapped>()))
-  explicit time_single_deferred(Wrapped obj) : time_single_deferred() {
+  explicit any_time_single_deferred(Wrapped obj) : any_time_single_deferred() {
     struct s {
       static void op(data& src, data* dst) {
         if (dst)
@@ -68,7 +71,7 @@ class time_single_deferred<V, E, TP> {
   PUSHMI_TEMPLATE (class Wrapped)
     (requires TimeSenderTo<wrapped_t<Wrapped>, single<V, E>> &&
       insitu<Wrapped>())
-  explicit time_single_deferred(Wrapped obj) noexcept : time_single_deferred() {
+  explicit any_time_single_deferred(Wrapped obj) noexcept : any_time_single_deferred() {
     struct s {
       static void op(data& src, data* dst) {
         if (dst)
@@ -90,12 +93,12 @@ class time_single_deferred<V, E, TP> {
     new (data_.buffer_) Wrapped(std::move(obj));
     vptr_ = &vtbl;
   }
-  ~time_single_deferred() {
+  ~any_time_single_deferred() {
     vptr_->op_(data_, nullptr);
   }
-  time_single_deferred& operator=(time_single_deferred&& that) noexcept {
-    this->~time_single_deferred();
-    new ((void*)this) time_single_deferred(std::move(that));
+  any_time_single_deferred& operator=(any_time_single_deferred&& that) noexcept {
+    this->~any_time_single_deferred();
+    new ((void*)this) any_time_single_deferred(std::move(that));
     return *this;
   }
   TP now() {
@@ -108,11 +111,13 @@ class time_single_deferred<V, E, TP> {
 
 // Class static definitions:
 template <class V, class E, class TP>
-constexpr typename time_single_deferred<V, E, TP>::vtable const
-    time_single_deferred<V, E, TP>::vtable::noop_;
+constexpr typename any_time_single_deferred<V, E, TP>::vtable const
+    any_time_single_deferred<V, E, TP>::vtable::noop_;
 
 template <class SF, class NF>
+#if __cpp_concepts
   requires Invocable<NF&>
+#endif
 class time_single_deferred<SF, NF> {
   SF sf_{};
   NF nf_{};
@@ -136,9 +141,12 @@ class time_single_deferred<SF, NF> {
   }
 };
 
-template <class Data, class DSF, class DNF>
-  requires TimeSender<Data, is_single<>> && Invocable<DNF&, Data&>
-class time_single_deferred<Data, DSF, DNF> {
+namespace detail {
+template <PUSHMI_TYPE_CONSTRAINT(TimeSender<is_single<>>) Data, class DSF, class DNF>
+#if __cpp_concepts
+  requires Invocable<DNF&, Data&>
+#endif
+class time_single_deferred_2 {
   Data data_{};
   DSF sf_{};
   DNF nf_{};
@@ -146,10 +154,10 @@ class time_single_deferred<Data, DSF, DNF> {
  public:
   using properties = property_set<is_time<>, is_single<>>;
 
-  constexpr time_single_deferred() = default;
-  constexpr explicit time_single_deferred(Data data)
+  constexpr time_single_deferred_2() = default;
+  constexpr explicit time_single_deferred_2(Data data)
       : data_(std::move(data)) {}
-  constexpr time_single_deferred(Data data, DSF sf, DNF nf = DNF{})
+  constexpr time_single_deferred_2(Data data, DSF sf, DNF nf = DNF{})
       : data_(std::move(data)), sf_(std::move(sf)), nf_(std::move(nf)) {}
   auto now() {
     return nf_(data_);
@@ -160,6 +168,21 @@ class time_single_deferred<Data, DSF, DNF> {
   void submit(TP tp, Out out) {
     sf_(data_, std::move(tp), std::move(out));
   }
+};
+
+template <class A, class B, class C>
+using time_single_deferred_base =
+  meta::if_c<
+    TimeSender<A, is_single<>>,
+    time_single_deferred_2<A, B, C>,
+    any_time_single_deferred<A, B, C>>;
+} // namespace detail
+
+template <class A, class B, class C>
+struct time_single_deferred<A, B, C>
+  : detail::time_single_deferred_base<A, B, C> {
+  constexpr time_single_deferred() = default;
+  using detail::time_single_deferred_base<A, B, C>::time_single_deferred_base;
 };
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -210,12 +233,6 @@ PUSHMI_TEMPLATE (class Data, class DSF, class DNF)
   (requires TimeSender<Data, is_single<>> && Invocable<DNF&, Data&>)
 time_single_deferred(Data, DSF, DNF) -> time_single_deferred<Data, DSF, DNF>;
 #endif
-
-template <
-    class V,
-    class E = std::exception_ptr,
-    class TP = std::chrono::system_clock::time_point>
-using any_time_single_deferred = time_single_deferred<V, E, TP>;
 
 // template <
 //     class V,

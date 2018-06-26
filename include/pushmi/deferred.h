@@ -112,10 +112,7 @@ class deferred<SF> {
   }
 };
 
-template <class Data, class DSF>
-#if __cpp_concepts
-  requires Sender<Data, is_none<>>
-#endif
+template <PUSHMI_TYPE_CONSTRAINT(Sender<is_none<>>) Data, class DSF>
 class deferred<Data, DSF> {
   Data data_{};
   DSF sf_{};

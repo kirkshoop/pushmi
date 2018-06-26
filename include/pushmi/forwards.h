@@ -12,7 +12,7 @@ namespace pushmi {
 
 // property_set
 
-template <class T>
+template <class T, class = void>
 struct property_traits;
 
 template <class T>

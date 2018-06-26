@@ -49,7 +49,7 @@ struct tap_ {
 
 PUSHMI_TEMPLATE(class SideEffects, class Out)
   (requires Receiver<SideEffects> && Receiver<Out> &&
-    Receiver<tap_<SideEffects, Out>, property_from_category_t<Out, is_silent<>>>)
+    Receiver<tap_<SideEffects, Out>, property_set_index_t<properties_t<Out>, is_silent<>>>)
 auto make_tap(SideEffects se, Out out) -> tap_<SideEffects, Out> {
   return {std::move(se), std::move(out)};
 }

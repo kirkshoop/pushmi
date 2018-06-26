@@ -19,10 +19,10 @@ namespace pushmi {
 using std::apply;
 #else
 namespace detail {
-  template <class F, class Tuple, std::size_t... Is>
-    requires requires (F&& f, Tuple&& t) {
-      pushmi::invoke((F&&) f, std::get<Is>((Tuple&&) t)...);
-    }
+  PUSHMI_TEMPLATE (class F, class Tuple, std::size_t... Is)
+    (requires requires (
+      pushmi::invoke(std::declval<F>(), std::get<Is>(std::declval<Tuple>())...)
+    ))
   constexpr decltype(auto) apply_impl(F&& f, Tuple&& t, std::index_sequence<Is...>) {
     return pushmi::invoke((F&&) f, std::get<Is>((Tuple&&) t)...);
   }
@@ -30,10 +30,10 @@ namespace detail {
   using tupidxs = std::make_index_sequence<std::tuple_size<Tuple>::value>;
 } // namespace detail
 
-template <class F, class Tuple>
-  requires requires (F&& f, Tuple&& t) {
-    detail::apply_impl((F&&) f, (Tuple&&) t, detail::tupidxs<Tuple>{});
-  }
+PUSHMI_TEMPLATE (class F, class Tuple)
+  (requires requires (
+    detail::apply_impl(std::declval<F>(), std::declval<Tuple>(), detail::tupidxs<Tuple>{})
+  ))
 constexpr decltype(auto) apply(F&& f, Tuple&& t) {
   return detail::apply_impl((F&&) f, (Tuple&&) t, detail::tupidxs<Tuple>{});
 }
@@ -48,21 +48,20 @@ struct make_receiver<is_none<>> : construct_deduced<none> {};
 template <>
 struct make_receiver<is_single<>> : construct_deduced<single> {};
 
-template <class In>
-  requires Sender<In>
+template <PUSHMI_TYPE_CONSTRAINT(Sender) In>
 struct out_from_fn {
-  using Cardinality = property_from_category_t<In, is_silent<>>;
+  using Cardinality = property_set_index_t<properties_t<In>, is_silent<>>;
   using Make = make_receiver<Cardinality>;
-  template <class... Ts>
-   requires Invocable<Make, Ts...>
+  PUSHMI_TEMPLATE (class... Ts)
+   (requires Invocable<Make, Ts...>)
   auto operator()(std::tuple<Ts...> args) const {
     return pushmi::apply(Make(), std::move(args));
   }
-  template <class... Ts, class... Fns,
-    class This = std::enable_if_t<sizeof...(Fns) != 0, out_from_fn>>
-    requires And<SemiMovable<Fns>...> &&
+  PUSHMI_TEMPLATE (class... Ts, class... Fns,
+    class This = std::enable_if_t<sizeof...(Fns) != 0, out_from_fn>)
+    (requires And<SemiMovable<Fns>...> &&
       Invocable<Make, std::tuple<Ts...>> &&
-      Invocable<This, pushmi::invoke_result_t<Make, std::tuple<Ts...>>, Fns...>
+      Invocable<This, pushmi::invoke_result_t<Make, std::tuple<Ts...>>, Fns...>)
   auto operator()(std::tuple<Ts...> args, Fns...fns) const {
     return This()(This()(std::move(args)), std::move(fns)...);
   }

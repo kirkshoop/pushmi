@@ -6,8 +6,8 @@
 
 #include "traits.h"
 
-template <class In, class Op>
-  requires pushmi::Invocable<Op&, In>
+PUSHMI_TEMPLATE (class In, class Op)
+  (requires pushmi::Invocable<Op&, In>)
 decltype(auto) operator|(In&& in, Op op) {
   return op((In&&) in);
 }

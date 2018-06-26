@@ -120,16 +120,16 @@ public:
     new ((void*)this) single(std::move(that));
     return *this;
   }
-  template<class T>
-  requires ConvertibleTo<T&&, V&&>
+  PUSHMI_TEMPLATE (class T)
+    (requires ConvertibleTo<T&&, V&&>)
   void value(T&& t) {
     if (!done_) {
       done_ = true;
       vptr_->rvalue_(data_, (T&&) t);
     }
   }
-  template<class T>
-  requires ConvertibleTo<T&, V&>
+  PUSHMI_TEMPLATE (class T)
+    (requires ConvertibleTo<T&, V&>)
   void value(T& t) {
     if (!done_) {
       done_ = true;
@@ -155,7 +155,9 @@ template <class V, class E>
 constexpr typename single<V, E>::vtable const single<V, E>::vtable::noop_;
 
 template <class VF, class EF, class DF>
+#if __cpp_concepts
   requires Invocable<DF&>
+#endif
 class single<VF, EF, DF> {
   bool done_ = false;
   VF vf_{};
@@ -184,15 +186,15 @@ class single<VF, EF, DF> {
       : done_(false), vf_(std::move(vf)), ef_(std::move(ef)), df_(std::move(df))
   {}
 
-  template <class V>
-  requires Invocable<VF&, V>
+  PUSHMI_TEMPLATE (class V)
+    (requires Invocable<VF&, V>)
   void value(V&& v) {
     if (done_) {return;}
     done_ = true;
     vf_((V&&) v);
   }
-  template <class E>
-  requires Invocable<EF&, E>
+  PUSHMI_TEMPLATE (class E)
+    (requires Invocable<EF&, E>)
   void error(E e) noexcept {
     static_assert(NothrowInvocable<EF&, E>, "error function must be noexcept");
     if (!done_) {
@@ -208,8 +210,10 @@ class single<VF, EF, DF> {
   }
 };
 
-template <class Data, class DVF, class DEF, class DDF>
-  requires Receiver<Data> && Invocable<DDF&, Data&>
+template <PUSHMI_TYPE_CONSTRAINT(Receiver) Data, class DVF, class DEF, class DDF>
+#if __cpp_concepts
+  requires Invocable<DDF&, Data&>
+#endif
 class single<Data, DVF, DEF, DDF> {
   bool done_ = false;
   Data data_{};
@@ -238,16 +242,16 @@ class single<Data, DVF, DEF, DDF> {
   constexpr single(Data d, DVF vf, DEF ef = DEF{}, DDF df = DDF{})
       : done_(false), data_(std::move(d)), vf_(vf), ef_(ef), df_(df) {}
 
-  template <class V>
-  requires Invocable<DVF&, Data&, V>
+  PUSHMI_TEMPLATE(class V)
+    (requires Invocable<DVF&, Data&, V>)
   void value(V&& v) {
     if (!done_) {
       done_ = true;
       vf_(data_, (V&&) v);
     }
   }
-  template <class E>
-  requires Invocable<DEF&, Data&, E>
+  PUSHMI_TEMPLATE(class E)
+    (requires Invocable<DEF&, Data&, E>)
   void error(E e) noexcept {
     static_assert(
         NothrowInvocable<DEF&, Data&, E>, "error function must be noexcept");
