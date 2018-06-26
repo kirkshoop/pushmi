@@ -11,11 +11,13 @@ target_include_directories(pushmi INTERFACE
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/external/meta/include>
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/external/executors-impl/include>
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/external/futures-impl/future-executor-interaction/include>
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/external/networking-ts-impl/include>
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/external/Catch2/single_include>
     $<INSTALL_INTERFACE:$<INSTALL_PREFIX>/include>
     $<INSTALL_INTERFACE:$<INSTALL_PREFIX>/include/meta>
     $<INSTALL_INTERFACE:$<INSTALL_PREFIX>/include/executors>
+    $<INSTALL_INTERFACE:$<INSTALL_PREFIX>/include/futures>
     $<INSTALL_INTERFACE:$<INSTALL_PREFIX>/include/net>
     $<INSTALL_INTERFACE:$<INSTALL_PREFIX>/include/Catch2>)
 target_compile_features(pushmi INTERFACE cxx_std_14)
@@ -36,6 +38,9 @@ install(
 install(
     DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/external/executors-impl/include/
     DESTINATION include/executors)
+install(
+    DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/external/futures-impl/future-executor-interaction/include/
+    DESTINATION include/futures)
 install(
     DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/external/networking-ts-impl/include/
     DESTINATION include/net)
