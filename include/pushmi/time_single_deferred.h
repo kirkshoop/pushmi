@@ -122,8 +122,8 @@ template <class SF, class NF>
   requires Invocable<NF&>
 #endif
 class time_single_deferred<SF, NF> {
-  SF sf_{};
-  NF nf_{};
+  SF sf_;
+  NF nf_;
 
  public:
   using properties = property_set<is_time<>, is_single<>>;
@@ -150,9 +150,9 @@ template <PUSHMI_TYPE_CONSTRAINT(TimeSender<is_single<>>) Data, class DSF, class
   requires Invocable<DNF&, Data&>
 #endif
 class time_single_deferred_2 {
-  Data data_{};
-  DSF sf_{};
-  DNF nf_{};
+  Data data_;
+  DSF sf_;
+  DNF nf_;
 
  public:
   using properties = property_set<is_time<>, is_single<>>;

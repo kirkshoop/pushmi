@@ -161,9 +161,9 @@ template <class VF, class EF, class DF>
 #endif
 class single<VF, EF, DF> {
   bool done_ = false;
-  VF vf_{};
-  EF ef_{};
-  DF df_{};
+  VF vf_;
+  EF ef_;
+  DF df_;
 
   static_assert(
       !detail::is_v<VF, on_error_fn>,
@@ -217,10 +217,10 @@ template <PUSHMI_TYPE_CONSTRAINT(Receiver) Data, class DVF, class DEF, class DDF
 #endif
 class single<Data, DVF, DEF, DDF> {
   bool done_ = false;
-  Data data_{};
-  DVF vf_{};
-  DEF ef_{};
-  DDF df_{};
+  Data data_;
+  DVF vf_;
+  DEF ef_;
+  DDF df_;
 
   static_assert(
       !detail::is_v<DVF, on_error_fn>,

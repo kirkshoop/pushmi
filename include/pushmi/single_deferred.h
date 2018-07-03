@@ -98,7 +98,7 @@ PUSHMI_DEFINE_CONSTEXPR_IN_CLASS_INIT(typename any_single_deferred<V, E>::vtable
 
 template <class SF>
 class single_deferred<SF> {
-  SF sf_{};
+  SF sf_;
 
  public:
   using properties = property_set<is_sender<>, is_single<>>;
@@ -117,8 +117,8 @@ class single_deferred<SF> {
 namespace detail {
 template <PUSHMI_TYPE_CONSTRAINT(Sender<is_single<>>) Data, class DSF>
 class single_deferred_2 {
-  Data data_{};
-  DSF sf_{};
+  Data data_;
+  DSF sf_;
 
  public:
   using properties = property_set<is_sender<>, is_single<>>;

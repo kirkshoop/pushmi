@@ -2426,8 +2426,8 @@ template <class EF, class DF>
 class none<EF, DF> {
   static_assert(!detail::is_v<EF, on_value_fn> && !detail::is_v<EF, single>, "none was passed an invalid Error Function");
   bool done_ = false;
-  EF ef_{};
-  DF df_{};
+  EF ef_;
+  DF df_;
 
 public:
   using properties = property_set<is_receiver<>, is_none<>>;
@@ -2465,9 +2465,9 @@ template <PUSHMI_TYPE_CONSTRAINT(Receiver<is_none<>>) Data, class DEF, class DDF
 #endif
 class none<Data, DEF, DDF> {
   bool done_ = false;
-  Data data_{};
-  DEF ef_{};
-  DDF df_{};
+  Data data_;
+  DEF ef_;
+  DDF df_;
   static_assert(!detail::is_v<DEF, on_value_fn>, "none was passed an invalid Error Function");
   static_assert(!detail::is_v<Data, single>, "none was passed an invalid Data");
 public:
@@ -2718,7 +2718,7 @@ PUSHMI_DEFINE_CONSTEXPR_IN_CLASS_INIT(typename deferred<detail::erase_deferred_t
 
 template <class SF>
 class deferred<SF> {
-  SF sf_{};
+  SF sf_;
 
  public:
   using properties = property_set<is_sender<>, is_none<>>;
@@ -2734,8 +2734,8 @@ class deferred<SF> {
 
 template <PUSHMI_TYPE_CONSTRAINT(Sender<is_none<>>) Data, class DSF>
 class deferred<Data, DSF> {
-  Data data_{};
-  DSF sf_{};
+  Data data_;
+  DSF sf_;
   static_assert(Sender<Data, is_none<>>, "The Data template parameter "
     "must satisfy the Sender concept.");
 
@@ -2972,9 +2972,9 @@ template <class VF, class EF, class DF>
 #endif
 class single<VF, EF, DF> {
   bool done_ = false;
-  VF vf_{};
-  EF ef_{};
-  DF df_{};
+  VF vf_;
+  EF ef_;
+  DF df_;
 
   static_assert(
       !detail::is_v<VF, on_error_fn>,
@@ -3028,10 +3028,10 @@ template <PUSHMI_TYPE_CONSTRAINT(Receiver) Data, class DVF, class DEF, class DDF
 #endif
 class single<Data, DVF, DEF, DDF> {
   bool done_ = false;
-  Data data_{};
-  DVF vf_{};
-  DEF ef_{};
-  DDF df_{};
+  Data data_;
+  DVF vf_;
+  DEF ef_;
+  DDF df_;
 
   static_assert(
       !detail::is_v<DVF, on_error_fn>,
@@ -3343,7 +3343,7 @@ PUSHMI_DEFINE_CONSTEXPR_IN_CLASS_INIT(typename any_single_deferred<V, E>::vtable
 
 template <class SF>
 class single_deferred<SF> {
-  SF sf_{};
+  SF sf_;
 
  public:
   using properties = property_set<is_sender<>, is_single<>>;
@@ -3362,8 +3362,8 @@ class single_deferred<SF> {
 namespace detail {
 template <PUSHMI_TYPE_CONSTRAINT(Sender<is_single<>>) Data, class DSF>
 class single_deferred_2 {
-  Data data_{};
-  DSF sf_{};
+  Data data_;
+  DSF sf_;
 
  public:
   using properties = property_set<is_sender<>, is_single<>>;
@@ -3568,8 +3568,8 @@ template <class SF, class NF>
   requires Invocable<NF&>
 #endif
 class time_single_deferred<SF, NF> {
-  SF sf_{};
-  NF nf_{};
+  SF sf_;
+  NF nf_;
 
  public:
   using properties = property_set<is_time<>, is_single<>>;
@@ -3596,9 +3596,9 @@ template <PUSHMI_TYPE_CONSTRAINT(TimeSender<is_single<>>) Data, class DSF, class
   requires Invocable<DNF&, Data&>
 #endif
 class time_single_deferred_2 {
-  Data data_{};
-  DSF sf_{};
-  DNF nf_{};
+  Data data_;
+  DSF sf_;
+  DNF nf_;
 
  public:
   using properties = property_set<is_time<>, is_single<>>;

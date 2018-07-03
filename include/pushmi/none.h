@@ -115,8 +115,8 @@ template <class EF, class DF>
 class none<EF, DF> {
   static_assert(!detail::is_v<EF, on_value_fn> && !detail::is_v<EF, single>, "none was passed an invalid Error Function");
   bool done_ = false;
-  EF ef_{};
-  DF df_{};
+  EF ef_;
+  DF df_;
 
 public:
   using properties = property_set<is_receiver<>, is_none<>>;
@@ -154,9 +154,9 @@ template <PUSHMI_TYPE_CONSTRAINT(Receiver<is_none<>>) Data, class DEF, class DDF
 #endif
 class none<Data, DEF, DDF> {
   bool done_ = false;
-  Data data_{};
-  DEF ef_{};
-  DDF df_{};
+  Data data_;
+  DEF ef_;
+  DDF df_;
   static_assert(!detail::is_v<DEF, on_value_fn>, "none was passed an invalid Error Function");
   static_assert(!detail::is_v<Data, single>, "none was passed an invalid Data");
 public:
