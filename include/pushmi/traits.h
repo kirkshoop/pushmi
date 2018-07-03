@@ -104,7 +104,7 @@ PUSHMI_CONCEPT_DEF(
 PUSHMI_CONCEPT_DEF(
   template (class T, class... Args)
   (concept Constructible)(T, Args...),
-    __is_constructible(T, Args...)
+    PUSHMI_PP_IS_CONSTRUCTIBLE(T, Args...)
 );
 
 PUSHMI_CONCEPT_DEF(

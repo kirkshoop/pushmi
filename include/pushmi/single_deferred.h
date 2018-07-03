@@ -24,7 +24,7 @@ class any_single_deferred {
     static void s_submit(data&, single<V, E>) {}
     void (*op_)(data&, data*) = s_op;
     void (*submit_)(data&, single<V, E>) = s_submit;
-    static constexpr vtable const noop_ {};
+    PUSHMI_DECLARE_CONSTEXPR_IN_CLASS_INIT(static vtable const noop_);
   } const* vptr_ = &vtable::noop_;
   template <class Wrapped>
   any_single_deferred(Wrapped obj, std::false_type) : any_single_deferred() {
@@ -93,8 +93,8 @@ class any_single_deferred {
 
 // Class static definitions:
 template <class V, class E>
-constexpr typename any_single_deferred<V, E>::vtable const
-    any_single_deferred<V, E>::vtable::noop_;
+PUSHMI_DEFINE_CONSTEXPR_IN_CLASS_INIT(typename any_single_deferred<V, E>::vtable const
+    any_single_deferred<V, E>::vtable::noop_);
 
 template <class SF>
 class single_deferred<SF> {

@@ -27,7 +27,7 @@ class none<E> {
     void (*op_)(data&, data*) = s_op;
     void (*done_)(data&) = s_done;
     void (*error_)(data&, E) noexcept = s_error;
-    static constexpr vtable const noop_ {};
+    PUSHMI_DECLARE_CONSTEXPR_IN_CLASS_INIT(static vtable const noop_ );
   } const* vptr_ = &vtable::noop_;
   template <class Wrapped>
   none(Wrapped obj, std::false_type) : none() {
@@ -106,14 +106,14 @@ public:
 
 // Class static definitions:
 template <class E>
-constexpr typename none<E>::vtable const none<E>::vtable::noop_;
+PUSHMI_DEFINE_CONSTEXPR_IN_CLASS_INIT( typename none<E>::vtable const none<E>::vtable::noop_);
 
 template <class EF, class DF>
 #if __cpp_concepts
   requires Invocable<DF&>
 #endif
 class none<EF, DF> {
-  static_assert(!detail::is_v<EF, on_value_fn> && !detail::is_v<EF, single>);
+  static_assert(!detail::is_v<EF, on_value_fn> && !detail::is_v<EF, single>, "none was passed an invalid Error Function");
   bool done_ = false;
   EF ef_{};
   DF df_{};
@@ -157,8 +157,8 @@ class none<Data, DEF, DDF> {
   Data data_{};
   DEF ef_{};
   DDF df_{};
-  static_assert(!detail::is_v<DEF, on_value_fn>);
-  static_assert(!detail::is_v<Data, single>);
+  static_assert(!detail::is_v<DEF, on_value_fn>, "none was passed an invalid Error Function");
+  static_assert(!detail::is_v<Data, single>, "none was passed an invalid Data");
 public:
   using properties = property_set<is_receiver<>, is_none<>>;
 
