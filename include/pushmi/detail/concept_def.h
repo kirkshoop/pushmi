@@ -401,9 +401,13 @@ PUSHMI_PP_IGNORE_CXX2A_COMPAT_BEGIN
 #if __cpp_concepts
 #define PUSHMI_BROKEN_SUBSUMPTION(...)
 #define PUSHMI_TYPE_CONSTRAINT(...) __VA_ARGS__
+// #define PUSHMI_EXP_AND(...)
+// #define PUSHMI_EXP_NOT(T) not T
 #else
 #define PUSHMI_BROKEN_SUBSUMPTION(...) __VA_ARGS__
 #define PUSHMI_TYPE_CONSTRAINT(...) class
+// #define PUSHMI_EXP_AND(...) expAnd(__VA_ARGS__)
+// #define PUSHMI_EXP_NOT(T) expNot(T)
 #endif
 
 
@@ -459,8 +463,29 @@ struct And {
         return detail::And<And, That>{};
     }
 };
+
+template<class T0>
+constexpr auto expAnd(T0&& t0) {
+  return (T0&&)t0;
+}
+
+template<class T0, class... TN>
+constexpr auto expAnd(T0&& t0, TN&&... tn) {
+  return concepts::detail::And<T0, decltype(concepts::detail::expAnd((TN&&)tn...))>{};
+}
+
 } // namespace detail
 } // namespace concepts
+
+template<class... TN>
+constexpr auto expAnd(TN&&... tn) {
+  return concepts::detail::expAnd((TN&&)tn...);
+}
+
+template<class T0>
+constexpr concepts::detail::Not<T0> expNot(T0) {
+  return {};
+}
 
 template <class T>
 constexpr bool implicitly_convertible_to(T) {

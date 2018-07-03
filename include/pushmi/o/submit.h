@@ -128,7 +128,7 @@ private:
       std::condition_variable signaled;
       auto out{::pushmi::detail::out_from_fn<In>()(
         std::move(args_),
-        on_value(constrain(pushmi::lazy::Receiver<_1, is_single<>>,
+        on_value(constrain(pushmi::defer::Receiver<_1, is_single<>>,
           [&](auto out, auto&& v) {
             using V = remove_cvref_t<decltype(v)>;
             PUSHMI_IF_CONSTEXPR( ((bool)Time<V>) (
@@ -144,14 +144,14 @@ private:
             signaled.notify_all();
           }
         )),
-        on_error(constrain(pushmi::lazy::NoneReceiver<_1, _2>,
+        on_error(constrain(pushmi::defer::NoneReceiver<_1, _2>,
           [&](auto out, auto e) noexcept {
             ::pushmi::set_error(out, std::move(e));
             done = true;
             signaled.notify_all();
           }
         )),
-        on_done(constrain(pushmi::lazy::Receiver<_1>,
+        on_done(constrain(pushmi::defer::Receiver<_1>,
           [&](auto out){
             ::pushmi::set_done(out);
             done = true;

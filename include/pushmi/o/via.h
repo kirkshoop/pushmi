@@ -29,12 +29,12 @@ struct via_fn {
   PUSHMI_TEMPLATE(class ExecutorFactory)
     (requires Invocable<ExecutorFactory&>)
   auto operator()(ExecutorFactory ef) const {
-    return constrain(lazy::Sender<_1>, [ef = std::move(ef)](auto in) {
+    return constrain(defer::Sender<_1>, [ef = std::move(ef)](auto in) {
       using In = decltype(in);
       return ::pushmi::detail::deferred_from<In, single<>>(
         std::move(in),
         ::pushmi::detail::submit_transform_out<In>(
-          constrain(lazy::Receiver<_1>, [ef](auto out) {
+          constrain(defer::Receiver<_1>, [ef](auto out) {
             using Out = decltype(out);
             auto exec = ef();
             return ::pushmi::detail::out_from_fn<In>()(

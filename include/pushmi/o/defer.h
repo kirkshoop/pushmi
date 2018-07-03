@@ -7,7 +7,6 @@
 // LICENSE file in the root directory of this source tree.
 
 #include "../single.h"
-#include "../single_deferred.h"
 #include "submit.h"
 #include "extension_operators.h"
 
@@ -26,7 +25,7 @@ PUSHMI_TEMPLATE(class F)
   (requires Invocable<F>)
 auto defer(F f) {
   return MAKE(single_deferred)(
-    constrain(lazy::Receiver<_1>,
+    constrain(defer::Receiver<_1>,
       [f = std::move(f)](auto out) mutable {
         auto sender = f();
         PUSHMI_IF_CONSTEXPR( ((bool)TimeSender<decltype(sender)>) (

@@ -29,7 +29,7 @@ struct request_via_fn {
 };
 
 inline auto request_via_fn::operator()() const {
-  return constrain(lazy::Sender<_1>, [](auto in) {
+  return constrain(defer::Sender<_1>, [](auto in) {
     using In = decltype(in);
     return send_via<In>{in};
   });
