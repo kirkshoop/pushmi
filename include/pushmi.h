@@ -586,6 +586,8 @@ namespace pushmi {
 
 template <bool B>
 using bool_ = std::integral_constant<bool, B>;
+template <bool B>
+constexpr bool bool_v = std::integral_constant<bool, B>::value;
 
 namespace concepts {
 namespace detail {
@@ -900,6 +902,8 @@ PUSHMI_INLINE_VAR constexpr struct as_const_fn {
 //#include "../traits.h"
 //#include "../forwards.h"
 
+//#include "concept_def.h"
+
 namespace pushmi {
 
 namespace detail {
@@ -955,14 +959,14 @@ struct constrained_fn : Fn {
 
   PUSHMI_TEMPLATE (class... Ts)
     (requires Invocable<Fn&, Ts...> &&
-      (bool)typename substitute<Requirements, typelist<Ts...>>::type{})
+      bool_v<(bool)typename substitute<Requirements, typelist<Ts...>>::type{}>)
   decltype(auto) operator()(Ts&&... ts)
       noexcept(noexcept(std::declval<Fn&>()((Ts&&) ts...))) {
     return static_cast<Fn&>(*this)((Ts&&) ts...);
   }
   PUSHMI_TEMPLATE (class... Ts)
     (requires Invocable<const Fn&, Ts...> &&
-      (bool)typename substitute<Requirements, typelist<Ts...>>::type{})
+      bool_v<(bool)typename substitute<Requirements, typelist<Ts...>>::type{}>)
   decltype(auto) operator()(Ts&&... ts) const
       noexcept(noexcept(std::declval<const Fn&>()((Ts&&) ts...))) {
     return static_cast<const Fn&>(*this)((Ts&&) ts...);
@@ -6228,24 +6232,25 @@ auto via(ExecutorFactory factory) {
 
 namespace pushmi {
 
+template<typename In>
+struct send_via {
+    In in;
+    template<class... AN>
+    auto via(AN&&... an) {
+        return in | ::pushmi::operators::via((AN&&) an...);
+    }
+};
+
 namespace detail {
 
 struct request_via_fn {
-  template<typename In>
-  struct semisender {
-      In in;
-      template<class... AN>
-      auto via(AN&&... an) {
-          return in | ::pushmi::operators::via((AN&&) an...);
-      }
-  };
-  auto operator()() const;
+  inline auto operator()() const;
 };
 
-auto request_via_fn::operator()() const {
+inline auto request_via_fn::operator()() const {
   return constrain(lazy::Sender<_1>, [](auto in) {
     using In = decltype(in);
-    return semisender<In>{in};
+    return send_via<In>{in};
   });
 }
 
@@ -6265,7 +6270,7 @@ auto via_cast(In in) {
 
 PUSHMI_TEMPLATE(class To, class In)
   (requires Same<To, is_sender<>>)
-auto via_cast(detail::request_via_fn::semisender<In> ss) {
+auto via_cast(send_via<In> ss) {
   return ss.in;
 }
 
