@@ -49,7 +49,7 @@ PUSHMI_PP_IGNORE_CXX2A_COMPAT_BEGIN
 
 #ifdef __clang__
 #define PUSHMI_PP_IS_SAME(...) __is_same(__VA_ARGS__)
-#elif defined(__GNUC__) && __GNUC__ >= 6
+#elif defined(__GNUC__) && __GNUC__ >= 6 && !defined(__NVCC__)
 #define PUSHMI_PP_IS_SAME(...) __is_same_as(__VA_ARGS__)
 #else
 #define PUSHMI_PP_IS_SAME(...) std::is_same<__VA_ARGS__>::value
