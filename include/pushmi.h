@@ -586,8 +586,6 @@ namespace pushmi {
 
 template <bool B>
 using bool_ = std::integral_constant<bool, B>;
-template <bool B>
-constexpr bool bool_v = std::integral_constant<bool, B>::value;
 
 namespace concepts {
 namespace detail {
@@ -902,8 +900,6 @@ PUSHMI_INLINE_VAR constexpr struct as_const_fn {
 //#include "../traits.h"
 //#include "../forwards.h"
 
-//#include "concept_def.h"
-
 namespace pushmi {
 
 namespace detail {
@@ -959,14 +955,14 @@ struct constrained_fn : Fn {
 
   PUSHMI_TEMPLATE (class... Ts)
     (requires Invocable<Fn&, Ts...> &&
-      bool_v<(bool)typename substitute<Requirements, typelist<Ts...>>::type{}>)
+      (bool)typename substitute<Requirements, typelist<Ts...>>::type{})
   decltype(auto) operator()(Ts&&... ts)
       noexcept(noexcept(std::declval<Fn&>()((Ts&&) ts...))) {
     return static_cast<Fn&>(*this)((Ts&&) ts...);
   }
   PUSHMI_TEMPLATE (class... Ts)
     (requires Invocable<const Fn&, Ts...> &&
-      bool_v<(bool)typename substitute<Requirements, typelist<Ts...>>::type{}>)
+      (bool)typename substitute<Requirements, typelist<Ts...>>::type{})
   decltype(auto) operator()(Ts&&... ts) const
       noexcept(noexcept(std::declval<const Fn&>()((Ts&&) ts...))) {
     return static_cast<const Fn&>(*this)((Ts&&) ts...);

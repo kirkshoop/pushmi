@@ -422,8 +422,6 @@ namespace pushmi {
 
 template <bool B>
 using bool_ = std::integral_constant<bool, B>;
-template <bool B>
-constexpr bool bool_v = std::integral_constant<bool, B>::value;
 
 namespace concepts {
 namespace detail {
