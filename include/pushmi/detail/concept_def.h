@@ -406,7 +406,8 @@ PUSHMI_PP_IGNORE_CXX2A_COMPAT_BEGIN
 #else
 #define PUSHMI_BROKEN_SUBSUMPTION(...) __VA_ARGS__
 #define PUSHMI_TYPE_CONSTRAINT(...) class
-#define PUSHMI_EXP(...) (::pushmi::expAnd(__VA_ARGS__))
+// not not is used to prevent 'error: pasting "PUSHMI_PP_REQUIRES_PROBE_" and "::" does not give a valid preprocessing token'
+#define PUSHMI_EXP(...) not not ::pushmi::expAnd(__VA_ARGS__)
 #define PUSHMI_AND ,
 #endif
 
