@@ -60,7 +60,7 @@ struct tap_fn {
 };
 
 #if __NVCC__
-#define PUSHMI_STATIC_ASSERT
+#define PUSHMI_STATIC_ASSERT(...)
 #elif __cpp_if_constexpr >= 201606
 #define PUSHMI_STATIC_ASSERT static_assert
 #else
