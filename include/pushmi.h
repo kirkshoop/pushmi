@@ -565,13 +565,13 @@ PUSHMI_PP_IGNORE_CXX2A_COMPAT_BEGIN
 #if __cpp_concepts
 #define PUSHMI_BROKEN_SUBSUMPTION(...)
 #define PUSHMI_TYPE_CONSTRAINT(...) __VA_ARGS__
-// #define PUSHMI_EXP_AND(...)
-// #define PUSHMI_EXP_NOT(T) not T
+#define PUSHMI_EXP(...) __VA_ARGS__
+#define PUSHMI_AND &&
 #else
 #define PUSHMI_BROKEN_SUBSUMPTION(...) __VA_ARGS__
 #define PUSHMI_TYPE_CONSTRAINT(...) class
-// #define PUSHMI_EXP_AND(...) expAnd(__VA_ARGS__)
-// #define PUSHMI_EXP_NOT(T) expNot(T)
+#define PUSHMI_EXP(...) ::pushmi::expAnd(__VA_ARGS__)
+#define PUSHMI_AND ,
 #endif
 
 
@@ -607,10 +607,10 @@ struct Not {
     constexpr auto operator!() const noexcept {
         return T{};
     }
-    template <class That>
-    constexpr auto operator&&(That) const noexcept {
-        return And<Not, That>{};
-    }
+    // template <class That>
+    // constexpr auto operator&&(That) const noexcept {
+    //     return And<Not, That>{};
+    // }
 };
 template <class T, class U>
 struct And {
@@ -622,33 +622,31 @@ struct And {
     constexpr auto operator!() const noexcept {
         return Not<And>{};
     }
-    template <class That>
-    constexpr auto operator&&(That) const noexcept {
-        return detail::And<And, That>{};
-    }
+    // template <class That>
+    // constexpr auto operator&&(That) const noexcept {
+    //     return detail::And<And, That>{};
+    // }
 };
+
+} // namespace detail
+} // namespace concepts
+
+namespace isolated {
 
 template<class T0>
 constexpr auto expAnd(T0&& t0) {
   return (T0&&)t0;
 }
-
 template<class T0, class... TN>
 constexpr auto expAnd(T0&& t0, TN&&... tn) {
-  return concepts::detail::And<T0, decltype(concepts::detail::expAnd((TN&&)tn...))>{};
+  return concepts::detail::And<T0, decltype(isolated::expAnd((TN&&)tn...))>{};
 }
 
-} // namespace detail
-} // namespace concepts
+}
 
 template<class... TN>
 constexpr auto expAnd(TN&&... tn) {
-  return concepts::detail::expAnd((TN&&)tn...);
-}
-
-template<class T0>
-constexpr concepts::detail::Not<T0> expNot(T0) {
-  return {};
+  return isolated::expAnd((TN&&)tn...);
 }
 
 template <class T>
@@ -2533,39 +2531,39 @@ inline auto make_none() -> none<> {
   return {};
 }
 PUSHMI_TEMPLATE(class EF)
-  (requires expAnd(defer::True<> PUSHMI_BROKEN_SUBSUMPTION(, expNot(defer::Receiver<EF>) , expNot(defer::Invocable<EF&>))))
+  (requires PUSHMI_EXP(defer::True<> PUSHMI_BROKEN_SUBSUMPTION(PUSHMI_AND not defer::Receiver<EF> PUSHMI_AND not defer::Invocable<EF&>)))
 auto make_none(EF ef) -> none<EF, ignoreDF> {
   return none<EF, ignoreDF>{std::move(ef)};
 }
 PUSHMI_TEMPLATE(class DF)
-  (requires expAnd(defer::True<> , defer::Invocable<DF&> PUSHMI_BROKEN_SUBSUMPTION(, expNot(defer::Receiver<DF>))))
+  (requires PUSHMI_EXP(defer::True<> PUSHMI_AND defer::Invocable<DF&> PUSHMI_BROKEN_SUBSUMPTION(PUSHMI_AND not defer::Receiver<DF>)))
 auto make_none(DF df) -> none<abortEF, DF> {
   return none<abortEF, DF>{std::move(df)};
 }
 PUSHMI_TEMPLATE(class EF, class DF)
-  (requires expAnd(defer::Invocable<DF&> PUSHMI_BROKEN_SUBSUMPTION(, expNot(defer::Receiver<EF>))))
+  (requires PUSHMI_EXP(defer::Invocable<DF&> PUSHMI_BROKEN_SUBSUMPTION(PUSHMI_AND not defer::Receiver<EF>)))
 auto make_none(EF ef, DF df) -> none<EF, DF> {
   return {std::move(ef), std::move(df)};
 }
 PUSHMI_TEMPLATE(class Data)
-  (requires expAnd(defer::True<> , defer::Receiver<Data, is_none<>> , expNot(defer::Receiver<Data, is_single<>>)))
+  (requires PUSHMI_EXP(defer::True<> PUSHMI_AND defer::Receiver<Data, is_none<>> PUSHMI_AND not defer::Receiver<Data, is_single<>>))
 auto make_none(Data d) -> none<Data, passDEF, passDDF> {
   return none<Data, passDEF, passDDF>{std::move(d)};
 }
 PUSHMI_TEMPLATE(class Data, class DEF)
-  (requires expAnd(defer::Receiver<Data, is_none<>> , expNot(defer::Receiver<Data, is_single<>>)
-    PUSHMI_BROKEN_SUBSUMPTION(, expNot(defer::Invocable<DEF&, Data&>))))
+  (requires PUSHMI_EXP(defer::Receiver<Data, is_none<>> PUSHMI_AND not defer::Receiver<Data, is_single<>>
+    PUSHMI_BROKEN_SUBSUMPTION(PUSHMI_AND not defer::Invocable<DEF&, Data&>)))
 auto make_none(Data d, DEF ef) -> none<Data, DEF, passDDF> {
   return {std::move(d), std::move(ef)};
 }
 PUSHMI_TEMPLATE(class Data, class DDF)
-  (requires expAnd(defer::Receiver<Data, is_none<>> , expNot(defer::Receiver<Data, is_single<>>) ,
+  (requires PUSHMI_EXP(defer::Receiver<Data, is_none<>> PUSHMI_AND not defer::Receiver<Data, is_single<>> PUSHMI_AND
     defer::Invocable<DDF&, Data&>))
 auto make_none(Data d, DDF df) -> none<Data, passDEF, DDF> {
   return {std::move(d), std::move(df)};
 }
 PUSHMI_TEMPLATE(class Data, class DEF, class DDF)
-  (requires expAnd(defer::Receiver<Data, is_none<>> , expNot(defer::Receiver<Data, is_single<>>) ,
+  (requires PUSHMI_EXP(defer::Receiver<Data, is_none<>> PUSHMI_AND not defer::Receiver<Data, is_single<>> PUSHMI_AND
     defer::Invocable<DDF&, Data&>))
 auto make_none(Data d, DEF ef, DDF df) -> none<Data, DEF, DDF> {
   return {std::move(d), std::move(ef), std::move(df)};
@@ -2577,33 +2575,33 @@ auto make_none(Data d, DEF ef, DDF df) -> none<Data, DEF, DDF> {
 none() -> none<>;
 
 PUSHMI_TEMPLATE(class EF)
-  (requires expAnd(defer::True<> PUSHMI_BROKEN_SUBSUMPTION(, expNot(defer::Receiver<EF>) , expNot(defer::Invocable<EF&>))))
+  (requires PUSHMI_EXP(defer::True<> PUSHMI_BROKEN_SUBSUMPTION(PUSHMI_AND not defer::Receiver<EF> PUSHMI_AND not defer::Invocable<EF&>)))
 none(EF) -> none<EF, ignoreDF>;
 
 PUSHMI_TEMPLATE(class DF)
-  (requires expAnd(defer::True<> , defer::Invocable<DF&> PUSHMI_BROKEN_SUBSUMPTION(, expNot(defer::Receiver<DF>))))
+  (requires PUSHMI_EXP(defer::True<> PUSHMI_AND defer::Invocable<DF&> PUSHMI_BROKEN_SUBSUMPTION(PUSHMI_AND not defer::Receiver<DF>)))
 none(DF) -> none<abortEF, DF>;
 
 PUSHMI_TEMPLATE(class EF, class DF)
-  (requires expAnd(defer::Invocable<DF&> PUSHMI_BROKEN_SUBSUMPTION(, expNot(defer::Receiver<EF>))))
+  (requires PUSHMI_EXP(defer::Invocable<DF&> PUSHMI_BROKEN_SUBSUMPTION(PUSHMI_AND not defer::Receiver<EF>)))
 none(EF, DF) -> none<EF, DF>;
 
 PUSHMI_TEMPLATE(class Data)
-  (requires expAnd(defer::True<> , defer::Receiver<Data, is_none<>> , expNot(defer::Receiver<Data, is_single<>>)))
+  (requires PUSHMI_EXP(defer::True<> PUSHMI_AND defer::Receiver<Data, is_none<>> PUSHMI_AND not defer::Receiver<Data, is_single<>>))
 none(Data) -> none<Data, passDEF, passDDF>;
 
 PUSHMI_TEMPLATE(class Data, class DEF)
-  (requires expAnd(defer::Receiver<Data, is_none<>> , expNot(defer::Receiver<Data, is_single<>>)
-    PUSHMI_BROKEN_SUBSUMPTION(, expNot(defer::Invocable<DEF&, Data&>))))
+  (requires PUSHMI_EXP(defer::Receiver<Data, is_none<>> PUSHMI_AND not defer::Receiver<Data, is_single<>>
+    PUSHMI_BROKEN_SUBSUMPTION(PUSHMI_AND not defer::Invocable<DEF&, Data&>)))
 none(Data, DEF) -> none<Data, DEF, passDDF>;
 
 PUSHMI_TEMPLATE(class Data, class DDF)
-  (requires expAnd(defer::Receiver<Data, is_none<>> , expNot(defer::Receiver<Data, is_single<>>) ,
+  (requires PUSHMI_EXP(defer::Receiver<Data, is_none<>> PUSHMI_AND not defer::Receiver<Data, is_single<>> PUSHMI_AND
     defer::Invocable<DDF&, Data&>))
 none(Data, DDF) -> none<Data, passDEF, DDF>;
 
 PUSHMI_TEMPLATE(class Data, class DEF, class DDF)
-  (requires expAnd(defer::Receiver<Data, is_none<>> , expNot(defer::Receiver<Data, is_single<>>) ,
+  (requires PUSHMI_EXP(defer::Receiver<Data, is_none<>> PUSHMI_AND not defer::Receiver<Data, is_single<>> PUSHMI_AND
     defer::Invocable<DDF&, Data&>))
 none(Data, DEF, DDF) -> none<Data, DEF, DDF>;
 #endif
@@ -3118,7 +3116,7 @@ inline auto make_single() -> single<> {
   return {};
 }
 PUSHMI_TEMPLATE(class VF)
-  (requires expAnd(defer::True<> PUSHMI_BROKEN_SUBSUMPTION(, expNot(defer::Receiver<VF>) , expNot(defer::Invocable<VF&>))))
+  (requires PUSHMI_EXP(defer::True<> PUSHMI_BROKEN_SUBSUMPTION(PUSHMI_AND not defer::Receiver<VF> PUSHMI_AND not defer::Invocable<VF&>)))
 auto make_single(VF vf) -> single<VF, abortEF, ignoreDF> {
   return single<VF, abortEF, ignoreDF>{std::move(vf)};
 }
@@ -3127,58 +3125,58 @@ auto make_single(on_error_fn<EFN...> ef) -> single<ignoreVF, on_error_fn<EFN...>
   return single<ignoreVF, on_error_fn<EFN...>, ignoreDF>{std::move(ef)};
 }
 PUSHMI_TEMPLATE(class DF)
-  (requires expAnd(defer::True<> , defer::Invocable<DF&> PUSHMI_BROKEN_SUBSUMPTION(, expNot(defer::Receiver<DF>))))
+  (requires PUSHMI_EXP(defer::True<> PUSHMI_AND defer::Invocable<DF&> PUSHMI_BROKEN_SUBSUMPTION(PUSHMI_AND not defer::Receiver<DF>)))
 auto make_single(DF df) -> single<ignoreVF, abortEF, DF> {
   return single<ignoreVF, abortEF, DF>{std::move(df)};
 }
 PUSHMI_TEMPLATE(class VF, class EF)
-  (requires expAnd(defer::True<> PUSHMI_BROKEN_SUBSUMPTION(, expNot(defer::Receiver<VF>) , expNot(defer::Invocable<EF&>))))
+  (requires PUSHMI_EXP(defer::True<> PUSHMI_BROKEN_SUBSUMPTION(PUSHMI_AND not defer::Receiver<VF> PUSHMI_AND not defer::Invocable<EF&>)))
 auto make_single(VF vf, EF ef) -> single<VF, EF, ignoreDF> {
   return {std::move(vf), std::move(ef)};
 }
 PUSHMI_TEMPLATE(class EF, class DF)
-  (requires expAnd(defer::True<> , defer::Invocable<DF&> PUSHMI_BROKEN_SUBSUMPTION(, expNot(defer::Receiver<EF>))))
+  (requires PUSHMI_EXP(defer::True<> PUSHMI_AND defer::Invocable<DF&> PUSHMI_BROKEN_SUBSUMPTION(PUSHMI_AND not defer::Receiver<EF>)))
 auto make_single(EF ef, DF df) -> single<ignoreVF, EF, DF> {
   return {std::move(ef), std::move(df)};
 }
 PUSHMI_TEMPLATE(class VF, class EF, class DF)
-  (requires expAnd(defer::Invocable<DF&> PUSHMI_BROKEN_SUBSUMPTION(, expNot(defer::Receiver<VF>))))
+  (requires PUSHMI_EXP(defer::Invocable<DF&> PUSHMI_BROKEN_SUBSUMPTION(PUSHMI_AND not defer::Receiver<VF>)))
 auto make_single(VF vf, EF ef, DF df) -> single<VF, EF, DF> {
   return {std::move(vf), std::move(ef), std::move(df)};
 }
 PUSHMI_TEMPLATE(class Data)
-  (requires expAnd(defer::True<> , defer::Receiver<Data, is_single<>>))
+  (requires PUSHMI_EXP(defer::True<> PUSHMI_AND defer::Receiver<Data, is_single<>>))
 auto make_single(Data d) -> single<Data, passDVF, passDEF, passDDF> {
   return single<Data, passDVF, passDEF, passDDF>{std::move(d)};
 }
 PUSHMI_TEMPLATE(class Data, class DVF)
-  (requires expAnd(defer::True<> , defer::Receiver<Data, is_single<>> PUSHMI_BROKEN_SUBSUMPTION(, expNot(defer::Invocable<DVF&, Data&>))))
+  (requires PUSHMI_EXP(defer::True<> PUSHMI_AND defer::Receiver<Data, is_single<>> PUSHMI_BROKEN_SUBSUMPTION(PUSHMI_AND not defer::Invocable<DVF&, Data&>)))
 auto make_single(Data d, DVF vf) -> single<Data, DVF, passDEF, passDDF> {
   return {std::move(d), std::move(vf)};
 }
 PUSHMI_TEMPLATE(class Data, class... DEFN)
-  (requires defer::Receiver<Data, is_single<>>)
+  (requires PUSHMI_EXP(defer::Receiver<Data, is_single<>>))
 auto make_single(Data d, on_error_fn<DEFN...> ef) ->
     single<Data, passDVF, on_error_fn<DEFN...>, passDDF> {
   return {std::move(d), std::move(ef)};
 }
 PUSHMI_TEMPLATE(class Data, class DDF)
-  (requires expAnd(defer::True<> , defer::Receiver<Data, is_single<>> , defer::Invocable<DDF&, Data&>))
+  (requires PUSHMI_EXP(defer::True<> PUSHMI_AND defer::Receiver<Data, is_single<>> PUSHMI_AND defer::Invocable<DDF&, Data&>))
 auto make_single(Data d, DDF df) -> single<Data, passDVF, passDEF, DDF> {
   return {std::move(d), std::move(df)};
 }
 PUSHMI_TEMPLATE(class Data, class DVF, class DEF)
-  (requires expAnd(defer::Receiver<Data, is_single<>> PUSHMI_BROKEN_SUBSUMPTION(, expNot(defer::Invocable<DEF&, Data&>))))
+  (requires PUSHMI_EXP(defer::Receiver<Data, is_single<>> PUSHMI_BROKEN_SUBSUMPTION(PUSHMI_AND not defer::Invocable<DEF&, Data&>)))
 auto make_single(Data d, DVF vf, DEF ef) -> single<Data, DVF, DEF, passDDF> {
   return {std::move(d), std::move(vf), std::move(ef)};
 }
 PUSHMI_TEMPLATE(class Data, class DEF, class DDF)
-  (requires expAnd(defer::Receiver<Data, is_single<>> , defer::Invocable<DDF&, Data&>))
+  (requires PUSHMI_EXP(defer::Receiver<Data, is_single<>> PUSHMI_AND defer::Invocable<DDF&, Data&>))
 auto make_single(Data d, DEF ef, DDF df) -> single<Data, passDVF, DEF, DDF> {
   return {std::move(d), std::move(ef), std::move(df)};
 }
 PUSHMI_TEMPLATE(class Data, class DVF, class DEF, class DDF)
-  (requires expAnd(defer::Receiver<Data, is_single<>> , defer::Invocable<DDF&, Data&>))
+  (requires PUSHMI_EXP(defer::Receiver<Data, is_single<>> PUSHMI_AND defer::Invocable<DDF&, Data&>))
 auto make_single(Data d, DVF vf, DEF ef, DDF df) -> single<Data, DVF, DEF, DDF> {
   return {std::move(d), std::move(vf), std::move(ef), std::move(df)};
 }
@@ -3189,55 +3187,55 @@ auto make_single(Data d, DVF vf, DEF ef, DDF df) -> single<Data, DVF, DEF, DDF> 
 single() -> single<>;
 
 PUSHMI_TEMPLATE(class VF)
-  (requires expAnd(defer::True<> PUSHMI_BROKEN_SUBSUMPTION(, expNot(defer::Receiver<VF>) , expNot(defer::Invocable<VF&>))))
+  (requires PUSHMI_EXP(defer::True<> PUSHMI_BROKEN_SUBSUMPTION(PUSHMI_AND not defer::Receiver<VF> PUSHMI_AND not defer::Invocable<VF&>)))
 single(VF) -> single<VF, abortEF, ignoreDF>;
 
 template <class... EFN>
 single(on_error_fn<EFN...>) -> single<ignoreVF, on_error_fn<EFN...>, ignoreDF>;
 
 PUSHMI_TEMPLATE(class DF)
-  (requires expAnd(defer::True<> , defer::Invocable<DF&> PUSHMI_BROKEN_SUBSUMPTION(, expNot(defer::Receiver<DF>))))
+  (requires PUSHMI_EXP(defer::True<> PUSHMI_AND defer::Invocable<DF&> PUSHMI_BROKEN_SUBSUMPTION(PUSHMI_AND not defer::Receiver<DF>)))
 single(DF) -> single<ignoreVF, abortEF, DF>;
 
 PUSHMI_TEMPLATE(class VF, class EF)
-  (requires expAnd(defer::True<> PUSHMI_BROKEN_SUBSUMPTION(, expNot(defer::Receiver<VF>) , expNot(defer::Invocable<EF&>))))
+  (requires PUSHMI_EXP(defer::True<> PUSHMI_BROKEN_SUBSUMPTION(PUSHMI_AND not defer::Receiver<VF> PUSHMI_AND not defer::Invocable<EF&>)))
 single(VF, EF) -> single<VF, EF, ignoreDF>;
 
 PUSHMI_TEMPLATE(class EF, class DF)
-  (requires expAnd(defer::True<> , defer::Invocable<DF&> PUSHMI_BROKEN_SUBSUMPTION(, expNot(defer::Receiver<EF>))))
+  (requires PUSHMI_EXP(defer::True<> PUSHMI_AND defer::Invocable<DF&> PUSHMI_BROKEN_SUBSUMPTION(PUSHMI_AND not defer::Receiver<EF>)))
 single(EF, DF) -> single<ignoreVF, EF, DF>;
 
 PUSHMI_TEMPLATE(class VF, class EF, class DF)
-  (requires expAnd(defer::Invocable<DF&> PUSHMI_BROKEN_SUBSUMPTION(, expNot(defer::Receiver<VF>))))
+  (requires PUSHMI_EXP(defer::Invocable<DF&> PUSHMI_BROKEN_SUBSUMPTION(PUSHMI_AND not defer::Receiver<VF>)))
 single(VF, EF, DF) -> single<VF, EF, DF>;
 
 PUSHMI_TEMPLATE(class Data)
-  (requires expAnd(defer::True<> , defer::Receiver<Data, is_single<>>))
+  (requires PUSHMI_EXP(defer::True<> PUSHMI_AND defer::Receiver<Data, is_single<>>))
 single(Data d) -> single<Data, passDVF, passDEF, passDDF>;
 
 PUSHMI_TEMPLATE(class Data, class DVF)
-  (requires expAnd(defer::True<> , defer::Receiver<Data, is_single<>> PUSHMI_BROKEN_SUBSUMPTION(, expNot(defer::Invocable<DVF&, Data&>))))
+  (requires PUSHMI_EXP(defer::True<> PUSHMI_AND defer::Receiver<Data, is_single<>> PUSHMI_BROKEN_SUBSUMPTION(PUSHMI_AND not defer::Invocable<DVF&, Data&>)))
 single(Data d, DVF vf) -> single<Data, DVF, passDEF, passDDF>;
 
 PUSHMI_TEMPLATE(class Data, class... DEFN)
-  (requires defer::Receiver<Data, is_single<>>)
+  (requires PUSHMI_EXP(defer::Receiver<Data, is_single<>>))
 single(Data d, on_error_fn<DEFN...>) ->
     single<Data, passDVF, on_error_fn<DEFN...>, passDDF>;
 
 PUSHMI_TEMPLATE(class Data, class DDF)
-  (requires expAnd(defer::True<> , defer::Receiver<Data, is_single<>> , defer::Invocable<DDF&, Data&>))
+  (requires PUSHMI_EXP(defer::True<> PUSHMI_AND defer::Receiver<Data, is_single<>> PUSHMI_AND defer::Invocable<DDF&, Data&>))
 single(Data d, DDF) -> single<Data, passDVF, passDEF, DDF>;
 
 PUSHMI_TEMPLATE(class Data, class DVF, class DEF)
-  (requires expAnd(defer::Receiver<Data, is_single<>> PUSHMI_BROKEN_SUBSUMPTION(, expNot(defer::Invocable<DEF&, Data&>))))
+  (requires PUSHMI_EXP(defer::Receiver<Data, is_single<>> PUSHMI_BROKEN_SUBSUMPTION(PUSHMI_AND not defer::Invocable<DEF&, Data&>)))
 single(Data d, DVF vf, DEF ef) -> single<Data, DVF, DEF, passDDF>;
 
 PUSHMI_TEMPLATE(class Data, class DEF, class DDF)
-  (requires expAnd(defer::Receiver<Data, is_single<>> , defer::Invocable<DDF&, Data&>))
+  (requires PUSHMI_EXP(defer::Receiver<Data, is_single<>> PUSHMI_AND defer::Invocable<DDF&, Data&>))
 single(Data d, DEF, DDF) -> single<Data, passDVF, DEF, DDF>;
 
 PUSHMI_TEMPLATE(class Data, class DVF, class DEF, class DDF)
-  (requires expAnd(defer::Receiver<Data, is_single<>> , defer::Invocable<DDF&, Data&>))
+  (requires PUSHMI_EXP(defer::Receiver<Data, is_single<>> PUSHMI_AND defer::Invocable<DDF&, Data&>))
 single(Data d, DVF vf, DEF ef, DDF df) -> single<Data, DVF, DEF, DDF>;
 #endif
 
@@ -3378,7 +3376,7 @@ class single_deferred<SF> {
       : sf_(std::move(sf)) {}
 
   PUSHMI_TEMPLATE(class Out)
-    (requires expAnd(defer::Receiver<Out, is_single<>>, defer::Invocable<SF&, Out>))
+    (requires PUSHMI_EXP(defer::Receiver<Out, is_single<>> PUSHMI_AND defer::Invocable<SF&, Out>))
   void submit(Out out) {
     sf_(std::move(out));
   }
@@ -3399,7 +3397,7 @@ class single_deferred_2 {
   constexpr single_deferred_2(Data data, DSF sf)
       : data_(std::move(data)), sf_(std::move(sf)) {}
   PUSHMI_TEMPLATE(class Out)
-    (requires expAnd(defer::Receiver<Out, is_single<>>,
+    (requires PUSHMI_EXP(defer::Receiver<Out, is_single<>> PUSHMI_AND
         defer::Invocable<DSF&, Data&, Out>))
   void submit(Out out) {
     sf_(data_, std::move(out));
@@ -4974,7 +4972,7 @@ PUSHMI_TEMPLATE(class In, class FN)
 auto submit_transform_out(FN fn){
   PUSHMI_IF_CONSTEXPR_RETURN( ((bool)TimeSender<In>) (
     return on_submit(
-      constrain(defer::Receiver<_3>,
+      constrain(lazy::Receiver<_3>,
         [fn = std::move(fn)](In& in, auto tp, auto out) {
           ::pushmi::submit(in, tp, fn(std::move(out)));
         }
@@ -4982,7 +4980,7 @@ auto submit_transform_out(FN fn){
     );
   ) else (
     return on_submit(
-      constrain(defer::Receiver<_2>,
+      constrain(lazy::Receiver<_2>,
         [fn = std::move(fn)](In& in, auto out) {
           ::pushmi::submit(in, fn(std::move(out)));
         }
@@ -4996,7 +4994,7 @@ PUSHMI_TEMPLATE(class In, class SDSF, class TSDSF)
 auto submit_transform_out(SDSF sdsf, TSDSF tsdsf) {
   PUSHMI_IF_CONSTEXPR_RETURN( ((bool)TimeSender<In>) (
     return on_submit(
-      constrain(defer::Receiver<_3> && defer::Invocable<TSDSF&, In&, _2, _3>,
+      constrain(lazy::Receiver<_3> && lazy::Invocable<TSDSF&, In&, _2, _3>,
         [tsdsf = std::move(tsdsf)](In& in, auto tp, auto out) {
           tsdsf(in, tp, std::move(out));
         }
@@ -5004,7 +5002,7 @@ auto submit_transform_out(SDSF sdsf, TSDSF tsdsf) {
     );
   ) else (
     return on_submit(
-      constrain(defer::Receiver<_2> && defer::Invocable<SDSF&, In&, _2>,
+      constrain(lazy::Receiver<_2> && lazy::Invocable<SDSF&, In&, _2>,
         [sdsf = std::move(sdsf)](In& in, auto out) {
           sdsf(in, std::move(out));
         }
@@ -5072,7 +5070,7 @@ constexpr bool deferred_requires_from() {
 struct set_value_fn {
   template<class V>
   auto operator()(V&& v) const {
-    return constrain(defer::Receiver<_1, is_single<>>,
+    return constrain(lazy::Receiver<_1, is_single<>>,
         [v = (V&&) v](auto out) mutable {
           ::pushmi::set_value(out, (V&&) v);
         }
@@ -5084,7 +5082,7 @@ struct set_error_fn {
   PUSHMI_TEMPLATE(class E)
     (requires SemiMovable<E>)
   auto operator()(E e) const {
-    return constrain(defer::NoneReceiver<_1, E>,
+    return constrain(lazy::NoneReceiver<_1, E>,
       [e = std::move(e)](auto out) mutable {
         ::pushmi::set_error(out, std::move(e));
       }
@@ -5094,7 +5092,7 @@ struct set_error_fn {
 
 struct set_done_fn {
   auto operator()() const {
-    return constrain(defer::Receiver<_1>,
+    return constrain(lazy::Receiver<_1>,
       [](auto out) {
         ::pushmi::set_done(out);
       }
@@ -5104,7 +5102,7 @@ struct set_done_fn {
 
 struct set_stopping_fn {
   auto operator()() const {
-    return constrain(defer::Receiver<_1>,
+    return constrain(lazy::Receiver<_1>,
       [](auto out) {
         ::pushmi::set_stopping(out);
       }
@@ -5116,7 +5114,7 @@ struct set_starting_fn {
   PUSHMI_TEMPLATE(class Up)
     (requires Receiver<Up>)
   auto operator()(Up up) const {
-    return constrain(defer::Receiver<_1>,
+    return constrain(lazy::Receiver<_1>,
       [up = std::move(up)](auto out) {
         ::pushmi::set_starting(out, std::move(up));
       }
@@ -5128,7 +5126,7 @@ struct do_submit_fn {
   PUSHMI_TEMPLATE(class Out)
     (requires Receiver<Out>)
   auto operator()(Out out) const {
-    return constrain(defer::SenderTo<_1, Out>,
+    return constrain(lazy::SenderTo<_1, Out>,
       [out = std::move(out)](auto in) mutable {
         ::pushmi::submit(in, std::move(out));
       }
@@ -5137,7 +5135,7 @@ struct do_submit_fn {
   PUSHMI_TEMPLATE(class TP, class Out)
     (requires Receiver<Out>)
   auto operator()(TP tp, Out out) const {
-    return constrain(defer::TimeSenderTo<_1, Out>,
+    return constrain(lazy::TimeSenderTo<_1, Out>,
       [tp = std::move(tp), out = std::move(out)](auto in) mutable {
         ::pushmi::submit(in, std::move(tp), std::move(out));
       }
@@ -5147,7 +5145,7 @@ struct do_submit_fn {
 
 struct now_fn {
   auto operator()() const {
-    return constrain(defer::TimeSender<_1>,
+    return constrain(lazy::TimeSender<_1>,
       [](auto in) {
         return ::pushmi::now(in);
       }
@@ -5301,7 +5299,7 @@ private:
       std::condition_variable signaled;
       auto out{::pushmi::detail::out_from_fn<In>()(
         std::move(args_),
-        on_value(constrain(pushmi::defer::Receiver<_1, is_single<>>,
+        on_value(constrain(pushmi::lazy::Receiver<_1, is_single<>>,
           [&](auto out, auto&& v) {
             using V = remove_cvref_t<decltype(v)>;
             PUSHMI_IF_CONSTEXPR( ((bool)Time<V>) (
@@ -5317,14 +5315,14 @@ private:
             signaled.notify_all();
           }
         )),
-        on_error(constrain(pushmi::defer::NoneReceiver<_1, _2>,
+        on_error(constrain(pushmi::lazy::NoneReceiver<_1, _2>,
           [&](auto out, auto e) noexcept {
             ::pushmi::set_error(out, std::move(e));
             done = true;
             signaled.notify_all();
           }
         )),
-        on_done(constrain(pushmi::defer::Receiver<_1>,
+        on_done(constrain(pushmi::lazy::Receiver<_1>,
           [&](auto out){
             ::pushmi::set_done(out);
             done = true;
@@ -5514,7 +5512,7 @@ namespace operators {
 template <class V>
 auto empty() {
   return make_single_deferred(
-    constrain(defer::SingleReceiver<_1, V>, [](auto out) mutable {
+    constrain(lazy::SingleReceiver<_1, V>, [](auto out) mutable {
       ::pushmi::set_done(out);
     })
   );
@@ -5522,7 +5520,7 @@ auto empty() {
 
 inline auto empty() {
   return make_deferred(
-    constrain(defer::NoneReceiver<_1>, [](auto out) mutable {
+    constrain(lazy::NoneReceiver<_1>, [](auto out) mutable {
       ::pushmi::set_done(out);
     })
   );
@@ -5550,7 +5548,7 @@ PUSHMI_TEMPLATE(class V)
   (requires SemiMovable<V>)
 auto just(V v) {
   return make_single_deferred(
-    constrain(defer::SingleReceiver<_1, V>,
+    constrain(lazy::SingleReceiver<_1, V>,
       [v = std::move(v)](auto out) mutable {
         ::pushmi::set_value(out, std::move(v));
       }
@@ -5570,6 +5568,7 @@ auto just(V v) {
 // LICENSE file in the root directory of this source tree.
 
 //#include "../single.h"
+//#include "../single_deferred.h"
 //#include "submit.h"
 //#include "extension_operators.h"
 
@@ -5588,7 +5587,7 @@ PUSHMI_TEMPLATE(class F)
   (requires Invocable<F>)
 auto defer(F f) {
   return MAKE(single_deferred)(
-    constrain(defer::Receiver<_1>,
+    constrain(lazy::Receiver<_1>,
       [f = std::move(f)](auto out) mutable {
         auto sender = f();
         PUSHMI_IF_CONSTEXPR( ((bool)TimeSender<decltype(sender)>) (
@@ -5622,12 +5621,12 @@ struct on_fn {
   PUSHMI_TEMPLATE(class ExecutorFactory)
     (requires Invocable<ExecutorFactory&>)
   auto operator()(ExecutorFactory ef) const {
-    return constrain(defer::Sender<_1>, [ef = std::move(ef)](auto in) {
+    return constrain(lazy::Sender<_1>, [ef = std::move(ef)](auto in) {
       using In = decltype(in);
       return ::pushmi::detail::deferred_from<In, single<>>(
         std::move(in),
         ::pushmi::detail::submit_transform_out<In>(
-          constrain(defer::SenderTo<In, _2>, [ef](In& in, auto out) {
+          constrain(lazy::SenderTo<In, _2>, [ef](In& in, auto out) {
             auto exec = ef();
             ::pushmi::submit(exec, ::pushmi::now(exec),
               ::pushmi::make_single([in = in, out = std::move(out)](auto) mutable {
@@ -5635,7 +5634,7 @@ struct on_fn {
               })
             );
           }),
-          constrain(defer::TimeSenderTo<In, _3>, [ef](In& in, auto at, auto out) {
+          constrain(lazy::TimeSenderTo<In, _3>, [ef](In& in, auto at, auto out) {
             auto exec = ef();
             ::pushmi::submit(exec, at,
               ::pushmi::on_value([in = in, at, out = std::move(out)](auto) mutable {
@@ -5876,7 +5875,7 @@ inline void do_assert(bool condition, char const*) {
 
 template <class... AN>
 auto tap_fn::operator()(AN... an) const {
-  return constrain(defer::Sender<_1>,
+  return constrain(lazy::Sender<_1>,
     [args = std::tuple<AN...>{std::move(an)...}](auto in) mutable {
       using In = decltype(in);
       auto sideEffects{::pushmi::detail::out_from_fn<In>()(std::move(args))};
@@ -5892,7 +5891,7 @@ auto tap_fn::operator()(AN... an) const {
       return ::pushmi::detail::deferred_from<In, SideEffects>(
         std::move(in),
         ::pushmi::detail::submit_transform_out<In>(
-          constrain(defer::Receiver<_1>,
+          constrain(lazy::Receiver<_1>,
             [sideEffects = std::move(sideEffects)](auto out) {
               using Out = decltype(out);
               PUSHMI_STATIC_ASSERT(
@@ -5950,13 +5949,13 @@ struct transform_fn {
 template <class... FN>
 auto transform_fn::operator()(FN... fn) const {
   auto f = overload(std::move(fn)...);
-  return constrain(defer::Sender<_1>, [f = std::move(f)](auto in) {
+  return constrain(lazy::Sender<_1>, [f = std::move(f)](auto in) {
     using In = decltype(in);
     // copy 'f' to allow multiple calls to connect to multiple 'in'
     return ::pushmi::detail::deferred_from<In, single<>>(
       std::move(in),
       ::pushmi::detail::submit_transform_out<In>(
-        constrain(defer::Receiver<_1>, [f](auto out) {
+        constrain(lazy::Receiver<_1>, [f](auto out) {
           using Out = decltype(out);
           return ::pushmi::detail::out_from_fn<In>()(
             std::move(out),
@@ -6017,12 +6016,12 @@ struct via_fn {
   PUSHMI_TEMPLATE(class ExecutorFactory)
     (requires Invocable<ExecutorFactory&>)
   auto operator()(ExecutorFactory ef) const {
-    return constrain(defer::Sender<_1>, [ef = std::move(ef)](auto in) {
+    return constrain(lazy::Sender<_1>, [ef = std::move(ef)](auto in) {
       using In = decltype(in);
       return ::pushmi::detail::deferred_from<In, single<>>(
         std::move(in),
         ::pushmi::detail::submit_transform_out<In>(
-          constrain(defer::Receiver<_1>, [ef](auto out) {
+          constrain(lazy::Receiver<_1>, [ef](auto out) {
             using Out = decltype(out);
             auto exec = ef();
             return ::pushmi::detail::out_from_fn<In>()(
@@ -6268,7 +6267,7 @@ struct request_via_fn {
 };
 
 inline auto request_via_fn::operator()() const {
-  return constrain(defer::Sender<_1>, [](auto in) {
+  return constrain(lazy::Sender<_1>, [](auto in) {
     using In = decltype(in);
     return send_via<In>{in};
   });
@@ -6320,7 +6319,7 @@ struct share_fn {
 
 template<class T>
 auto share_fn<T>::operator()() const {
-  return constrain(defer::Sender<_1>, [](auto in) {
+  return constrain(lazy::Sender<_1>, [](auto in) {
     using In = decltype(in);
     subject<T, properties_t<In>> sub;
 

@@ -70,7 +70,7 @@ inline void do_assert(bool condition, char const*) {
 
 template <class... AN>
 auto tap_fn::operator()(AN... an) const {
-  return constrain(defer::Sender<_1>,
+  return constrain(lazy::Sender<_1>,
     [args = std::tuple<AN...>{std::move(an)...}](auto in) mutable {
       using In = decltype(in);
       auto sideEffects{::pushmi::detail::out_from_fn<In>()(std::move(args))};
@@ -86,7 +86,7 @@ auto tap_fn::operator()(AN... an) const {
       return ::pushmi::detail::deferred_from<In, SideEffects>(
         std::move(in),
         ::pushmi::detail::submit_transform_out<In>(
-          constrain(defer::Receiver<_1>,
+          constrain(lazy::Receiver<_1>,
             [sideEffects = std::move(sideEffects)](auto out) {
               using Out = decltype(out);
               PUSHMI_STATIC_ASSERT(

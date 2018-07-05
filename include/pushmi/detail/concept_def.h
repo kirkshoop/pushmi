@@ -401,13 +401,13 @@ PUSHMI_PP_IGNORE_CXX2A_COMPAT_BEGIN
 #if __cpp_concepts
 #define PUSHMI_BROKEN_SUBSUMPTION(...)
 #define PUSHMI_TYPE_CONSTRAINT(...) __VA_ARGS__
-// #define PUSHMI_EXP_AND(...)
-// #define PUSHMI_EXP_NOT(T) not T
+#define PUSHMI_EXP(...) __VA_ARGS__
+#define PUSHMI_AND &&
 #else
 #define PUSHMI_BROKEN_SUBSUMPTION(...) __VA_ARGS__
 #define PUSHMI_TYPE_CONSTRAINT(...) class
-// #define PUSHMI_EXP_AND(...) expAnd(__VA_ARGS__)
-// #define PUSHMI_EXP_NOT(T) expNot(T)
+#define PUSHMI_EXP(...) ::pushmi::expAnd(__VA_ARGS__)
+#define PUSHMI_AND ,
 #endif
 
 
@@ -443,10 +443,10 @@ struct Not {
     constexpr auto operator!() const noexcept {
         return T{};
     }
-    template <class That>
-    constexpr auto operator&&(That) const noexcept {
-        return And<Not, That>{};
-    }
+    // template <class That>
+    // constexpr auto operator&&(That) const noexcept {
+    //     return And<Not, That>{};
+    // }
 };
 template <class T, class U>
 struct And {
@@ -458,33 +458,31 @@ struct And {
     constexpr auto operator!() const noexcept {
         return Not<And>{};
     }
-    template <class That>
-    constexpr auto operator&&(That) const noexcept {
-        return detail::And<And, That>{};
-    }
+    // template <class That>
+    // constexpr auto operator&&(That) const noexcept {
+    //     return detail::And<And, That>{};
+    // }
 };
+
+} // namespace detail
+} // namespace concepts
+
+namespace isolated {
 
 template<class T0>
 constexpr auto expAnd(T0&& t0) {
   return (T0&&)t0;
 }
-
 template<class T0, class... TN>
 constexpr auto expAnd(T0&& t0, TN&&... tn) {
-  return concepts::detail::And<T0, decltype(concepts::detail::expAnd((TN&&)tn...))>{};
+  return concepts::detail::And<T0, decltype(isolated::expAnd((TN&&)tn...))>{};
 }
 
-} // namespace detail
-} // namespace concepts
+}
 
 template<class... TN>
 constexpr auto expAnd(TN&&... tn) {
-  return concepts::detail::expAnd((TN&&)tn...);
-}
-
-template<class T0>
-constexpr concepts::detail::Not<T0> expNot(T0) {
-  return {};
+  return isolated::expAnd((TN&&)tn...);
 }
 
 template <class T>

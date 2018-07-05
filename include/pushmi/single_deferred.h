@@ -108,7 +108,7 @@ class single_deferred<SF> {
       : sf_(std::move(sf)) {}
 
   PUSHMI_TEMPLATE(class Out)
-    (requires expAnd(defer::Receiver<Out, is_single<>>, defer::Invocable<SF&, Out>))
+    (requires PUSHMI_EXP(defer::Receiver<Out, is_single<>> PUSHMI_AND defer::Invocable<SF&, Out>))
   void submit(Out out) {
     sf_(std::move(out));
   }
@@ -129,7 +129,7 @@ class single_deferred_2 {
   constexpr single_deferred_2(Data data, DSF sf)
       : data_(std::move(data)), sf_(std::move(sf)) {}
   PUSHMI_TEMPLATE(class Out)
-    (requires expAnd(defer::Receiver<Out, is_single<>>,
+    (requires PUSHMI_EXP(defer::Receiver<Out, is_single<>> PUSHMI_AND
         defer::Invocable<DSF&, Data&, Out>))
   void submit(Out out) {
     sf_(data_, std::move(out));

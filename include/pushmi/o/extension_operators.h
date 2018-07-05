@@ -77,7 +77,7 @@ PUSHMI_TEMPLATE(class In, class FN)
 auto submit_transform_out(FN fn){
   PUSHMI_IF_CONSTEXPR_RETURN( ((bool)TimeSender<In>) (
     return on_submit(
-      constrain(defer::Receiver<_3>,
+      constrain(lazy::Receiver<_3>,
         [fn = std::move(fn)](In& in, auto tp, auto out) {
           ::pushmi::submit(in, tp, fn(std::move(out)));
         }
@@ -85,7 +85,7 @@ auto submit_transform_out(FN fn){
     );
   ) else (
     return on_submit(
-      constrain(defer::Receiver<_2>,
+      constrain(lazy::Receiver<_2>,
         [fn = std::move(fn)](In& in, auto out) {
           ::pushmi::submit(in, fn(std::move(out)));
         }
@@ -99,7 +99,7 @@ PUSHMI_TEMPLATE(class In, class SDSF, class TSDSF)
 auto submit_transform_out(SDSF sdsf, TSDSF tsdsf) {
   PUSHMI_IF_CONSTEXPR_RETURN( ((bool)TimeSender<In>) (
     return on_submit(
-      constrain(defer::Receiver<_3> && defer::Invocable<TSDSF&, In&, _2, _3>,
+      constrain(lazy::Receiver<_3> && lazy::Invocable<TSDSF&, In&, _2, _3>,
         [tsdsf = std::move(tsdsf)](In& in, auto tp, auto out) {
           tsdsf(in, tp, std::move(out));
         }
@@ -107,7 +107,7 @@ auto submit_transform_out(SDSF sdsf, TSDSF tsdsf) {
     );
   ) else (
     return on_submit(
-      constrain(defer::Receiver<_2> && defer::Invocable<SDSF&, In&, _2>,
+      constrain(lazy::Receiver<_2> && lazy::Invocable<SDSF&, In&, _2>,
         [sdsf = std::move(sdsf)](In& in, auto out) {
           sdsf(in, std::move(out));
         }
@@ -175,7 +175,7 @@ constexpr bool deferred_requires_from() {
 struct set_value_fn {
   template<class V>
   auto operator()(V&& v) const {
-    return constrain(defer::Receiver<_1, is_single<>>,
+    return constrain(lazy::Receiver<_1, is_single<>>,
         [v = (V&&) v](auto out) mutable {
           ::pushmi::set_value(out, (V&&) v);
         }
@@ -187,7 +187,7 @@ struct set_error_fn {
   PUSHMI_TEMPLATE(class E)
     (requires SemiMovable<E>)
   auto operator()(E e) const {
-    return constrain(defer::NoneReceiver<_1, E>,
+    return constrain(lazy::NoneReceiver<_1, E>,
       [e = std::move(e)](auto out) mutable {
         ::pushmi::set_error(out, std::move(e));
       }
@@ -197,7 +197,7 @@ struct set_error_fn {
 
 struct set_done_fn {
   auto operator()() const {
-    return constrain(defer::Receiver<_1>,
+    return constrain(lazy::Receiver<_1>,
       [](auto out) {
         ::pushmi::set_done(out);
       }
@@ -207,7 +207,7 @@ struct set_done_fn {
 
 struct set_stopping_fn {
   auto operator()() const {
-    return constrain(defer::Receiver<_1>,
+    return constrain(lazy::Receiver<_1>,
       [](auto out) {
         ::pushmi::set_stopping(out);
       }
@@ -219,7 +219,7 @@ struct set_starting_fn {
   PUSHMI_TEMPLATE(class Up)
     (requires Receiver<Up>)
   auto operator()(Up up) const {
-    return constrain(defer::Receiver<_1>,
+    return constrain(lazy::Receiver<_1>,
       [up = std::move(up)](auto out) {
         ::pushmi::set_starting(out, std::move(up));
       }
@@ -231,7 +231,7 @@ struct do_submit_fn {
   PUSHMI_TEMPLATE(class Out)
     (requires Receiver<Out>)
   auto operator()(Out out) const {
-    return constrain(defer::SenderTo<_1, Out>,
+    return constrain(lazy::SenderTo<_1, Out>,
       [out = std::move(out)](auto in) mutable {
         ::pushmi::submit(in, std::move(out));
       }
@@ -240,7 +240,7 @@ struct do_submit_fn {
   PUSHMI_TEMPLATE(class TP, class Out)
     (requires Receiver<Out>)
   auto operator()(TP tp, Out out) const {
-    return constrain(defer::TimeSenderTo<_1, Out>,
+    return constrain(lazy::TimeSenderTo<_1, Out>,
       [tp = std::move(tp), out = std::move(out)](auto in) mutable {
         ::pushmi::submit(in, std::move(tp), std::move(out));
       }
@@ -250,7 +250,7 @@ struct do_submit_fn {
 
 struct now_fn {
   auto operator()() const {
-    return constrain(defer::TimeSender<_1>,
+    return constrain(lazy::TimeSender<_1>,
       [](auto in) {
         return ::pushmi::now(in);
       }

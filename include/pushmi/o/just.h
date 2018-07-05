@@ -18,7 +18,7 @@ PUSHMI_TEMPLATE(class V)
   (requires SemiMovable<V>)
 auto just(V v) {
   return make_single_deferred(
-    constrain(defer::SingleReceiver<_1, V>,
+    constrain(lazy::SingleReceiver<_1, V>,
       [v = std::move(v)](auto out) mutable {
         ::pushmi::set_value(out, std::move(v));
       }

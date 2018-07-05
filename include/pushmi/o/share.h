@@ -23,7 +23,7 @@ struct share_fn {
 
 template<class T>
 auto share_fn<T>::operator()() const {
-  return constrain(defer::Sender<_1>, [](auto in) {
+  return constrain(lazy::Sender<_1>, [](auto in) {
     using In = decltype(in);
     subject<T, properties_t<In>> sub;
 
