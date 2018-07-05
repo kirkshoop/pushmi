@@ -59,9 +59,7 @@ struct tap_fn {
   auto operator()(AN... an) const;
 };
 
-#if 0//__NVCC__
-#define PUSHMI_STATIC_ASSERT(...)
-#elif __cpp_if_constexpr >= 201606
+#if __cpp_if_constexpr >= 201606
 #define PUSHMI_STATIC_ASSERT static_assert
 #else
 #define PUSHMI_STATIC_ASSERT detail::do_assert
