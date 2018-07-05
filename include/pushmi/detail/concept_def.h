@@ -406,7 +406,7 @@ PUSHMI_PP_IGNORE_CXX2A_COMPAT_BEGIN
 #else
 #define PUSHMI_BROKEN_SUBSUMPTION(...) __VA_ARGS__
 #define PUSHMI_TYPE_CONSTRAINT(...) class
-#define PUSHMI_EXP(...) ::pushmi::expAnd(__VA_ARGS__)
+#define PUSHMI_EXP(...) (::pushmi::expAnd(__VA_ARGS__))
 #define PUSHMI_AND ,
 #endif
 
