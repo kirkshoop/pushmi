@@ -2742,7 +2742,7 @@ PUSHMI_DEFINE_CONSTEXPR_IN_CLASS_INIT(typename deferred<detail::erase_deferred_t
 
 template <class SF>
 class deferred<SF> {
-  SF sf_{};
+  SF sf_;
 
  public:
   using properties = property_set<is_sender<>, is_none<>>;
@@ -2758,8 +2758,8 @@ class deferred<SF> {
 
 template <PUSHMI_TYPE_CONSTRAINT(Sender<is_none<>>) Data, class DSF>
 class deferred<Data, DSF> {
-  Data data_{};
-  DSF sf_{};
+  Data data_;
+  DSF sf_;
   static_assert(Sender<Data, is_none<>>, "The Data template parameter "
     "must satisfy the Sender concept.");
 
