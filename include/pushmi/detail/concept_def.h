@@ -444,10 +444,10 @@ struct Not {
     constexpr auto operator!() const noexcept {
         return T{};
     }
-    // template <class That>
-    // constexpr auto operator&&(That) const noexcept {
-    //     return And<Not, That>{};
-    // }
+    template <class That>
+    constexpr auto operator&&(That) const noexcept {
+        return And<Not, That>{};
+    }
 };
 template <class T, class U>
 struct And {
@@ -459,10 +459,10 @@ struct And {
     constexpr auto operator!() const noexcept {
         return Not<And>{};
     }
-    // template <class That>
-    // constexpr auto operator&&(That) const noexcept {
-    //     return detail::And<And, That>{};
-    // }
+    template <class That>
+    constexpr auto operator&&(That) const noexcept {
+        return detail::And<And, That>{};
+    }
 };
 
 } // namespace detail

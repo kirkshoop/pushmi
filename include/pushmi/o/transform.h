@@ -51,16 +51,16 @@ auto transform_fn::operator()(FN... fn) const {
             std::move(out),
             // copy 'f' to allow multiple calls to submit
             ::pushmi::on_value(
-              transform_on_value<F>{f}
-              // [f](Out& out, auto&& v) {
-              //   using V = decltype(v);
-              //   using Result = decltype(f((V&&) v));
-              //   static_assert(::pushmi::SemiMovable<Result>,
-              //     "none of the functions supplied to transform can convert this value");
-              //   static_assert(::pushmi::SingleReceiver<Out, Result>,
-              //     "Result of value transform cannot be delivered to Out");
-              //   ::pushmi::set_value(out, f((V&&) v));
-              // }
+              // transform_on_value<F>{f}
+              [f](Out& out, auto&& v) {
+                using V = decltype(v);
+                using Result = decltype(f((V&&) v));
+                static_assert(::pushmi::SemiMovable<Result>,
+                  "none of the functions supplied to transform can convert this value");
+                static_assert(::pushmi::SingleReceiver<Out, Result>,
+                  "Result of value transform cannot be delivered to Out");
+                ::pushmi::set_value(out, f((V&&) v));
+              }
             )
           );
         })

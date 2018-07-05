@@ -608,10 +608,10 @@ struct Not {
     constexpr auto operator!() const noexcept {
         return T{};
     }
-    // template <class That>
-    // constexpr auto operator&&(That) const noexcept {
-    //     return And<Not, That>{};
-    // }
+    template <class That>
+    constexpr auto operator&&(That) const noexcept {
+        return And<Not, That>{};
+    }
 };
 template <class T, class U>
 struct And {
@@ -623,10 +623,10 @@ struct And {
     constexpr auto operator!() const noexcept {
         return Not<And>{};
     }
-    // template <class That>
-    // constexpr auto operator&&(That) const noexcept {
-    //     return detail::And<And, That>{};
-    // }
+    template <class That>
+    constexpr auto operator&&(That) const noexcept {
+        return detail::And<And, That>{};
+    }
 };
 
 } // namespace detail
@@ -5865,7 +5865,7 @@ struct tap_fn {
   auto operator()(AN... an) const;
 };
 
-#if __NVCC__
+#if 0//__NVCC__
 #define PUSHMI_STATIC_ASSERT(...)
 #elif __cpp_if_constexpr >= 201606
 #define PUSHMI_STATIC_ASSERT static_assert
@@ -5981,16 +5981,16 @@ auto transform_fn::operator()(FN... fn) const {
             std::move(out),
             // copy 'f' to allow multiple calls to submit
             ::pushmi::on_value(
-              transform_on_value<F>{f}
-              // [f](Out& out, auto&& v) {
-              //   using V = decltype(v);
-              //   using Result = decltype(f((V&&) v));
-              //   static_assert(::pushmi::SemiMovable<Result>,
-              //     "none of the functions supplied to transform can convert this value");
-              //   static_assert(::pushmi::SingleReceiver<Out, Result>,
-              //     "Result of value transform cannot be delivered to Out");
-              //   ::pushmi::set_value(out, f((V&&) v));
-              // }
+              // transform_on_value<F>{f}
+              [f](Out& out, auto&& v) {
+                using V = decltype(v);
+                using Result = decltype(f((V&&) v));
+                static_assert(::pushmi::SemiMovable<Result>,
+                  "none of the functions supplied to transform can convert this value");
+                static_assert(::pushmi::SingleReceiver<Out, Result>,
+                  "Result of value transform cannot be delivered to Out");
+                ::pushmi::set_value(out, f((V&&) v));
+              }
             )
           );
         })
