@@ -12,6 +12,8 @@
 #include "pushmi/none.h"
 #include "pushmi/flow_single.h"
 #include "pushmi/flow_single_sender.h"
+#include "pushmi/flow_many.h"
+#include "pushmi/flow_many_sender.h"
 #include "pushmi/entangle.h"
 
 #include "pool.h"
@@ -42,6 +44,7 @@ void countdown<R>::operator()(ExecutorRef exec) const {
 using countdownsingle = countdown<mi::make_single_fn>;
 using countdownflowsingle = countdown<mi::make_flow_single_fn>;
 using countdownmany = countdown<mi::make_many_fn>;
+using countdownflowmany = countdown<mi::make_flow_many_fn>;
 
 struct countdownnone {
   countdownnone(int& c)
@@ -56,6 +59,17 @@ struct inline_executor {
     using properties = mi::property_set<mi::is_sender<>, mi::is_single<>>;
     template<class Out>
     void submit(Out out) {
+      ::mi::set_value(out, *this);
+    }
+};
+
+struct inline_time_executor {
+    using properties = mi::property_set<mi::is_time<>, mi::is_single<>>;
+
+    std::chrono::system_clock::time_point now() { return std::chrono::system_clock::now(); }
+    template<class Out>
+    void submit(std::chrono::system_clock::time_point at, Out out) {
+      std::this_thread::sleep_until(at);
       ::mi::set_value(out, *this);
     }
 };
@@ -152,6 +166,69 @@ struct inline_executor_flow_single_ignore {
     }
 };
 
+struct inline_executor_flow_many {
+  inline_executor_flow_many()
+    : counter(nullptr) {}
+  inline_executor_flow_many(int& c)
+      : counter(&c) {}
+
+  int* counter;
+
+  using properties = mi::property_set<mi::is_sender<>, mi::is_flow<>, mi::is_many<>>;
+
+  template<class Out>
+  void submit(Out out) {
+
+    // boolean cancellation
+    struct producer {
+      producer(Out out, bool s) : out(std::move(out)), stop(s) {}
+      Out out;
+      std::atomic<bool> stop;
+    };
+    auto p = std::make_shared<producer>(std::move(out), false);
+
+    struct Data : mi::many<> {
+      explicit Data(std::shared_ptr<producer> p) : p(std::move(p)) {}
+      std::shared_ptr<producer> p;
+    };
+
+    auto up = mi::MAKE(many)(
+        Data{p},
+        [counter = this->counter](auto& data, auto requested) {
+          if (requested < 1) {return;}
+          // check boolean to select signal
+          while (!data.p->stop && !!counter && --*counter > 0) {
+            ::mi::set_next(data.p->out, inline_executor_flow_many{*counter});
+          }
+          ::mi::set_done(data.p->out);
+        },
+        [](auto& data, auto e) noexcept {
+          data.p->stop.store(true);
+          ::mi::set_done(data.p->out);
+        },
+        [](auto& data) {
+          data.p->stop.store(true);
+          ::mi::set_done(data.p->out);
+        });
+
+    // pass reference for cancellation.
+    ::mi::set_starting(p->out, std::move(up));
+  }
+};
+
+struct inline_executor_flow_many_ignore {
+    using properties = mi::property_set<mi::is_sender<>, mi::is_flow<>, mi::is_many<>>;
+    template<class Out>
+    void submit(Out out) {
+      // pass reference for cancellation.
+      ::mi::set_starting(out, mi::many<>{});
+
+      ::mi::set_next(out, *this);
+
+      ::mi::set_done(out);
+    }
+};
+
 struct inline_executor_many {
     using properties = mi::property_set<mi::is_sender<>, mi::is_many<>>;
     template<class Out>
@@ -180,6 +257,18 @@ NONIUS_BENCHMARK("inline 10 none", [](nonius::chronometer meter){
 NONIUS_BENCHMARK("inline 10 single", [](nonius::chronometer meter){
   int counter = 0;
   auto ie = inline_executor{};
+  using IE = decltype(ie);
+  countdownsingle single{counter};
+  meter.measure([&]{
+    counter = 10;
+    ie | op::submit(mi::make_single(single));
+    return counter;
+  });
+})
+
+NONIUS_BENCHMARK("inline 10 time single", [](nonius::chronometer meter){
+  int counter = 0;
+  auto ie = inline_time_executor{};
   using IE = decltype(ie);
   countdownsingle single{counter};
   meter.measure([&]{
@@ -233,6 +322,41 @@ NONIUS_BENCHMARK("inline 10 flow_single ignore cancellation", [](nonius::chronom
   meter.measure([&]{
     counter = 10;
     ie | op::submit(mi::make_flow_single(flowsingle));
+    return counter;
+  });
+})
+
+NONIUS_BENCHMARK("inline 10 flow_many", [](nonius::chronometer meter){
+  int counter = 0;
+  auto ie = inline_executor_flow_many{};
+  using IE = decltype(ie);
+  countdownflowmany flowmany{counter};
+  meter.measure([&]{
+    counter = 10;
+    ie | op::submit(mi::make_flow_many(flowmany));
+    return counter;
+  });
+})
+
+NONIUS_BENCHMARK("inline 1 flow_many with 10 values", [](nonius::chronometer meter){
+  int counter = 0;
+  auto ie = inline_executor_flow_many{counter};
+  using IE = decltype(ie);
+  meter.measure([&]{
+    counter = 10;
+    ie | op::submit(mi::make_flow_many());
+    return counter;
+  });
+})
+
+NONIUS_BENCHMARK("inline 10 flow_many ignore cancellation", [](nonius::chronometer meter){
+  int counter = 0;
+  auto ie = inline_executor_flow_many_ignore{};
+  using IE = decltype(ie);
+  countdownflowmany flowmany{counter};
+  meter.measure([&]{
+    counter = 10;
+    ie | op::submit(mi::make_flow_many(flowmany));
     return counter;
   });
 })
