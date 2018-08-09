@@ -208,7 +208,7 @@ class flow_many<NF, EF, DF, StrtF> {
     df_();
   }
   PUSHMI_TEMPLATE(class Up)
-    (requires Receiver<Up, is_many<>> && Invocable<StrtF&, Up&&>)
+    (requires Invocable<StrtF&, Up&&>)
   void starting(Up&& up) {
     if (started_) {std::abort();}
     started_ = true;

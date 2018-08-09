@@ -84,7 +84,7 @@ private:
 
       ::pushmi::submit(exec_,
         ::pushmi::now(exec_),
-        make_single([p](auto exec) mutable {
+        make_single([p](auto exec) {
           auto up = make_many(
             Data{p},
             [](auto& data, auto requested) {
@@ -92,7 +92,7 @@ private:
               // submit work to exec
               ::pushmi::submit(data.p->exec,
                 ::pushmi::now(data.p->exec),
-                make_single([p = data.p, requested](auto)  {
+                make_single([p = data.p, requested](auto) {
                   auto remaining = requested;
                   // this loop is structured to work when there is re-entrancy
                   // out.next in the loop may call up.next. to handle this the
@@ -100,7 +100,7 @@ private:
                   // must be changed before out.next is called.
                   while (remaining-- > 0 && !p->stop && p->c != p->end) {
                     auto i = (p->c)++;
-                    ::pushmi::set_next(p->out, *i);
+                    ::pushmi::set_next(p->out, pushmi::detail::as_const(*i));
                   }
                   if (p->c == p->end) {
                     ::pushmi::set_done(p->out);
@@ -111,7 +111,7 @@ private:
               data.p->stop.store(true);
               ::pushmi::submit(data.p->exec,
                 ::pushmi::now(data.p->exec),
-                make_single([p = data.p](auto)  {
+                make_single([p = data.p](auto) {
                   ::pushmi::set_done(p->out);
                 }));
             },
@@ -119,7 +119,7 @@ private:
               data.p->stop.store(true);
               ::pushmi::submit(data.p->exec,
                 ::pushmi::now(data.p->exec),
-                make_single([p = data.p](auto)  {
+                make_single([p = data.p](auto) {
                   ::pushmi::set_done(p->out);
                 }));
             });
@@ -151,14 +151,14 @@ public:
           typename std::iterator_traits<I>::iterator_category,
           std::forward_iterator_tag> &&
       Sender<Exec> && Time<Exec> && Single<Exec>)
-  auto operator()(I begin, S end, Exec&& exec) const {
-    return make_flow_many_sender(out_impl<I, S, Exec>{begin, end, (Exec&&) exec});
+  auto operator()(I begin, S end, Exec exec) const {
+    return make_flow_many_sender(out_impl<I, S, Exec>{begin, end, exec});
   }
 
   PUSHMI_TEMPLATE(class R, class Exec)
     (requires Range<R> && Sender<Exec> && Time<Exec> && Single<Exec>)
-  auto operator()(R&& range, Exec&& exec) const {
-    return (*this)(std::begin(range), std::end(range), (Exec&&) exec);
+  auto operator()(R&& range, Exec exec) const {
+    return (*this)(std::begin(range), std::end(range), exec);
   }
 } flow_from {};
 
