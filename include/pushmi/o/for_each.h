@@ -25,14 +25,15 @@ private:
       pull(1);
     }
     PUSHMI_TEMPLATE(class Up)
-      (requires Many<In> && Many<Up>)
+      (requires ManyReceiver<Up, std::ptrdiff_t>)
     void starting(Up up){
-      pull = [up = std::move(up)](ptrdiff_t requested) mutable {
+      pull = [up = std::move(up)](std::ptrdiff_t requested) mutable {
         ::pushmi::set_next(up, requested);
       };
       pull(1);
     }
-    template<class Up>
+    PUSHMI_TEMPLATE(class Up)
+      (requires None<Up> && not Many<Up>)
     void starting(Up up){}
   };
   template <class... AN>

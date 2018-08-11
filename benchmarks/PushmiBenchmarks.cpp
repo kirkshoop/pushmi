@@ -43,7 +43,8 @@ struct countdown {
   void starting(Up up) {
     mi::set_next(up, 1);
   }
-  template<class Up>
+  PUSHMI_TEMPLATE (class Up)
+    (requires mi::None<Up> && not mi::Many<Up>)
   void starting(Up up) {
   }
 };
@@ -268,7 +269,7 @@ struct inline_executor_many {
 #include <nonius/nonius.h++>
 
 NONIUS_BENCHMARK("inline 1'000 none", [](nonius::chronometer meter){
-  std::atomic<int> counter = 0;
+  std::atomic<int> counter{0};
   auto ie = inline_executor_none{};
   using IE = decltype(ie);
   countdownnone none{counter};
@@ -281,7 +282,7 @@ NONIUS_BENCHMARK("inline 1'000 none", [](nonius::chronometer meter){
 })
 
 NONIUS_BENCHMARK("inline 1'000 single", [](nonius::chronometer meter){
-  std::atomic<int> counter = 0;
+  std::atomic<int> counter{0};
   auto ie = inline_executor{};
   using IE = decltype(ie);
   countdownsingle single{counter};
@@ -294,7 +295,7 @@ NONIUS_BENCHMARK("inline 1'000 single", [](nonius::chronometer meter){
 })
 
 NONIUS_BENCHMARK("inline 1'000 time single", [](nonius::chronometer meter){
-  std::atomic<int> counter = 0;
+  std::atomic<int> counter{0};
   auto ie = inline_time_executor{};
   using IE = decltype(ie);
   countdownsingle single{counter};
@@ -307,7 +308,7 @@ NONIUS_BENCHMARK("inline 1'000 time single", [](nonius::chronometer meter){
 })
 
 NONIUS_BENCHMARK("inline 1'000 many", [](nonius::chronometer meter){
-  std::atomic<int> counter = 0;
+  std::atomic<int> counter{0};
   auto ie = inline_executor_many{};
   using IE = decltype(ie);
   countdownmany many{counter};
@@ -320,7 +321,7 @@ NONIUS_BENCHMARK("inline 1'000 many", [](nonius::chronometer meter){
 })
 
 NONIUS_BENCHMARK("inline 1'000 flow_single shared", [](nonius::chronometer meter){
-  std::atomic<int> counter = 0;
+  std::atomic<int> counter{0};
   auto ie = inline_executor_flow_single_shared{};
   using IE = decltype(ie);
   countdownflowsingle flowsingle{counter};
@@ -333,7 +334,7 @@ NONIUS_BENCHMARK("inline 1'000 flow_single shared", [](nonius::chronometer meter
 })
 
 NONIUS_BENCHMARK("inline 1'000 flow_single entangle", [](nonius::chronometer meter){
-  std::atomic<int> counter = 0;
+  std::atomic<int> counter{0};
   auto ie = inline_executor_flow_single_entangled{};
   using IE = decltype(ie);
   countdownflowsingle flowsingle{counter};
@@ -346,7 +347,7 @@ NONIUS_BENCHMARK("inline 1'000 flow_single entangle", [](nonius::chronometer met
 })
 
 NONIUS_BENCHMARK("inline 1'000 flow_single ignore cancellation", [](nonius::chronometer meter){
-  std::atomic<int> counter = 0;
+  std::atomic<int> counter{0};
   auto ie = inline_executor_flow_single_ignore{};
   using IE = decltype(ie);
   countdownflowsingle flowsingle{counter};
@@ -359,7 +360,7 @@ NONIUS_BENCHMARK("inline 1'000 flow_single ignore cancellation", [](nonius::chro
 })
 
 NONIUS_BENCHMARK("inline 1'000 flow_many", [](nonius::chronometer meter){
-  std::atomic<int> counter = 0;
+  std::atomic<int> counter{0};
   auto ie = inline_executor_flow_many{};
   using IE = decltype(ie);
   countdownflowmany flowmany{counter};
@@ -372,7 +373,7 @@ NONIUS_BENCHMARK("inline 1'000 flow_many", [](nonius::chronometer meter){
 })
 
 NONIUS_BENCHMARK("inline 1 flow_many with 1'000 values pull 1", [](nonius::chronometer meter){
-  std::atomic<int> counter = 0;
+  std::atomic<int> counter{0};
   auto ie = inline_executor_flow_many{counter};
   using IE = decltype(ie);
   meter.measure([&]{
@@ -384,7 +385,7 @@ NONIUS_BENCHMARK("inline 1 flow_many with 1'000 values pull 1", [](nonius::chron
 })
 
 NONIUS_BENCHMARK("inline 1 flow_many with 1'000 values pull 1'000", [](nonius::chronometer meter){
-  std::atomic<int> counter = 0;
+  std::atomic<int> counter{0};
   auto ie = inline_executor_flow_many{counter};
   using IE = decltype(ie);
   meter.measure([&]{
@@ -398,7 +399,7 @@ NONIUS_BENCHMARK("inline 1 flow_many with 1'000 values pull 1'000", [](nonius::c
 })
 
 NONIUS_BENCHMARK("inline 1'000 flow_many ignore cancellation", [](nonius::chronometer meter){
-  std::atomic<int> counter = 0;
+  std::atomic<int> counter{0};
   auto ie = inline_executor_flow_many_ignore{};
   using IE = decltype(ie);
   countdownflowmany flowmany{counter};
@@ -411,7 +412,7 @@ NONIUS_BENCHMARK("inline 1'000 flow_many ignore cancellation", [](nonius::chrono
 })
 
 NONIUS_BENCHMARK("trampoline static derecursion 1'000", [](nonius::chronometer meter){
-  std::atomic<int> counter = 0;
+  std::atomic<int> counter{0};
   auto tr = mi::trampoline();
   using TR = decltype(tr);
   countdownsingle single{counter};
@@ -424,7 +425,7 @@ NONIUS_BENCHMARK("trampoline static derecursion 1'000", [](nonius::chronometer m
 })
 
 NONIUS_BENCHMARK("trampoline virtual derecursion 1'000", [](nonius::chronometer meter){
-  std::atomic<int> counter = 0;
+  std::atomic<int> counter{0};
   auto tr = mi::trampoline();
   using TR = decltype(tr);
   auto single = countdownsingle{counter};
@@ -438,7 +439,7 @@ NONIUS_BENCHMARK("trampoline virtual derecursion 1'000", [](nonius::chronometer 
 })
 
 NONIUS_BENCHMARK("trampoline flow_many_sender 1'000", [](nonius::chronometer meter){
-  std::atomic<int> counter = 0;
+  std::atomic<int> counter{0};
   auto tr = mi::trampoline();
   using TR = decltype(tr);
   std::vector<int> values(1'000);
@@ -458,7 +459,7 @@ NONIUS_BENCHMARK("pool{1} submit 1'000", [](nonius::chronometer meter){
   mi::pool pl{std::max(1u,std::thread::hardware_concurrency())};
   auto pe = pl.executor();
   using PE = decltype(pe);
-  std::atomic<int> counter = 0;
+  std::atomic<int> counter{0};
   countdownsingle single{counter};
   meter.measure([&]{
     counter.store(1'000);
@@ -472,7 +473,7 @@ NONIUS_BENCHMARK("pool{hardware_concurrency} submit 1'000", [](nonius::chronomet
   mi::pool pl{std::min(1u,std::thread::hardware_concurrency())};
   auto pe = pl.executor();
   using PE = decltype(pe);
-  std::atomic<int> counter = 0;
+  std::atomic<int> counter{0};
   countdownsingle single{counter};
   meter.measure([&]{
     counter.store(1'000);
@@ -485,7 +486,7 @@ NONIUS_BENCHMARK("pool{hardware_concurrency} submit 1'000", [](nonius::chronomet
 NONIUS_BENCHMARK("new thread submit 1'000", [](nonius::chronometer meter){
   auto nt = mi::new_thread();
   using NT = decltype(nt);
-  std::atomic<int> counter = 0;
+  std::atomic<int> counter{0};
   countdownsingle single{counter};
   meter.measure([&]{
     counter.store(1'000);
