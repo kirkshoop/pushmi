@@ -32,28 +32,28 @@ private:
       };
       pull(1);
     }
-    PUSHMI_TEMPLATE(class Up)
-      (requires None<Up>)
+    template<class Up>
     void starting(Up up){}
   };
   template <class... AN>
   struct fn {
     std::tuple<AN...> args_;
     PUSHMI_TEMPLATE(class In)
-      (requires submit_detail::AutoSenderTo<In, AN...> && Flow<In>)
+      (requires Sender<In> && Flow<In> && Many<In>)
     In operator()(In in) {
       auto out{::pushmi::detail::receiver_from_fn<subset<is_sender<>, property_set_index_t<properties_t<In>, is_silent<>>>>()(std::move(args_))};
       using Out = decltype(out);
-      ::pushmi::submit(in, Pull<In, Out>{std::move(out)});
+      ::pushmi::submit(in, ::pushmi::detail::receiver_from_fn<In>()(Pull<In, Out>{std::move(out)}));
       return in;
     }
-    // PUSHMI_TEMPLATE(class In)
-    //   (requires submit_detail::AutoTimeSenderTo<In, AN...> && Flow<In>)
-    // In operator()(In in) {
-    //   auto out{::pushmi::detail::receiver_from_fn<subset<is_sender<>, property_set_index_t<properties_t<In>, is_silent<>>>>()(std::move(args_))};
-    //   ::pushmi::submit(in, ::pushmi::now(in), std::move(out));
-    //   return in;
-    // }
+    PUSHMI_TEMPLATE(class In)
+      (requires Sender<In> && Time<In> && Flow<In> && Many<In>)
+    In operator()(In in) {
+      auto out{::pushmi::detail::receiver_from_fn<subset<is_sender<>, property_set_index_t<properties_t<In>, is_silent<>>>>()(std::move(args_))};
+      using Out = decltype(out);
+      ::pushmi::submit(in, ::pushmi::now(in), ::pushmi::detail::receiver_from_fn<In>()(Pull<In, Out>{std::move(out)}));
+      return in;
+    }
   };
 public:
   template <class... AN>

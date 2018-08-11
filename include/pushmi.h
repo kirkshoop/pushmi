@@ -5857,13 +5857,13 @@ PUSHMI_INLINE_VAR constexpr struct make_flow_many_fn {
       std::move(df), std::move(strtf)};
   }
   PUSHMI_TEMPLATE(class Data)
-    (requires PUSHMI_EXP(lazy::True<> PUSHMI_AND lazy::Receiver<Data>))
+    (requires PUSHMI_EXP(lazy::True<> PUSHMI_AND lazy::Receiver<Data> PUSHMI_AND lazy::Flow<Data>))
   auto operator()(Data d) const {
     return flow_many<Data, passDNXF, passDEF, passDDF, passDStrtF>{
         std::move(d)};
   }
   PUSHMI_TEMPLATE(class Data, class DNF)
-    (requires PUSHMI_EXP(lazy::True<> PUSHMI_AND lazy::Receiver<Data> PUSHMI_BROKEN_SUBSUMPTION(PUSHMI_AND not lazy::Invocable<DNF&, Data&>)))
+    (requires PUSHMI_EXP(lazy::True<> PUSHMI_AND lazy::Receiver<Data> PUSHMI_AND lazy::Flow<Data> PUSHMI_BROKEN_SUBSUMPTION(PUSHMI_AND not lazy::Invocable<DNF&, Data&>)))
   auto operator()(Data d, DNF nf) const {
     return flow_many<Data, DNF, passDEF, passDDF, passDStrtF>{
       std::move(d), std::move(nf)};
@@ -5875,30 +5875,30 @@ PUSHMI_INLINE_VAR constexpr struct make_flow_many_fn {
       std::move(d), std::move(ef)};
   }
   PUSHMI_TEMPLATE(class Data, class DDF)
-    (requires PUSHMI_EXP(lazy::True<> PUSHMI_AND lazy::Receiver<Data> PUSHMI_AND lazy::Invocable<DDF&, Data&>))
+    (requires PUSHMI_EXP(lazy::True<> PUSHMI_AND lazy::Receiver<Data> PUSHMI_AND lazy::Flow<Data> PUSHMI_AND lazy::Invocable<DDF&, Data&>))
   auto operator()(Data d, DDF df) const {
     return flow_many<Data, passDNXF, passDEF, DDF, passDStrtF>{
       std::move(d), std::move(df)};
   }
   PUSHMI_TEMPLATE(class Data, class DNF, class DEF)
-    (requires PUSHMI_EXP(lazy::Receiver<Data> PUSHMI_BROKEN_SUBSUMPTION(PUSHMI_AND not lazy::Invocable<DEF&, Data&>)))
+    (requires PUSHMI_EXP(lazy::Receiver<Data> PUSHMI_AND lazy::Flow<Data> PUSHMI_BROKEN_SUBSUMPTION(PUSHMI_AND not lazy::Invocable<DEF&, Data&>)))
   auto operator()(Data d, DNF nf, DEF ef) const {
     return flow_many<Data, DNF, DEF, passDDF, passDStrtF>{std::move(d), std::move(nf), std::move(ef)};
   }
   PUSHMI_TEMPLATE(class Data, class DEF, class DDF)
-    (requires PUSHMI_EXP(lazy::Receiver<Data> PUSHMI_AND lazy::Invocable<DDF&, Data&>))
+    (requires PUSHMI_EXP(lazy::Receiver<Data> PUSHMI_AND lazy::Flow<Data> PUSHMI_AND lazy::Invocable<DDF&, Data&>))
   auto operator()(Data d, DEF ef, DDF df) const {
     return flow_many<Data, passDNXF, DEF, DDF, passDStrtF>{
       std::move(d), std::move(ef), std::move(df)};
   }
   PUSHMI_TEMPLATE(class Data, class DNF, class DEF, class DDF)
-    (requires PUSHMI_EXP(lazy::Receiver<Data> PUSHMI_AND lazy::Invocable<DDF&, Data&>))
+    (requires PUSHMI_EXP(lazy::Receiver<Data> PUSHMI_AND lazy::Flow<Data> PUSHMI_AND lazy::Invocable<DDF&, Data&>))
   auto operator()(Data d, DNF nf, DEF ef, DDF df) const {
     return flow_many<Data, DNF, DEF, DDF, passDStrtF>{std::move(d),
       std::move(nf), std::move(ef), std::move(df)};
   }
   PUSHMI_TEMPLATE(class Data, class DNF, class DEF, class DDF, class DStrtF)
-    (requires PUSHMI_EXP(lazy::Receiver<Data> PUSHMI_AND lazy::Invocable<DDF&, Data&>))
+    (requires PUSHMI_EXP(lazy::Receiver<Data> PUSHMI_AND lazy::Flow<Data> PUSHMI_AND lazy::Invocable<DDF&, Data&>))
   auto operator()(Data d, DNF nf, DEF ef, DDF df, DStrtF strtf) const {
     return flow_many<Data, DNF, DEF, DDF, DStrtF>{std::move(d),
       std::move(nf), std::move(ef), std::move(df), std::move(strtf)};
@@ -5945,12 +5945,12 @@ flow_many(NF, EF, DF, StrtF) ->
   flow_many<NF, EF, DF, StrtF>;
 
 PUSHMI_TEMPLATE(class Data)
-  (requires PUSHMI_EXP(lazy::True<> PUSHMI_AND lazy::Receiver<Data>))
+  (requires PUSHMI_EXP(lazy::True<> PUSHMI_AND lazy::Receiver<Data> PUSHMI_AND lazy::Flow<Data>))
 flow_many(Data d) ->
   flow_many<Data, passDNXF, passDEF, passDDF, passDStrtF>;
 
 PUSHMI_TEMPLATE(class Data, class DNF)
-  (requires PUSHMI_EXP(lazy::True<> PUSHMI_AND lazy::Receiver<Data> PUSHMI_BROKEN_SUBSUMPTION(PUSHMI_AND not lazy::Invocable<DNF&, Data&>)))
+  (requires PUSHMI_EXP(lazy::True<> PUSHMI_AND lazy::Receiver<Data> PUSHMI_AND lazy::Flow<Data> PUSHMI_BROKEN_SUBSUMPTION(PUSHMI_AND not lazy::Invocable<DNF&, Data&>)))
 flow_many(Data d, DNF nf) ->
   flow_many<Data, DNF, passDEF, passDDF, passDStrtF>;
 
@@ -5960,27 +5960,27 @@ flow_many(Data d, on_error_fn<DEFN...>) ->
   flow_many<Data, passDNXF, on_error_fn<DEFN...>, passDDF, passDStrtF>;
 
 PUSHMI_TEMPLATE(class Data, class DDF)
-  (requires PUSHMI_EXP(lazy::True<> PUSHMI_AND lazy::Receiver<Data> PUSHMI_AND lazy::Invocable<DDF&, Data&>))
+  (requires PUSHMI_EXP(lazy::True<> PUSHMI_AND lazy::Receiver<Data> PUSHMI_AND lazy::Flow<Data> PUSHMI_AND lazy::Invocable<DDF&, Data&>))
 flow_many(Data d, DDF) ->
     flow_many<Data, passDNXF, passDEF, DDF, passDStrtF>;
 
 PUSHMI_TEMPLATE(class Data, class DNF, class DEF)
-  (requires PUSHMI_EXP(lazy::Receiver<Data> PUSHMI_BROKEN_SUBSUMPTION(PUSHMI_AND not lazy::Invocable<DEF&, Data&>)))
+  (requires PUSHMI_EXP(lazy::Receiver<Data> PUSHMI_AND lazy::Flow<Data> PUSHMI_BROKEN_SUBSUMPTION(PUSHMI_AND not lazy::Invocable<DEF&, Data&>)))
 flow_many(Data d, DNF nf, DEF ef) ->
   flow_many<Data, DNF, DEF, passDDF, passDStrtF>;
 
 PUSHMI_TEMPLATE(class Data, class DEF, class DDF)
-  (requires PUSHMI_EXP(lazy::Receiver<Data> PUSHMI_AND lazy::Invocable<DDF&, Data&>))
+  (requires PUSHMI_EXP(lazy::Receiver<Data> PUSHMI_AND lazy::Flow<Data> PUSHMI_AND lazy::Invocable<DDF&, Data&>))
 flow_many(Data d, DEF, DDF) ->
   flow_many<Data, passDNXF, DEF, DDF, passDStrtF>;
 
 PUSHMI_TEMPLATE(class Data, class DNF, class DEF, class DDF)
-  (requires PUSHMI_EXP(lazy::Receiver<Data> PUSHMI_AND lazy::Invocable<DDF&, Data&>))
+  (requires PUSHMI_EXP(lazy::Receiver<Data> PUSHMI_AND lazy::Flow<Data> PUSHMI_AND lazy::Invocable<DDF&, Data&>))
 flow_many(Data d, DNF nf, DEF ef, DDF df) ->
   flow_many<Data, DNF, DEF, DDF, passDStrtF>;
 
 PUSHMI_TEMPLATE(class Data, class DNF, class DEF, class DDF, class DStrtF)
-  (requires PUSHMI_EXP(lazy::Receiver<Data> PUSHMI_AND lazy::Invocable<DDF&, Data&> ))
+  (requires PUSHMI_EXP(lazy::Receiver<Data> PUSHMI_AND lazy::Flow<Data> PUSHMI_AND lazy::Invocable<DDF&, Data&> ))
 flow_many(Data d, DNF nf, DEF ef, DDF df, DStrtF strtf) ->
   flow_many<Data, DNF, DEF, DDF, DStrtF>;
 #endif
@@ -6489,8 +6489,13 @@ struct __new_thread_submit {
     (requires Regular<TP> && Receiver<Out>)
   void operator()(TP at, Out out) const {
     std::thread t{[at = std::move(at), out = std::move(out)]() mutable {
+#if 0
+      std::this_thread::sleep_until(at);
+      ::pushmi::set_value(out, make_time_single_sender(__new_thread_submit{}));
+#else
       auto tr = trampoline();
       ::pushmi::submit(tr, std::move(at), std::move(out));
+#endif
     }};
     // pass ownership of thread to out
     t.detach();
@@ -7280,28 +7285,28 @@ private:
       };
       pull(1);
     }
-    PUSHMI_TEMPLATE(class Up)
-      (requires None<Up>)
+    template<class Up>
     void starting(Up up){}
   };
   template <class... AN>
   struct fn {
     std::tuple<AN...> args_;
     PUSHMI_TEMPLATE(class In)
-      (requires submit_detail::AutoSenderTo<In, AN...> && Flow<In>)
+      (requires Sender<In> && Flow<In> && Many<In>)
     In operator()(In in) {
       auto out{::pushmi::detail::receiver_from_fn<subset<is_sender<>, property_set_index_t<properties_t<In>, is_silent<>>>>()(std::move(args_))};
       using Out = decltype(out);
-      ::pushmi::submit(in, Pull<In, Out>{std::move(out)});
+      ::pushmi::submit(in, ::pushmi::detail::receiver_from_fn<In>()(Pull<In, Out>{std::move(out)}));
       return in;
     }
-    // PUSHMI_TEMPLATE(class In)
-    //   (requires submit_detail::AutoTimeSenderTo<In, AN...> && Flow<In>)
-    // In operator()(In in) {
-    //   auto out{::pushmi::detail::receiver_from_fn<subset<is_sender<>, property_set_index_t<properties_t<In>, is_silent<>>>>()(std::move(args_))};
-    //   ::pushmi::submit(in, ::pushmi::now(in), std::move(out));
-    //   return in;
-    // }
+    PUSHMI_TEMPLATE(class In)
+      (requires Sender<In> && Time<In> && Flow<In> && Many<In>)
+    In operator()(In in) {
+      auto out{::pushmi::detail::receiver_from_fn<subset<is_sender<>, property_set_index_t<properties_t<In>, is_silent<>>>>()(std::move(args_))};
+      using Out = decltype(out);
+      ::pushmi::submit(in, ::pushmi::now(in), ::pushmi::detail::receiver_from_fn<In>()(Pull<In, Out>{std::move(out)}));
+      return in;
+    }
   };
 public:
   template <class... AN>

@@ -17,8 +17,13 @@ struct __new_thread_submit {
     (requires Regular<TP> && Receiver<Out>)
   void operator()(TP at, Out out) const {
     std::thread t{[at = std::move(at), out = std::move(out)]() mutable {
+#if 0
+      std::this_thread::sleep_until(at);
+      ::pushmi::set_value(out, make_time_single_sender(__new_thread_submit{}));
+#else
       auto tr = trampoline();
       ::pushmi::submit(tr, std::move(at), std::move(out));
+#endif
     }};
     // pass ownership of thread to out
     t.detach();
