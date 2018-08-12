@@ -1,5 +1,7 @@
 #include "catch.hpp"
 
+#include <array>
+
 #include <type_traits>
 
 #include <chrono>
