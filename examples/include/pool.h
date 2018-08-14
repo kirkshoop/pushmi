@@ -9,6 +9,7 @@
 
 #include <pushmi/executor.h>
 #include <pushmi/trampoline.h>
+#include <pushmi/time_single_sender.h>
 
 #if __cpp_deduction_guides >= 201703
 #define MAKE(x) x MAKE_

@@ -39,8 +39,10 @@ set(header_files
     "${CMAKE_CURRENT_SOURCE_DIR}/include/pushmi/many.h"
     "${CMAKE_CURRENT_SOURCE_DIR}/include/pushmi/flow_many.h"
     "${CMAKE_CURRENT_SOURCE_DIR}/include/pushmi/executor.h"
-    "${CMAKE_CURRENT_SOURCE_DIR}/include/pushmi/time_single_sender.h"
+    "${CMAKE_CURRENT_SOURCE_DIR}/include/pushmi/inline.h"
     "${CMAKE_CURRENT_SOURCE_DIR}/include/pushmi/trampoline.h"
+    "${CMAKE_CURRENT_SOURCE_DIR}/include/pushmi/new_thread.h"
+    "${CMAKE_CURRENT_SOURCE_DIR}/include/pushmi/time_single_sender.h"
     "${CMAKE_CURRENT_SOURCE_DIR}/include/pushmi/sender.h"
     "${CMAKE_CURRENT_SOURCE_DIR}/include/pushmi/single_sender.h"
     "${CMAKE_CURRENT_SOURCE_DIR}/include/pushmi/flow_single_sender.h"
@@ -63,7 +65,6 @@ set(header_files
     "${CMAKE_CURRENT_SOURCE_DIR}/include/pushmi/o/via.h"
     "${CMAKE_CURRENT_SOURCE_DIR}/include/pushmi/o/request_via.h"
     "${CMAKE_CURRENT_SOURCE_DIR}/include/pushmi/o/share.h"
-    "${CMAKE_CURRENT_SOURCE_DIR}/include/pushmi/new_thread.h"
 )
 
 BuildSingleHeader("pushmi" ${header_files})

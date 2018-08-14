@@ -9,7 +9,6 @@
 #include <deque>
 #include <thread>
 #include "executor.h"
-#include "time_single_sender.h"
 
 namespace pushmi {
 
@@ -46,7 +45,7 @@ class delegator : _pipeable_sender_ {
   time_point now() {
     return trampoline<E>::now();
   }
-  delegator executor() { return *this; }
+  delegator executor() { return {}; }
   PUSHMI_TEMPLATE (class SingleReceiver)
     (requires Receiver<remove_cvref_t<SingleReceiver>, is_single<>>)
   void submit(time_point when, SingleReceiver&& what) {
@@ -65,7 +64,7 @@ class nester : _pipeable_sender_ {
   time_point now() {
     return trampoline<E>::now();
   }
-  nester executor() { return *this; }
+  nester executor() { return {}; }
   template <class SingleReceiver>
   void submit(time_point when, SingleReceiver&& what) {
     trampoline<E>::submit(ownornest, when, std::forward<SingleReceiver>(what));

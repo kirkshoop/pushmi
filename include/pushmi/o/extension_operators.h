@@ -332,7 +332,7 @@ struct now_fn {
 private:
   struct impl {
     PUSHMI_TEMPLATE (class In)
-      (requires TimeSender<In>)
+      (requires True<>)//TimeSender<In>)
     auto operator()(In in) const {
       return ::pushmi::now(in);
     }

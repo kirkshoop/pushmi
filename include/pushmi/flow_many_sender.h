@@ -110,10 +110,10 @@ template <class V, class PV, class PE, class E>
 constexpr typename flow_many_sender<V, PV, PE, E>::vtable const
     flow_many_sender<V, PV, PE, E>::noop_;
 
-template <class SF>
-class flow_many_sender<SF> {
+template <class SF, class EXF>
+class flow_many_sender<SF, EXF> {
   SF sf_;
-  trampolineEXF exf_;
+  EXF exf_;
 
  public:
   using properties = property_set<is_sender<>, is_flow<>, is_many<>>;
@@ -121,6 +121,8 @@ class flow_many_sender<SF> {
   constexpr flow_many_sender() = default;
   constexpr explicit flow_many_sender(SF sf)
       : sf_(std::move(sf)) {}
+  constexpr flow_many_sender(SF sf, EXF exf)
+      : sf_(std::move(sf)), exf_(std::move(exf)) {}
 
   auto executor() { return exf_(); }
   PUSHMI_TEMPLATE(class Out)
@@ -130,20 +132,22 @@ class flow_many_sender<SF> {
   }
 };
 
-template <PUSHMI_TYPE_CONSTRAINT(Sender<is_many<>, is_flow<>>) Data, class DSF>
-class flow_many_sender<Data, DSF> {
+template <PUSHMI_TYPE_CONSTRAINT(Sender<is_many<>, is_flow<>>) Data, class DSF, class DEXF>
+class flow_many_sender<Data, DSF, DEXF> {
   Data data_;
   DSF sf_;
-  passDEXF exf_;
+  DEXF exf_;
 
  public:
-  using properties = property_set<is_sender<>, is_flow<>, is_many<>>;
+  using properties = property_set_insert_t<properties_t<Data>, property_set<is_sender<>, is_flow<>, is_many<>>>;
 
   constexpr flow_many_sender() = default;
   constexpr explicit flow_many_sender(Data data)
       : data_(std::move(data)) {}
   constexpr flow_many_sender(Data data, DSF sf)
       : data_(std::move(data)), sf_(std::move(sf)) {}
+  constexpr flow_many_sender(Data data, DSF sf, DEXF exf)
+      : data_(std::move(data)), sf_(std::move(sf)), exf_(std::move(exf)) {}
 
   auto executor() { return exf_(data_); }
   PUSHMI_TEMPLATE(class Out)
@@ -158,41 +162,59 @@ class flow_many_sender<Data, DSF> {
 // make_flow_many_sender
 PUSHMI_INLINE_VAR constexpr struct make_flow_many_sender_fn {
   inline auto operator()() const {
-    return flow_many_sender<ignoreSF>{};
+    return flow_many_sender<ignoreSF, trampolineEXF>{};
   }
   PUSHMI_TEMPLATE(class SF)
     (requires True<> PUSHMI_BROKEN_SUBSUMPTION(&& not Sender<SF>))
   auto operator()(SF sf) const {
-    return flow_many_sender<SF>{std::move(sf)};
+    return flow_many_sender<SF, trampolineEXF>{std::move(sf)};
+  }
+  PUSHMI_TEMPLATE(class SF, class EXF)
+    (requires True<> && Invocable<EXF&> PUSHMI_BROKEN_SUBSUMPTION(&& not Sender<SF>))
+  auto operator()(SF sf, EXF exf) const {
+    return flow_many_sender<SF, EXF>{std::move(sf), std::move(exf)};
   }
   PUSHMI_TEMPLATE(class Data)
     (requires True<> && Sender<Data, is_many<>, is_flow<>>)
   auto operator()(Data d) const {
-    return flow_many_sender<Data, passDSF>{std::move(d)};
+    return flow_many_sender<Data, passDSF, passDEXF>{std::move(d)};
   }
   PUSHMI_TEMPLATE(class Data, class DSF)
     (requires Sender<Data, is_many<>, is_flow<>>)
   auto operator()(Data d, DSF sf) const {
-    return flow_many_sender<Data, DSF>{std::move(d), std::move(sf)};
+    return flow_many_sender<Data, DSF, passDEXF>{std::move(d), std::move(sf)};
+  }
+  PUSHMI_TEMPLATE(class Data, class DSF, class DEXF)
+    (requires Sender<Data, is_many<>, is_flow<>> && Invocable<DEXF&, Data&>)
+  auto operator()(Data d, DSF sf, DEXF exf) const {
+    return flow_many_sender<Data, DSF, DEXF>{std::move(d), std::move(sf), std::move(exf)};
   }
 } const make_flow_many_sender {};
 
 ////////////////////////////////////////////////////////////////////////////////
 // deduction guides
 #if __cpp_deduction_guides >= 201703
-flow_many_sender() -> flow_many_sender<ignoreSF>;
+flow_many_sender() -> flow_many_sender<ignoreSF, trampolineEXF>;
 
 PUSHMI_TEMPLATE(class SF)
   (requires True<> PUSHMI_BROKEN_SUBSUMPTION(&& not Sender<SF>))
-flow_many_sender(SF) -> flow_many_sender<SF>;
+flow_many_sender(SF) -> flow_many_sender<SF, trampolineEXF>;
+
+PUSHMI_TEMPLATE(class SF, class EXF)
+  (requires True<> && Invocable<EXF&> PUSHMI_BROKEN_SUBSUMPTION(&& not Sender<SF>))
+flow_many_sender(SF, EXF) -> flow_many_sender<SF, EXF>;
 
 PUSHMI_TEMPLATE(class Data)
   (requires True<> && Sender<Data, is_many<>, is_flow<>>)
-flow_many_sender(Data) -> flow_many_sender<Data, passDSF>;
+flow_many_sender(Data) -> flow_many_sender<Data, passDSF, passDEXF>;
 
 PUSHMI_TEMPLATE(class Data, class DSF)
   (requires Sender<Data, is_many<>, is_flow<>>)
-flow_many_sender(Data, DSF) -> flow_many_sender<Data, DSF>;
+flow_many_sender(Data, DSF) -> flow_many_sender<Data, DSF, passDEXF>;
+
+PUSHMI_TEMPLATE(class Data, class DSF, class DEXF)
+  (requires Sender<Data, is_many<>, is_flow<>> && Invocable<DEXF&, Data&>)
+flow_many_sender(Data, DSF, DEXF) -> flow_many_sender<Data, DSF, DEXF>;
 #endif
 
 template <class V, class PV = std::ptrdiff_t, class PE = std::exception_ptr, class E = PE>

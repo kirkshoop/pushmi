@@ -110,16 +110,17 @@ template <class E>
 constexpr typename sender<detail::erase_sender_t, E>::vtable const
     sender<detail::erase_sender_t, E>::noop_;
 
-template <class SF>
-class sender<SF> {
+template <class SF, class EXF>
+class sender<SF, EXF> {
   SF sf_;
-  trampolineEXF exf_;
+  EXF exf_;
 
  public:
   using properties = property_set<is_sender<>, is_none<>>;
 
   constexpr sender() = default;
   constexpr explicit sender(SF sf) : sf_(std::move(sf)) {}
+  constexpr sender(SF sf, EXF exf) : sf_(std::move(sf)), exf_(std::move(exf)) {}
 
   auto executor() { return exf_(); }
   PUSHMI_TEMPLATE(class Out)
@@ -129,22 +130,24 @@ class sender<SF> {
   }
 };
 
-template <PUSHMI_TYPE_CONSTRAINT(Sender<is_none<>>) Data, class DSF>
-class sender<Data, DSF> {
+template <PUSHMI_TYPE_CONSTRAINT(Sender<is_none<>>) Data, class DSF, class DEXF>
+class sender<Data, DSF, DEXF> {
   Data data_;
   DSF sf_;
-  passDEXF exf_;
+  DEXF exf_;
     static_assert(Sender<Data, is_none<>>, "The Data template parameter "
     "must satisfy the Sender concept.");
 
  public:
-  using properties = property_set<is_sender<>, is_none<>>;
+  using properties = property_set_insert_t<properties_t<Data>, property_set<is_sender<>, is_none<>>>;
 
   constexpr sender() = default;
   constexpr explicit sender(Data data)
       : data_(std::move(data)) {}
   constexpr sender(Data data, DSF sf)
       : data_(std::move(data)), sf_(std::move(sf)) {}
+  constexpr sender(Data data, DSF sf, DEXF exf)
+      : data_(std::move(data)), sf_(std::move(sf)), exf_(std::move(exf)) {}
 
   auto executor() { return exf_(data_); }
   PUSHMI_TEMPLATE(class Out)
@@ -158,11 +161,15 @@ class sender<Data, DSF> {
 // make_sender
 PUSHMI_INLINE_VAR constexpr struct make_sender_fn {
   inline auto operator()() const {
-    return sender<ignoreSF>{};
+    return sender<ignoreSF, trampolineEXF>{};
   }
   template <class SF>
   auto operator()(SF sf) const {
-    return sender<SF>{std::move(sf)};
+    return sender<SF, trampolineEXF>{std::move(sf)};
+  }
+  template <class SF, class EXF>
+  auto operator()(SF sf, EXF exf) const {
+    return sender<SF, EXF>{std::move(sf), std::move(exf)};
   }
   PUSHMI_TEMPLATE(class Wrapped)
     (requires Sender<Wrapped, is_none<>>)
@@ -172,17 +179,25 @@ PUSHMI_INLINE_VAR constexpr struct make_sender_fn {
   PUSHMI_TEMPLATE(class Data, class DSF)
     (requires Sender<Data, is_none<>>)
   auto operator()(Data data, DSF sf) const {
-    return sender<Data, DSF>{std::move(data), std::move(sf)};
+    return sender<Data, DSF, passDEXF>{std::move(data), std::move(sf)};
+  }
+  PUSHMI_TEMPLATE(class Data, class DSF, class DEXF)
+    (requires Sender<Data, is_none<>>)
+  auto operator()(Data data, DSF sf, DEXF exf) const {
+    return sender<Data, DSF, DEXF>{std::move(data), std::move(sf), std::move(exf)};
   }
 } const make_sender {};
 
 ////////////////////////////////////////////////////////////////////////////////
 // deduction guides
 #if __cpp_deduction_guides >= 201703
-sender() -> sender<ignoreSF>;
+sender() -> sender<ignoreSF, trampolineEXF>;
 
 template <class SF>
-sender(SF) -> sender<SF>;
+sender(SF) -> sender<SF, trampolineEXF>;
+
+template <class SF, class EXF>
+sender(SF, EXF) -> sender<SF, EXF>;
 
 PUSHMI_TEMPLATE(class Wrapped)
   (requires Sender<Wrapped, is_none<>>)
@@ -191,7 +206,11 @@ sender(Wrapped) ->
 
 PUSHMI_TEMPLATE(class Data, class DSF)
   (requires Sender<Data, is_none<>>)
-sender(Data, DSF) -> sender<Data, DSF>;
+sender(Data, DSF) -> sender<Data, DSF, passDEXF>;
+
+PUSHMI_TEMPLATE(class Data, class DSF, class DEXF)
+  (requires Sender<Data, is_none<>>)
+sender(Data, DSF, DEXF) -> sender<Data, DSF, DEXF>;
 #endif
 
 template <class E = std::exception_ptr>
