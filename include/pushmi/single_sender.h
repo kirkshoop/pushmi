@@ -5,6 +5,8 @@
 // LICENSE file in the root directory of this source tree.
 
 #include "single.h"
+#include "executor.h"
+#include "trampoline.h"
 
 namespace pushmi {
 
@@ -21,8 +23,10 @@ class any_single_sender {
   }
   struct vtable {
     static void s_op(data&, data*) {}
+    static any_time_executor<E /* hmm, TP will be invasive */> s_executor(data&) { return {}; }
     static void s_submit(data&, single<V, E>) {}
     void (*op_)(data&, data*) = vtable::s_op;
+    any_time_executor<E> (*executor_)(data&) = vtable::s_executor;
     void (*submit_)(data&, single<V, E>) = vtable::s_submit;
   };
   static constexpr vtable const noop_ {};
@@ -35,11 +39,14 @@ class any_single_sender {
           dst->pobj_ = std::exchange(src.pobj_, nullptr);
         delete static_cast<Wrapped const*>(src.pobj_);
       }
+      static any_time_executor<E> executor(data& src) {
+        return any_time_executor<E>{::pushmi::executor(*static_cast<Wrapped*>(src.pobj_))};
+      }
       static void submit(data& src, single<V, E> out) {
         ::pushmi::submit(*static_cast<Wrapped*>(src.pobj_), std::move(out));
       }
     };
-    static const vtable vtbl{s::op, s::submit};
+    static const vtable vtbl{s::op, s::executor, s::submit};
     data_.pobj_ = new Wrapped(std::move(obj));
     vptr_ = &vtbl;
   }
@@ -53,12 +60,15 @@ class any_single_sender {
               std::move(*static_cast<Wrapped*>((void*)src.buffer_)));
         static_cast<Wrapped const*>((void*)src.buffer_)->~Wrapped();
       }
+      static any_time_executor<E> executor(data& src) {
+        return any_time_executor<E>{::pushmi::executor(*static_cast<Wrapped*>((void*)src.buffer_))};
+      }
       static void submit(data& src, single<V, E> out) {
         ::pushmi::submit(
             *static_cast<Wrapped*>((void*)src.buffer_), std::move(out));
       }
     };
-    static const vtable vtbl{s::op, s::submit};
+    static const vtable vtbl{s::op, s::executor, s::submit};
     new (data_.buffer_) Wrapped(std::move(obj));
     vptr_ = &vtbl;
   }
@@ -87,6 +97,9 @@ class any_single_sender {
     new ((void*)this) any_single_sender(std::move(that));
     return *this;
   }
+  any_time_executor<E> executor() {
+    vptr_->executor_(data_);
+  }
   void submit(single<V, E> out) {
     vptr_->submit_(data_, std::move(out));
   }
@@ -100,6 +113,7 @@ constexpr typename any_single_sender<V, E>::vtable const
 template <class SF>
 class single_sender<SF> {
   SF sf_;
+  trampolineEXF exf_;
 
  public:
   using properties = property_set<is_sender<>, is_single<>>;
@@ -108,6 +122,7 @@ class single_sender<SF> {
   constexpr explicit single_sender(SF sf)
       : sf_(std::move(sf)) {}
 
+  auto executor() { return exf_(); }
   PUSHMI_TEMPLATE(class Out)
     (requires PUSHMI_EXP(lazy::Receiver<Out, is_single<>> PUSHMI_AND lazy::Invocable<SF&, Out>))
   void submit(Out out) {
@@ -120,6 +135,7 @@ template <PUSHMI_TYPE_CONSTRAINT(Sender<is_single<>>) Data, class DSF>
 class single_sender_2 {
   Data data_;
   DSF sf_;
+  passDEXF exf_;
 
  public:
   using properties = property_set<is_sender<>, is_single<>>;
@@ -129,6 +145,8 @@ class single_sender_2 {
       : data_(std::move(data)) {}
   constexpr single_sender_2(Data data, DSF sf)
       : data_(std::move(data)), sf_(std::move(sf)) {}
+
+  auto executor() { return exf_(data_); }
   PUSHMI_TEMPLATE(class Out)
     (requires PUSHMI_EXP(lazy::Receiver<Out, is_single<>> PUSHMI_AND
         lazy::Invocable<DSF&, Data&, Out>))

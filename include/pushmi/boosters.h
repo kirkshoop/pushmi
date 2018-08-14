@@ -87,6 +87,12 @@ struct ignoreStrtF {
   void operator()(detail::any) {}
 };
 
+struct trampolineEXF;
+// see trampoline.h
+// struct trampolineEXF {
+//   auto operator()() { return trampoline(); }
+// };
+
 
 struct ignoreSF {
   void operator()(detail::any) {}
@@ -143,6 +149,13 @@ struct passDStrtF {
   }
 };
 
+struct passDEXF {
+  PUSHMI_TEMPLATE(class Data)
+    (requires Sender<Data>)
+  auto operator()(Data& in) const noexcept {
+    return ::pushmi::executor(in);
+  }
+};
 
 struct passDSF {
   template <class Data, class Out>

@@ -5,6 +5,8 @@
 // LICENSE file in the root directory of this source tree.
 
 #include "flow_many.h"
+#include "executor.h"
+#include "trampoline.h"
 
 namespace pushmi {
 
@@ -21,8 +23,10 @@ class flow_many_sender<V, PV, PE, E> {
   }
   struct vtable {
     static void s_op(data&, data*) {}
+    static any_time_executor<E /* hmm, TP will be invasive */> s_executor(data&) { return {}; }
     static void s_submit(data&, any_flow_many<V, PV, PE, E>) {}
     void (*op_)(data&, data*) = vtable::s_op;
+    any_time_executor<E> (*executor_)(data&) = vtable::s_executor;
     void (*submit_)(data&, any_flow_many<V, PV, PE, E>) = vtable::s_submit;
   };
   static constexpr vtable const noop_ {};
@@ -35,11 +39,14 @@ class flow_many_sender<V, PV, PE, E> {
           dst->pobj_ = std::exchange(src.pobj_, nullptr);
         delete static_cast<Wrapped const*>(src.pobj_);
       }
+      static any_time_executor<E> executor(data& src) {
+        return any_time_executor<E>{::pushmi::executor(*static_cast<Wrapped*>(src.pobj_))};
+      }
       static void submit(data& src, any_flow_many<V, PV, PE, E> out) {
         ::pushmi::submit(*static_cast<Wrapped*>(src.pobj_), std::move(out));
       }
     };
-    static const vtable vtbl{s::op, s::submit};
+    static const vtable vtbl{s::op, s::executor, s::submit};
     data_.pobj_ = new Wrapped(std::move(obj));
     vptr_ = &vtbl;
   }
@@ -53,13 +60,16 @@ class flow_many_sender<V, PV, PE, E> {
               std::move(*static_cast<Wrapped*>((void*)src.buffer_)));
         static_cast<Wrapped const*>((void*)src.buffer_)->~Wrapped();
       }
+      static any_time_executor<E> executor(data& src) {
+        return any_time_executor<E>{::pushmi::executor(*static_cast<Wrapped*>((void*)src.buffer_))};
+      }
       static void submit(data& src, any_flow_many<V, PV, PE, E> out) {
         ::pushmi::submit(
             *static_cast<Wrapped*>((void*)src.buffer_),
             std::move(out));
       }
     };
-    static const vtable vtbl{s::op, s::submit};
+    static const vtable vtbl{s::op, s::executor, s::submit};
     new (data_.buffer_) Wrapped(std::move(obj));
     vptr_ = &vtbl;
   }
@@ -87,6 +97,9 @@ class flow_many_sender<V, PV, PE, E> {
     new ((void*)this) flow_many_sender(std::move(that));
     return *this;
   }
+  any_time_executor<E> executor() {
+    return vptr_->executor_(data_);
+  }
   void submit(any_flow_many<V, PV, PE, E> out) {
     vptr_->submit_(data_, std::move(out));
   }
@@ -100,6 +113,7 @@ constexpr typename flow_many_sender<V, PV, PE, E>::vtable const
 template <class SF>
 class flow_many_sender<SF> {
   SF sf_;
+  trampolineEXF exf_;
 
  public:
   using properties = property_set<is_sender<>, is_flow<>, is_many<>>;
@@ -108,6 +122,7 @@ class flow_many_sender<SF> {
   constexpr explicit flow_many_sender(SF sf)
       : sf_(std::move(sf)) {}
 
+  auto executor() { return exf_(); }
   PUSHMI_TEMPLATE(class Out)
     (requires Receiver<Out, is_many<>, is_flow<>> && Invocable<SF&, Out>)
   void submit(Out out) {
@@ -119,6 +134,7 @@ template <PUSHMI_TYPE_CONSTRAINT(Sender<is_many<>, is_flow<>>) Data, class DSF>
 class flow_many_sender<Data, DSF> {
   Data data_;
   DSF sf_;
+  passDEXF exf_;
 
  public:
   using properties = property_set<is_sender<>, is_flow<>, is_many<>>;
@@ -128,6 +144,8 @@ class flow_many_sender<Data, DSF> {
       : data_(std::move(data)) {}
   constexpr flow_many_sender(Data data, DSF sf)
       : data_(std::move(data)), sf_(std::move(sf)) {}
+
+  auto executor() { return exf_(data_); }
   PUSHMI_TEMPLATE(class Out)
     (requires PUSHMI_EXP(lazy::Receiver<Out, is_many<>, is_flow<>> PUSHMI_AND
         lazy::Invocable<DSF&, Data&, Out>))

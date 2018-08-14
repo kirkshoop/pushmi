@@ -5,13 +5,12 @@
 // LICENSE file in the root directory of this source tree.
 
 #include "single.h"
+#include "executor.h"
+#include "trampoline.h"
 
 namespace pushmi {
 
-template <
-    class V,
-    class E = std::exception_ptr,
-    class TP = std::chrono::system_clock::time_point>
+template <class V, class E, class TP>
 class any_time_single_sender {
   union data {
     void* pobj_ = nullptr;
@@ -25,9 +24,11 @@ class any_time_single_sender {
   struct vtable {
     static void s_op(data&, data*) {}
     static TP s_now(data&) { return TP{}; }
+    static any_time_executor<E, TP> s_executor(data&) { return {}; }
     static void s_submit(data&, TP, single<V, E>) {}
     void (*op_)(data&, data*) = vtable::s_op;
     TP (*now_)(data&) = vtable::s_now;
+    any_time_executor<E, TP> (*executor_)(data&) = vtable::s_executor;
     void (*submit_)(data&, TP, single<V, E>) = vtable::s_submit;
   };
   static constexpr vtable const noop_ {};
@@ -44,6 +45,9 @@ class any_time_single_sender {
       static TP now(data& src) {
         return ::pushmi::now(*static_cast<Wrapped*>(src.pobj_));
       }
+      static any_time_executor<E, TP> executor(data& src) {
+        return any_time_executor<E, TP>{::pushmi::executor(*static_cast<Wrapped*>(src.pobj_))};
+      }
       static void submit(data& src, TP at, single<V, E> out) {
         ::pushmi::submit(
             *static_cast<Wrapped*>(src.pobj_),
@@ -51,7 +55,7 @@ class any_time_single_sender {
             std::move(out));
       }
     };
-    static const vtable vtbl{s::op, s::now, s::submit};
+    static const vtable vtbl{s::op, s::now, s::executor, s::submit};
     data_.pobj_ = new Wrapped(std::move(obj));
     vptr_ = &vtbl;
   }
@@ -68,6 +72,9 @@ class any_time_single_sender {
       static TP now(data& src) {
         return ::pushmi::now(*static_cast<Wrapped*>((void*)src.buffer_));
       }
+      static any_time_executor<E, TP> executor(data& src) {
+        return any_time_executor<E, TP>{::pushmi::executor(*static_cast<Wrapped*>((void*)src.buffer_))};
+      }
       static void submit(data& src, TP tp, single<V, E> out) {
         ::pushmi::submit(
             *static_cast<Wrapped*>((void*)src.buffer_),
@@ -75,7 +82,7 @@ class any_time_single_sender {
             std::move(out));
       }
     };
-    static const vtable vtbl{s::op, s::now, s::submit};
+    static const vtable vtbl{s::op, s::now, s::executor, s::submit};
     new (data_.buffer_) Wrapped(std::move(obj));
     vptr_ = &vtbl;
   }
@@ -84,7 +91,8 @@ class any_time_single_sender {
     std::enable_if_t<!std::is_same<U, any_time_single_sender>::value, U>;
 
  public:
-  using properties = property_set<is_time<>, is_single<>>;
+  //-----------------------------------------v cheating
+  using properties = property_set<is_time<>, is_executor<>, is_single<>>;
 
   any_time_single_sender() = default;
   any_time_single_sender(any_time_single_sender&& that) noexcept
@@ -106,7 +114,10 @@ class any_time_single_sender {
     return *this;
   }
   TP now() {
-    vptr_->now_(data_);
+    return vptr_->now_(data_);
+  }
+  any_time_executor<E, TP> executor() {
+    return vptr_->executor_(data_);
   }
   void submit(TP at, single<V, E> out) {
     vptr_->submit_(data_, std::move(at), std::move(out));
@@ -127,16 +138,20 @@ class time_single_sender<SF, NF> {
   NF nf_;
 
  public:
-  using properties = property_set<is_time<>, is_single<>>;
+  //-----------------------------------------v cheating
+  using properties = property_set<is_time<>, is_executor<>, is_single<>>;
 
   constexpr time_single_sender() = default;
   constexpr explicit time_single_sender(SF sf)
       : sf_(std::move(sf)) {}
   constexpr time_single_sender(SF sf, NF nf)
       : sf_(std::move(sf)), nf_(std::move(nf)) {}
+
   auto now() {
     return nf_();
   }
+  // need to break the recursion for trampoline!
+  auto executor() { return *this; }
   PUSHMI_TEMPLATE(class TP, class Out)
     (requires Regular<TP> && Receiver<Out, is_single<>> &&
       Invocable<SF&, TP, Out>)
@@ -154,18 +169,22 @@ class time_single_sender_2 {
   Data data_;
   DSF sf_;
   DNF nf_;
+  passDEXF exf_;
 
  public:
-  using properties = property_set<is_time<>, is_single<>>;
+  //-----------------------------------------v cheating
+  using properties = property_set<is_time<>, is_executor<>, is_single<>>;
 
   constexpr time_single_sender_2() = default;
   constexpr explicit time_single_sender_2(Data data)
       : data_(std::move(data)) {}
   constexpr time_single_sender_2(Data data, DSF sf, DNF nf = DNF{})
       : data_(std::move(data)), sf_(std::move(sf)), nf_(std::move(nf)) {}
+
   auto now() {
     return nf_(data_);
   }
+  auto executor() { return exf_(data_); }
   PUSHMI_TEMPLATE(class TP, class Out)
     (requires Regular<TP> && Receiver<Out, is_single<>> &&
       Invocable<DSF&, Data&, TP, Out>)
