@@ -246,7 +246,7 @@ void time_single_sender_test(){
     in0.submit(tp, pushmi::MAKE(single)(std::move(out),
       pushmi::on_value([](auto d, int v){ pushmi::set_value(d, v); })
     ));
-  }, [](){ return std::chrono::system_clock::now(); }, [](){ return pushmi::trampoline(); });
+  }, [](){ return pushmi::trampoline(); }, [](){ return std::chrono::system_clock::now(); });
   auto in4 = pushmi::MAKE(time_single_sender)(pushmi::ignoreSF{}, pushmi::systemNowF{});
 
   std::promise<int> p0;

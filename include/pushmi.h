@@ -2763,6 +2763,17 @@ auto on_starting(Fns... fns) -> on_starting_fn<Fns...> {
   return on_starting_fn<Fns...>{std::move(fns)...};
 }
 
+template <class Fn>
+struct on_executor_fn : overload_fn<Fn> {
+  constexpr on_executor_fn() = default;
+  using overload_fn<Fn>::overload_fn;
+};
+
+template <class Fn>
+auto on_executor(Fn fn) -> on_executor_fn<Fn> {
+  return on_executor_fn<Fn>{std::move(fn)};
+}
+
 template <class... Fns>
 struct on_submit_fn : overload_fn<Fns...> {
   constexpr on_submit_fn() = default;
@@ -2772,6 +2783,17 @@ struct on_submit_fn : overload_fn<Fns...> {
 template <class... Fns>
 auto on_submit(Fns... fns) -> on_submit_fn<Fns...> {
   return on_submit_fn<Fns...>{std::move(fns)...};
+}
+
+template <class Fn>
+struct on_now_fn : overload_fn<Fn> {
+  constexpr on_now_fn() = default;
+  using overload_fn<Fn>::overload_fn;
+};
+
+template <class Fn>
+auto on_now(Fn fn) -> on_now_fn<Fn> {
+  return on_now_fn<Fn>{std::move(fn)};
 }
 
 } // namespace pushmi
@@ -5103,8 +5125,6 @@ any_time_executor(Wrapped) ->
 
 namespace pushmi {
 
-namespace detail {
-
 class inline_time_executor {
   public:
     using properties = property_set<is_time<>, is_executor<>, is_single<>>;
@@ -5121,15 +5141,13 @@ class inline_time_executor {
     }
 };
 
-} // namespace detail
-
 struct inlineEXF {
-  detail::inline_time_executor operator()(){
+  inline_time_executor operator()(){
     return {};
   }
 };
 
-inline detail::inline_time_executor inline_time_executor() {
+inline inline_time_executor inline_executor() {
   return {};
 }
 
@@ -5588,8 +5606,8 @@ PUSHMI_TEMPLATE(class SF, class NF, class EXF)
   (requires Invocable<NF&> && Invocable<EXF&> PUSHMI_BROKEN_SUBSUMPTION(&& not Sender<SF>))
 class time_single_sender<SF, NF, EXF> {
   SF sf_;
-  NF nf_;
   EXF exf_;
+  NF nf_;
 
  public:
   //-----------------------------------------v cheating
@@ -5598,9 +5616,9 @@ class time_single_sender<SF, NF, EXF> {
   constexpr time_single_sender() = default;
   constexpr explicit time_single_sender(SF sf)
       : sf_(std::move(sf)) {}
-  constexpr time_single_sender(SF sf, NF nf)
-      : sf_(std::move(sf)), nf_(std::move(nf)) {}
-  constexpr time_single_sender(SF sf, NF nf, EXF exf)
+  constexpr time_single_sender(SF sf, EXF exf)
+      : sf_(std::move(sf)), exf_(std::move(exf)) {}
+  constexpr time_single_sender(SF sf, EXF exf, NF nf)
       : sf_(std::move(sf)), nf_(std::move(nf)), exf_(std::move(exf)) {}
 
   auto now() {
@@ -5622,8 +5640,8 @@ template <PUSHMI_TYPE_CONSTRAINT(TimeSender<is_single<>>) Data, class DSF, class
 class time_single_sender<Data, DSF, DNF, DEXF> {
   Data data_;
   DSF sf_;
-  DNF nf_;
   DEXF exf_;
+  DNF nf_;
 
  public:
   using properties = property_set_insert_t<properties_t<Data>, property_set<is_time<>, is_single<>>>;
@@ -5631,9 +5649,9 @@ class time_single_sender<Data, DSF, DNF, DEXF> {
   constexpr time_single_sender() = default;
   constexpr explicit time_single_sender(Data data)
       : data_(std::move(data)) {}
-  constexpr time_single_sender(Data data, DSF sf, DNF nf = DNF{})
-      : data_(std::move(data)), sf_(std::move(sf)), nf_(std::move(nf)) {}
-  constexpr time_single_sender(Data data, DSF sf, DNF nf, DEXF exf)
+  constexpr time_single_sender(Data data, DSF sf, DEXF exf = DEXF{})
+      : data_(std::move(data)), sf_(std::move(sf)), exf_(std::move(exf)) {}
+  constexpr time_single_sender(Data data, DSF sf, DEXF exf, DNF nf)
       : data_(std::move(data)), sf_(std::move(sf)), nf_(std::move(nf)), exf_(std::move(exf)) {}
 
   auto now() {
@@ -5659,15 +5677,15 @@ PUSHMI_INLINE_VAR constexpr struct make_time_single_sender_fn {
   auto operator()(SF sf) const {
     return time_single_sender<SF, systemNowF, trampolineEXF>{std::move(sf)};
   }
-  PUSHMI_TEMPLATE (class SF, class NF)
-    (requires Invocable<NF&> PUSHMI_BROKEN_SUBSUMPTION(&& not Sender<SF>))
-  auto operator()(SF sf, NF nf) const {
-    return time_single_sender<SF, NF, trampolineEXF>{std::move(sf), std::move(nf)};
+  PUSHMI_TEMPLATE (class SF, class EXF)
+    (requires Invocable<EXF&> PUSHMI_BROKEN_SUBSUMPTION(&& not Sender<SF>))
+  auto operator()(SF sf, EXF exf) const {
+    return time_single_sender<SF, systemNowF, EXF>{std::move(sf), std::move(exf)};
   }
   PUSHMI_TEMPLATE (class SF, class NF, class EXF)
     (requires Invocable<NF&> && Invocable<EXF&> PUSHMI_BROKEN_SUBSUMPTION(&& not Sender<SF>))
-  auto operator()(SF sf, NF nf, EXF exf) const {
-    return time_single_sender<SF, NF, EXF>{std::move(sf), std::move(nf), std::move(exf)};
+  auto operator()(SF sf, EXF exf, NF nf) const {
+    return time_single_sender<SF, NF, EXF>{std::move(sf), std::move(exf), std::move(nf)};
   }
   PUSHMI_TEMPLATE (class Data)
     (requires TimeSender<Data, is_single<>>)
@@ -5679,17 +5697,17 @@ PUSHMI_INLINE_VAR constexpr struct make_time_single_sender_fn {
   auto operator()(Data d, DSF sf) const {
     return time_single_sender<Data, DSF, passDNF, passDEXF>{std::move(d), std::move(sf)};
   }
-  PUSHMI_TEMPLATE (class Data, class DSF, class DNF)
-    (requires TimeSender<Data, is_single<>> && Invocable<DNF&, Data&>)
-  auto operator()(Data d, DSF sf, DNF nf) const  {
-    return time_single_sender<Data, DSF, DNF, passDEXF>{std::move(d), std::move(sf),
-      std::move(nf)};
+  PUSHMI_TEMPLATE (class Data, class DSF, class DEXF)
+    (requires TimeSender<Data, is_single<>> && Invocable<DEXF&, Data&>)
+  auto operator()(Data d, DSF sf, DEXF exf) const  {
+    return time_single_sender<Data, DSF, passDNF, DEXF>{std::move(d), std::move(sf),
+      std::move(exf)};
   }
   PUSHMI_TEMPLATE (class Data, class DSF, class DNF, class DEXF)
     (requires TimeSender<Data, is_single<>> && Invocable<DNF&, Data&> && Invocable<DEXF&, Data&>)
-  auto operator()(Data d, DSF sf, DNF nf, DEXF exf) const  {
+  auto operator()(Data d, DSF sf, DEXF exf, DNF nf) const  {
     return time_single_sender<Data, DSF, DNF, DEXF>{std::move(d), std::move(sf),
-      std::move(nf), std::move(exf)};
+      std::move(exf), std::move(nf)};
   }
 } const make_time_single_sender {};
 
@@ -5702,25 +5720,25 @@ PUSHMI_TEMPLATE(class SF)
   (requires True<> PUSHMI_BROKEN_SUBSUMPTION(&& not Sender<SF>))
 time_single_sender(SF) -> time_single_sender<SF, systemNowF, trampolineEXF>;
 
-PUSHMI_TEMPLATE (class SF, class NF)
-  (requires Invocable<NF&> PUSHMI_BROKEN_SUBSUMPTION(&& not Sender<SF>))
-time_single_sender(SF, NF) -> time_single_sender<SF, NF, trampolineEXF>;
+PUSHMI_TEMPLATE (class SF, class EXF)
+  (requires Invocable<EXF&> PUSHMI_BROKEN_SUBSUMPTION(&& not Sender<SF>))
+time_single_sender(SF, EXF) -> time_single_sender<SF, systemNowF, EXF>;
 
 PUSHMI_TEMPLATE (class SF, class NF, class EXF)
   (requires Invocable<NF&> && Invocable<EXF&> PUSHMI_BROKEN_SUBSUMPTION(&& not Sender<SF>))
-time_single_sender(SF, NF, EXF) -> time_single_sender<SF, NF, EXF>;
+time_single_sender(SF, EXF, NF) -> time_single_sender<SF, NF, EXF>;
 
 PUSHMI_TEMPLATE (class Data, class DSF)
   (requires TimeSender<Data, is_single<>>)
 time_single_sender(Data, DSF) -> time_single_sender<Data, DSF, passDNF, passDEXF>;
 
-PUSHMI_TEMPLATE (class Data, class DSF, class DNF)
-  (requires TimeSender<Data, is_single<>> && Invocable<DNF&, Data&>)
-time_single_sender(Data, DSF, DNF) -> time_single_sender<Data, DSF, DNF, passDEXF>;
+PUSHMI_TEMPLATE (class Data, class DSF, class DEXF)
+  (requires TimeSender<Data, is_single<>> && Invocable<DEXF&, Data&>)
+time_single_sender(Data, DSF, DEXF) -> time_single_sender<Data, DSF, passDNF, DEXF>;
 
 PUSHMI_TEMPLATE (class Data, class DSF, class DNF, class DEXF)
   (requires TimeSender<Data, is_single<>> && Invocable<DNF&, Data&> && Invocable<DEXF&, Data&>)
-time_single_sender(Data, DSF, DNF, DEXF) -> time_single_sender<Data, DSF, DNF, DEXF>;
+time_single_sender(Data, DSF, DEXF, DNF) -> time_single_sender<Data, DSF, DNF, DEXF>;
 #endif
 
 template<>
@@ -7194,6 +7212,21 @@ public:
   }
 };
 
+struct executor_fn {
+private:
+  struct impl {
+    PUSHMI_TEMPLATE (class In)
+      (requires Sender<In>)
+    auto operator()(In in) const {
+      return ::pushmi::executor(in);
+    }
+  };
+public:
+  auto operator()() const {
+    return impl{};
+  }
+};
+
 struct do_submit_fn {
 private:
   template <class Out>
@@ -7232,7 +7265,7 @@ struct now_fn {
 private:
   struct impl {
     PUSHMI_TEMPLATE (class In)
-      (requires True<>)//TimeSender<In>)
+      (requires TimeSender<In>)
     auto operator()(In in) const {
       return ::pushmi::now(in);
     }
@@ -7252,6 +7285,7 @@ PUSHMI_INLINE_VAR constexpr detail::set_error_fn set_error{};
 PUSHMI_INLINE_VAR constexpr detail::set_value_fn set_value{};
 PUSHMI_INLINE_VAR constexpr detail::set_next_fn set_next{};
 PUSHMI_INLINE_VAR constexpr detail::set_starting_fn set_starting{};
+PUSHMI_INLINE_VAR constexpr detail::executor_fn executor{};
 PUSHMI_INLINE_VAR constexpr detail::do_submit_fn submit{};
 PUSHMI_INLINE_VAR constexpr detail::now_fn now{};
 PUSHMI_INLINE_VAR constexpr detail::now_fn top{};
@@ -8813,6 +8847,14 @@ private:
     }
   };
   template <class In, class ExecutorFactory>
+  struct executor_impl {
+    ExecutorFactory ef_;
+    template <class Data>
+    auto operator()(Data& data) const {
+      return ef_();
+    }
+  };
+  template <class In, class ExecutorFactory>
   struct out_impl {
     ExecutorFactory ef_;
     PUSHMI_TEMPLATE(class Out)
@@ -8837,7 +8879,8 @@ private:
         std::move(in),
         ::pushmi::detail::submit_transform_out<In>(
           out_impl<In, ExecutorFactory>{ef_}
-        )
+        ),
+        ::pushmi::on_executor(executor_impl<In, ExecutorFactory>{ef_})
       );
     }
   };

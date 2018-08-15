@@ -8,8 +8,6 @@
 
 namespace pushmi {
 
-namespace detail {
-
 class inline_time_executor {
   public:
     using properties = property_set<is_time<>, is_executor<>, is_single<>>;
@@ -26,15 +24,13 @@ class inline_time_executor {
     }
 };
 
-} // namespace detail
-
 struct inlineEXF {
-  detail::inline_time_executor operator()(){
+  inline_time_executor operator()(){
     return {};
   }
 };
 
-inline detail::inline_time_executor inline_time_executor() {
+inline inline_time_executor inline_executor() {
   return {};
 }
 

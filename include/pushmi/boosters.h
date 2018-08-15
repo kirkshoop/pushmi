@@ -300,6 +300,17 @@ auto on_starting(Fns... fns) -> on_starting_fn<Fns...> {
   return on_starting_fn<Fns...>{std::move(fns)...};
 }
 
+template <class Fn>
+struct on_executor_fn : overload_fn<Fn> {
+  constexpr on_executor_fn() = default;
+  using overload_fn<Fn>::overload_fn;
+};
+
+template <class Fn>
+auto on_executor(Fn fn) -> on_executor_fn<Fn> {
+  return on_executor_fn<Fn>{std::move(fn)};
+}
+
 template <class... Fns>
 struct on_submit_fn : overload_fn<Fns...> {
   constexpr on_submit_fn() = default;
@@ -309,6 +320,17 @@ struct on_submit_fn : overload_fn<Fns...> {
 template <class... Fns>
 auto on_submit(Fns... fns) -> on_submit_fn<Fns...> {
   return on_submit_fn<Fns...>{std::move(fns)...};
+}
+
+template <class Fn>
+struct on_now_fn : overload_fn<Fn> {
+  constexpr on_now_fn() = default;
+  using overload_fn<Fn>::overload_fn;
+};
+
+template <class Fn>
+auto on_now(Fn fn) -> on_now_fn<Fn> {
+  return on_now_fn<Fn>{std::move(fn)};
 }
 
 } // namespace pushmi
