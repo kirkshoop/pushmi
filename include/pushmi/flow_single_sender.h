@@ -10,8 +10,8 @@
 
 namespace pushmi {
 
-template <class V, class PE, class E>
-class flow_single_sender<V, PE, E> {
+template <class V, class PE = std::exception_ptr, class E = PE>
+class any_flow_single_sender {
   union data {
     void* pobj_ = nullptr;
     char buffer_[sizeof(V)]; // can hold a V in-situ
@@ -32,7 +32,7 @@ class flow_single_sender<V, PE, E> {
   static constexpr vtable const noop_ {};
   vtable const* vptr_ = &noop_;
   template <class Wrapped>
-  flow_single_sender(Wrapped obj, std::false_type) : flow_single_sender() {
+  any_flow_single_sender(Wrapped obj, std::false_type) : any_flow_single_sender() {
     struct s {
       static void op(data& src, data* dst) {
         if (dst)
@@ -51,8 +51,8 @@ class flow_single_sender<V, PE, E> {
     vptr_ = &vtbl;
   }
   template <class Wrapped>
-  flow_single_sender(Wrapped obj, std::true_type) noexcept
-    : flow_single_sender() {
+  any_flow_single_sender(Wrapped obj, std::true_type) noexcept
+    : any_flow_single_sender() {
     struct s {
       static void op(data& src, data* dst) {
         if (dst)
@@ -75,26 +75,26 @@ class flow_single_sender<V, PE, E> {
   }
   template <class T, class U = std::decay_t<T>>
   using wrapped_t =
-    std::enable_if_t<!std::is_same<U, flow_single_sender>::value, U>;
+    std::enable_if_t<!std::is_same<U, any_flow_single_sender>::value, U>;
  public:
   using properties = property_set<is_sender<>, is_flow<>, is_single<>>;
 
-  flow_single_sender() = default;
-  flow_single_sender(flow_single_sender&& that) noexcept
-      : flow_single_sender() {
+  any_flow_single_sender() = default;
+  any_flow_single_sender(any_flow_single_sender&& that) noexcept
+      : any_flow_single_sender() {
     that.vptr_->op_(that.data_, &data_);
     std::swap(that.vptr_, vptr_);
   }
   PUSHMI_TEMPLATE (class Wrapped)
     (requires FlowSender<wrapped_t<Wrapped>, is_single<>>)
-  explicit flow_single_sender(Wrapped obj) noexcept(insitu<Wrapped>())
-    : flow_single_sender{std::move(obj), bool_<insitu<Wrapped>()>{}} {}
-  ~flow_single_sender() {
+  explicit any_flow_single_sender(Wrapped obj) noexcept(insitu<Wrapped>())
+    : any_flow_single_sender{std::move(obj), bool_<insitu<Wrapped>()>{}} {}
+  ~any_flow_single_sender() {
     vptr_->op_(data_, nullptr);
   }
-  flow_single_sender& operator=(flow_single_sender&& that) noexcept {
-    this->~flow_single_sender();
-    new ((void*)this) flow_single_sender(std::move(that));
+  any_flow_single_sender& operator=(any_flow_single_sender&& that) noexcept {
+    this->~any_flow_single_sender();
+    new ((void*)this) any_flow_single_sender(std::move(that));
     return *this;
   }
   any_time_executor<E> executor() {
@@ -107,8 +107,8 @@ class flow_single_sender<V, PE, E> {
 
 // Class static definitions:
 template <class V, class PE, class E>
-constexpr typename flow_single_sender<V, PE, E>::vtable const
-    flow_single_sender<V, PE, E>::noop_;
+constexpr typename any_flow_single_sender<V, PE, E>::vtable const
+    any_flow_single_sender<V, PE, E>::noop_;
 
 template <class SF, class EXF>
 class flow_single_sender<SF, EXF> {
@@ -216,9 +216,6 @@ PUSHMI_TEMPLATE(class Data, class DSF, class DEXF)
   (requires Sender<Data, is_single<>, is_flow<>> && Invocable<DEXF&, Data&>)
 flow_single_sender(Data, DSF, DEXF) -> flow_single_sender<Data, DSF, DEXF>;
 #endif
-
-template <class V, class PE = std::exception_ptr, class E = PE>
-using any_flow_single_sender = flow_single_sender<V, PE, E>;
 
 template<>
 struct construct_deduced<flow_single_sender>

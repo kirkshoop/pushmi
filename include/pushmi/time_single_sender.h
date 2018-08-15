@@ -128,16 +128,15 @@ template <class V, class E, class TP>
 constexpr typename any_time_single_sender<V, E, TP>::vtable const
     any_time_single_sender<V, E, TP>::noop_;
 
-PUSHMI_TEMPLATE(class SF, class NF, class EXF)
-  (requires Invocable<NF&> && Invocable<EXF&> PUSHMI_BROKEN_SUBSUMPTION(&& not Sender<SF>))
+template<class SF, class NF, class EXF>
+  // (requires Invocable<NF&> && Invocable<EXF&> PUSHMI_BROKEN_SUBSUMPTION(&& not Sender<SF>))
 class time_single_sender<SF, NF, EXF> {
   SF sf_;
   EXF exf_;
   NF nf_;
 
  public:
-  //-----------------------------------------v cheating
-  using properties = property_set<is_time<>, is_executor<>, is_single<>>;
+  using properties = property_set<is_time<>, is_single<>>;
 
   constexpr time_single_sender() = default;
   constexpr explicit time_single_sender(SF sf)

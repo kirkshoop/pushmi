@@ -163,11 +163,13 @@ PUSHMI_INLINE_VAR constexpr struct make_sender_fn {
   inline auto operator()() const {
     return sender<ignoreSF, trampolineEXF>{};
   }
-  template <class SF>
+  PUSHMI_TEMPLATE(class SF)
+    (requires True<> PUSHMI_BROKEN_SUBSUMPTION(&& not Sender<SF>))
   auto operator()(SF sf) const {
     return sender<SF, trampolineEXF>{std::move(sf)};
   }
-  template <class SF, class EXF>
+  PUSHMI_TEMPLATE(class SF, class EXF)
+    (requires True<> && Invocable<EXF&> PUSHMI_BROKEN_SUBSUMPTION(&& not Sender<SF>))
   auto operator()(SF sf, EXF exf) const {
     return sender<SF, EXF>{std::move(sf), std::move(exf)};
   }
@@ -193,10 +195,12 @@ PUSHMI_INLINE_VAR constexpr struct make_sender_fn {
 #if __cpp_deduction_guides >= 201703
 sender() -> sender<ignoreSF, trampolineEXF>;
 
-template <class SF>
+PUSHMI_TEMPLATE(class SF)
+  (requires True<> PUSHMI_BROKEN_SUBSUMPTION(&& not Sender<SF>))
 sender(SF) -> sender<SF, trampolineEXF>;
 
-template <class SF, class EXF>
+PUSHMI_TEMPLATE(class SF, class EXF)
+  (requires True<> && Invocable<EXF&> PUSHMI_BROKEN_SUBSUMPTION(&& not Sender<SF>))
 sender(SF, EXF) -> sender<SF, EXF>;
 
 PUSHMI_TEMPLATE(class Wrapped)
