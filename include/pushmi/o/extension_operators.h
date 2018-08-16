@@ -343,6 +343,21 @@ public:
   }
 };
 
+struct top_fn {
+private:
+  struct impl {
+    PUSHMI_TEMPLATE (class In)
+      (requires ConstrainedSender<In>)
+    auto operator()(In in) const {
+      return ::pushmi::top(in);
+    }
+  };
+public:
+  auto operator()() const {
+    return impl{};
+  }
+};
+
 struct now_fn {
 private:
   struct impl {
@@ -370,7 +385,7 @@ PUSHMI_INLINE_VAR constexpr detail::set_starting_fn set_starting{};
 PUSHMI_INLINE_VAR constexpr detail::executor_fn executor{};
 PUSHMI_INLINE_VAR constexpr detail::do_submit_fn submit{};
 PUSHMI_INLINE_VAR constexpr detail::now_fn now{};
-PUSHMI_INLINE_VAR constexpr detail::now_fn top{};
+PUSHMI_INLINE_VAR constexpr detail::top_fn top{};
 
 } // namespace extension_operators
 

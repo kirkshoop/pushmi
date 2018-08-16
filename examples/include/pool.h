@@ -30,7 +30,7 @@ struct pool_time_executor {
   using e_t = Executor;
   e_t e;
   explicit pool_time_executor(e_t e) : e(std::move(e)) {}
-  auto now() {
+  auto top() {
     return std::chrono::system_clock::now();
   }
   auto executor() { return *this; }

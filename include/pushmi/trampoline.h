@@ -42,7 +42,7 @@ class delegator : _pipeable_sender_ {
  public:
   using properties = property_set<is_time<>, is_executor<>, is_single<>>;
 
-  time_point now() {
+  time_point top() {
     return trampoline<E>::now();
   }
   delegator executor() { return {}; }
@@ -61,7 +61,7 @@ class nester : _pipeable_sender_ {
  public:
   using properties = property_set<is_time<>, is_executor<>, is_single<>>;
 
-  time_point now() {
+  time_point top() {
     return trampoline<E>::now();
   }
   nester executor() { return {}; }

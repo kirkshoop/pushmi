@@ -82,7 +82,7 @@ struct countdownnone {
 struct inline_time_executor {
     using properties = mi::property_set<mi::is_time<>, mi::is_executor<>, mi::is_single<>>;
 
-    std::chrono::system_clock::time_point now() { return std::chrono::system_clock::now(); }
+    std::chrono::system_clock::time_point top() { return std::chrono::system_clock::now(); }
     auto executor() { return *this; }
     template<class Out>
     void submit(std::chrono::system_clock::time_point at, Out out) {

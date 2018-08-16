@@ -208,7 +208,7 @@ SCENARIO("flow single shared cancellation new thread", "[flow][sender]") {
   auto nt = mi::new_thread();
   using NT = decltype(nt);
   std::atomic<int> signals{0};
-  auto at = nt.now() + 200ms;
+  auto at = mi::now(nt) + 200ms;
 
   GIVEN("A flow single sender") {
     auto f = mi::MAKE(flow_single_sender)([&](auto out) {
@@ -328,7 +328,7 @@ SCENARIO("flow single shared cancellation new thread", "[flow][sender]") {
       for (;;) {
         signals = 0;
         // set completion time to be in 100ms
-        at = nt.now() + 100ms;
+        at = mi::now(nt) + 100ms;
         {
         f |
             op::blocking_submit(
@@ -378,7 +378,7 @@ SCENARIO("flow single entangled cancellation new thread", "[flow][sender]") {
   auto nt = mi::new_thread();
   using NT = decltype(nt);
   std::atomic<int> signals{0};
-  auto at = nt.now() + 200ms;
+  auto at = mi::now(nt) + 200ms;
 
   GIVEN("A flow single sender") {
     auto f = mi::MAKE(flow_single_sender)([&](auto out) {
@@ -498,7 +498,7 @@ SCENARIO("flow single entangled cancellation new thread", "[flow][sender]") {
       for (;;) {
         signals = 0;
         // set completion time to be in 100ms
-        at = nt.now() + 100ms;
+        at = mi::now(nt) + 100ms;
         {
         f |
             op::blocking_submit(

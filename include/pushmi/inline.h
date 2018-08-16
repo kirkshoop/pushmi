@@ -12,7 +12,7 @@ class inline_time_executor {
   public:
     using properties = property_set<is_time<>, is_executor<>, is_single<>>;
 
-    auto now() {
+    auto top() {
       return std::chrono::system_clock::now();
     }
     auto executor() { return *this; }

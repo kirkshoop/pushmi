@@ -15,7 +15,7 @@ namespace pushmi {
 struct new_thread_time_executor {
   using properties = property_set<is_time<>, is_executor<>, is_single<>>;
 
-  auto now() {
+  auto top() {
     return std::chrono::system_clock::now();
   }
   new_thread_time_executor executor() { return {}; }

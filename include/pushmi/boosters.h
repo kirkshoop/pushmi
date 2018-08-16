@@ -57,6 +57,9 @@ template<>
 struct construct_deduced<flow_single_sender>;
 
 template<>
+struct construct_deduced<constrained_single_sender>;
+
+template<>
 struct construct_deduced<time_single_sender>;
 
 template<>

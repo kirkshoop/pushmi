@@ -251,20 +251,20 @@ void time_single_sender_test(){
 
   std::promise<int> p0;
   auto promise0 = pushmi::MAKE(single)(std::move(p0));
-  in0.submit(in0.now(), std::move(promise0));
+  in0.submit(in0.top(), std::move(promise0));
 
   auto out0 = pushmi::MAKE(single)();
   auto out1 = pushmi::MAKE(single)(out0, pushmi::on_value([](auto d, int v){
     pushmi::set_value(d, v);
   }));
-  in3.submit(in0.now(), out1);
+  in3.submit(in0.top(), out1);
 
   auto any0 = pushmi::any_time_single_sender<int>(in0);
 
   static_assert(pushmi::Executor<pushmi::executor_t<decltype(in0)>>, "sender has invalid executor");
 
   in3 | op::submit();
-  in3 | op::submit_at(in3.now() + 1s);
+  in3 | op::submit_at(in3.top() + 1s);
   in3 | op::submit_after(1s);
 
 #if 0

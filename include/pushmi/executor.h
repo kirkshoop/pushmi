@@ -63,7 +63,7 @@ public:
     pobj_ = std::addressof(w);
     vptr_ = &vtbl;
   }
-  std::chrono::system_clock::time_point now() {
+  std::chrono::system_clock::time_point top() {
     return vptr_->now_(pobj_);
   }
   any_time_executor_ref executor() { return *this; }
