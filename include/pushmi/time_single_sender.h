@@ -191,6 +191,13 @@ class time_single_sender<Data, DSF, DNF, DEXF> {
   }
 };
 
+template <>
+class time_single_sender<>
+    : public time_single_sender<ignoreSF, systemNowF, trampolineEXF> {
+public:
+  time_single_sender() = default;
+};
+
 ////////////////////////////////////////////////////////////////////////////////
 // make_time_single_sender
 PUSHMI_INLINE_VAR constexpr struct make_time_single_sender_fn {

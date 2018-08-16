@@ -5665,6 +5665,13 @@ class time_single_sender<Data, DSF, DNF, DEXF> {
   }
 };
 
+template <>
+class time_single_sender<>
+    : public time_single_sender<ignoreSF, systemNowF, trampolineEXF> {
+public:
+  time_single_sender() = default;
+};
+
 ////////////////////////////////////////////////////////////////////////////////
 // make_time_single_sender
 PUSHMI_INLINE_VAR constexpr struct make_time_single_sender_fn {
@@ -5913,6 +5920,13 @@ class sender<Data, DSF, DEXF> {
   }
 };
 
+template <>
+class sender<>
+    : public sender<ignoreSF, trampolineEXF> {
+public:
+  sender() = default;
+};
+
 ////////////////////////////////////////////////////////////////////////////////
 // make_sender
 PUSHMI_INLINE_VAR constexpr struct make_sender_fn {
@@ -6151,6 +6165,13 @@ class single_sender<Data, DSF, DEXF> {
   }
 };
 
+template <>
+class single_sender<>
+    : public single_sender<ignoreSF, trampolineEXF> {
+public:
+  single_sender() = default;
+};
+
 ////////////////////////////////////////////////////////////////////////////////
 // make_single_sender
 PUSHMI_INLINE_VAR constexpr struct make_single_sender_fn {
@@ -6380,6 +6401,13 @@ class flow_single_sender<Data, DSF, DEXF> {
   void submit(Out out) {
     sf_(data_, std::move(out));
   }
+};
+
+template <>
+class flow_single_sender<>
+    : public flow_single_sender<ignoreSF, trampolineEXF> {
+public:
+  flow_single_sender() = default;
 };
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -6612,6 +6640,13 @@ class many_sender<Data, DSF, DEXF> {
   }
 };
 
+template <>
+class many_sender<>
+    : public many_sender<ignoreSF, trampolineEXF> {
+public:
+  many_sender() = default;
+};
+
 ////////////////////////////////////////////////////////////////////////////////
 // make_many_sender
 PUSHMI_INLINE_VAR constexpr struct make_many_sender_fn {
@@ -6841,6 +6876,13 @@ class flow_many_sender<Data, DSF, DEXF> {
   void submit(Out out) {
     sf_(data_, std::move(out));
   }
+};
+
+template <>
+class flow_many_sender<>
+    : public flow_many_sender<ignoreSF, trampolineEXF> {
+public:
+  flow_many_sender() = default;
 };
 
 ////////////////////////////////////////////////////////////////////////////////

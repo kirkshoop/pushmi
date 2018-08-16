@@ -158,6 +158,13 @@ class single_sender<Data, DSF, DEXF> {
   }
 };
 
+template <>
+class single_sender<>
+    : public single_sender<ignoreSF, trampolineEXF> {
+public:
+  single_sender() = default;
+};
+
 ////////////////////////////////////////////////////////////////////////////////
 // make_single_sender
 PUSHMI_INLINE_VAR constexpr struct make_single_sender_fn {

@@ -157,6 +157,13 @@ class sender<Data, DSF, DEXF> {
   }
 };
 
+template <>
+class sender<>
+    : public sender<ignoreSF, trampolineEXF> {
+public:
+  sender() = default;
+};
+
 ////////////////////////////////////////////////////////////////////////////////
 // make_sender
 PUSHMI_INLINE_VAR constexpr struct make_sender_fn {

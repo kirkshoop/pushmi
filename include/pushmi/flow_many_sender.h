@@ -158,6 +158,13 @@ class flow_many_sender<Data, DSF, DEXF> {
   }
 };
 
+template <>
+class flow_many_sender<>
+    : public flow_many_sender<ignoreSF, trampolineEXF> {
+public:
+  flow_many_sender() = default;
+};
+
 ////////////////////////////////////////////////////////////////////////////////
 // make_flow_many_sender
 PUSHMI_INLINE_VAR constexpr struct make_flow_many_sender_fn {
