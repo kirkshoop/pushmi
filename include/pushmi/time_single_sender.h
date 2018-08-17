@@ -6,7 +6,7 @@
 
 #include "single.h"
 #include "executor.h"
-#include "trampoline.h"
+#include "inline.h"
 #include "constrained_single_sender.h"
 
 namespace pushmi {
@@ -23,6 +23,11 @@ public:
   template<class T0, class T1, class... TN>
   constexpr any_time_single_sender(T0 t0, T1 t1, TN... tn)
       : any_constrained_single_sender<V, E, TP>(std::move(t0), std::move(t1), std::move(tn)...) {}
+
+  any_time_executor<E, TP> executor() {
+    return {any_constrained_single_sender<V, E, TP>::executor()};
+  }
+
 };
 
 template<class SF, class NF, class EXF>
@@ -51,16 +56,23 @@ public:
       : constrained_single_sender<TN...>(std::move(c0), std::move(c1), std::move(cn)...) {}
 };
 
+template <>
+class time_single_sender<>
+    : public time_single_sender<ignoreSF, systemNowF, inlineTimeEXF> {
+public:
+  time_single_sender() = default;
+};
+
 ////////////////////////////////////////////////////////////////////////////////
 // make_time_single_sender
 PUSHMI_INLINE_VAR constexpr struct make_time_single_sender_fn {
   inline auto operator()() const  {
-    return time_single_sender<ignoreSF, systemNowF, trampolineEXF>{};
+    return time_single_sender<ignoreSF, systemNowF, inlineTimeEXF>{};
   }
   PUSHMI_TEMPLATE(class SF)
     (requires True<> PUSHMI_BROKEN_SUBSUMPTION(&& not Sender<SF>))
   auto operator()(SF sf) const {
-    return time_single_sender<SF, systemNowF, trampolineEXF>{std::move(sf)};
+    return time_single_sender<SF, systemNowF, inlineTimeEXF>{std::move(sf)};
   }
   PUSHMI_TEMPLATE (class SF, class EXF)
     (requires Invocable<EXF&> PUSHMI_BROKEN_SUBSUMPTION(&& not Sender<SF>))
@@ -99,11 +111,11 @@ PUSHMI_INLINE_VAR constexpr struct make_time_single_sender_fn {
 ////////////////////////////////////////////////////////////////////////////////
 // deduction guides
 #if __cpp_deduction_guides >= 201703
-time_single_sender() -> time_single_sender<ignoreSF, systemNowF, trampolineEXF>;
+time_single_sender() -> time_single_sender<ignoreSF, systemNowF, inlineTimeEXF>;
 
 PUSHMI_TEMPLATE(class SF)
   (requires True<> PUSHMI_BROKEN_SUBSUMPTION(&& not Sender<SF>))
-time_single_sender(SF) -> time_single_sender<SF, systemNowF, trampolineEXF>;
+time_single_sender(SF) -> time_single_sender<SF, systemNowF, inlineTimeEXF>;
 
 PUSHMI_TEMPLATE (class SF, class EXF)
   (requires Invocable<EXF&> PUSHMI_BROKEN_SUBSUMPTION(&& not Sender<SF>))

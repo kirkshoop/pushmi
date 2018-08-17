@@ -111,6 +111,16 @@ struct any_executor_ref;
 
 template<
   class E = std::exception_ptr,
+  class CV = std::ptrdiff_t>
+struct any_constrained_executor;
+
+template<
+  class E = std::exception_ptr,
+  class TP = std::ptrdiff_t>
+struct any_constrained_executor_ref;
+
+template<
+  class E = std::exception_ptr,
   class TP = std::chrono::system_clock::time_point>
 struct any_time_executor;
 

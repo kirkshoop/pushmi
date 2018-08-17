@@ -96,7 +96,6 @@ struct trampolineEXF;
 //   auto operator()() { return trampoline(); }
 // };
 
-
 struct ignoreSF {
   void operator()(detail::any) {}
   void operator()(detail::any, detail::any) {}
@@ -104,6 +103,10 @@ struct ignoreSF {
 
 struct systemNowF {
   auto operator()() { return std::chrono::system_clock::now(); }
+};
+
+struct priorityZeroF {
+  auto operator()(){ return 0; }
 };
 
 struct passDVF {
@@ -176,6 +179,14 @@ struct passDNF {
     (requires TimeSender<Data>)
   auto operator()(Data& in) const noexcept {
     return ::pushmi::now(in);
+  }
+};
+
+struct passDZF {
+  PUSHMI_TEMPLATE(class Data)
+    (requires ConstrainedSender<Data>)
+  auto operator()(Data& in) const noexcept {
+    return ::pushmi::top(in);
   }
 };
 

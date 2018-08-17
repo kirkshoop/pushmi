@@ -32,6 +32,11 @@ PUSHMI_CONCEPT_DEF(
 );
 PUSHMI_CONCEPT_DEF(
   template (class In, class ... AN)
+  (concept AutoConstrainedSenderTo)(In, AN...),
+    ConstrainedSenderTo<In, receiver_type_t<In, AN...>> && not Time<In>
+);
+PUSHMI_CONCEPT_DEF(
+  template (class In, class ... AN)
   (concept AutoTimeSenderTo)(In, AN...),
     TimeSenderTo<In, receiver_type_t<In, AN...>>
 );
@@ -50,6 +55,13 @@ private:
     In operator()(In in) {
       auto out{::pushmi::detail::receiver_from_fn<In>()(std::move(args_))};
       ::pushmi::submit(in, std::move(out));
+      return in;
+    }
+    PUSHMI_TEMPLATE(class In)
+      (requires submit_detail::AutoConstrainedSenderTo<In, AN...>)
+    In operator()(In in) {
+      auto out{::pushmi::detail::receiver_from_fn<In>()(std::move(args_))};
+      ::pushmi::submit(in, ::pushmi::top(in), std::move(out));
       return in;
     }
     PUSHMI_TEMPLATE(class In)
@@ -128,12 +140,12 @@ private:
       (requires Receiver<Out, is_single<>>)
     void operator()(Out out, Value&& v) const {
       using V = remove_cvref_t<Value>;
-      PUSHMI_IF_CONSTEXPR( ((bool)Time<V>) (
+      PUSHMI_IF_CONSTEXPR( ((bool)Executor<V>) (
         // to keep the blocking semantics, make sure that the
         // nested submits block here to prevent a spurious
         // completion signal
         auto nest = ::pushmi::nested_trampoline();
-        ::pushmi::submit(nest, ::pushmi::now(nest), std::move(out));
+        ::pushmi::submit(nest, std::move(out));
       ) else (
         ::pushmi::set_value(out, id((Value&&) v));
       ))
@@ -172,7 +184,7 @@ private:
       state_->signaled.notify_all();
     }
   };
-  template <bool IsTimeSender, class In>
+  template <bool IsConstrainedSender, bool IsTimeSender, class In>
   struct submit_impl {
     PUSHMI_TEMPLATE(class Out)
       (requires Receiver<Out>)
@@ -180,7 +192,11 @@ private:
       PUSHMI_IF_CONSTEXPR( (IsTimeSender) (
         id(::pushmi::submit)(in, id(::pushmi::now)(in), std::move(out));
       ) else (
-        id(::pushmi::submit)(in, std::move(out));
+        PUSHMI_IF_CONSTEXPR( (IsConstrainedSender) (
+          id(::pushmi::submit)(in, id(::pushmi::top)(in), std::move(out));
+        ) else (
+          id(::pushmi::submit)(in, std::move(out));
+        ))
       ))
     }
   };
@@ -191,11 +207,11 @@ private:
   struct fn {
     std::tuple<AN...> args_;
 
-    template <bool IsTimeSender, class In>
+    template <bool IsConstrainedSender, bool IsTimeSender, class In>
     In impl_(In in) {
       lock_state state{};
 
-      auto submit = submit_impl<IsTimeSender, In>{};
+      auto submit = submit_impl<IsConstrainedSender, IsTimeSender, In>{};
       PUSHMI_IF_CONSTEXPR( ((bool)Many<In>) (
         auto out{::pushmi::detail::receiver_from_fn<In>()(
           std::move(args_),
@@ -224,12 +240,17 @@ private:
     PUSHMI_TEMPLATE(class In)
       (requires submit_detail::AutoSenderTo<In, AN...>)
     In operator()(In in) {
-      return this->impl_<false>(std::move(in));
+      return this->impl_<false, false>(std::move(in));
+    }
+    PUSHMI_TEMPLATE(class In)
+      (requires submit_detail::AutoConstrainedSenderTo<In, AN...>)
+    In operator()(In in) {
+      return this->impl_<true, false>(std::move(in));
     }
     PUSHMI_TEMPLATE(class In)
       (requires submit_detail::AutoTimeSenderTo<In, AN...>)
     In operator()(In in) {
-      return this->impl_<true>(std::move(in));
+      return this->impl_<true, true>(std::move(in));
     }
   };
 public:
