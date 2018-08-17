@@ -10,7 +10,7 @@
 
 namespace pushmi {
 
-template <class V, class E = std::exception_ptr>
+template <class V, class E>
 class any_single_sender {
   union data {
     void* pobj_ = nullptr;

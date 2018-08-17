@@ -86,6 +86,11 @@ class flow_many_sender;
 
 template<
   class V,
+  class E = std::exception_ptr>
+class any_single_sender;
+
+template<
+  class V,
   class E = std::exception_ptr,
   class C = std::ptrdiff_t>
 struct any_constrained_single_sender;
@@ -95,6 +100,14 @@ template<
   class E = std::exception_ptr,
   class TP = std::chrono::system_clock::time_point>
 class any_time_single_sender;
+
+template<
+  class E = std::exception_ptr>
+struct any_executor;
+
+template<
+  class E = std::exception_ptr>
+struct any_executor_ref;
 
 template<
   class E = std::exception_ptr,
