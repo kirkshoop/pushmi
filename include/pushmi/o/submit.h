@@ -140,7 +140,7 @@ private:
       (requires Receiver<Out, is_single<>>)
     void operator()(Out out, Value&& v) const {
       using V = remove_cvref_t<Value>;
-      PUSHMI_IF_CONSTEXPR( ((bool)Executor<V>) (
+      PUSHMI_IF_CONSTEXPR( ((bool)Executor<V> && (bool) not Time<V>) (
         // to keep the blocking semantics, make sure that the
         // nested submits block here to prevent a spurious
         // completion signal

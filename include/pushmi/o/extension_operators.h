@@ -302,7 +302,7 @@ private:
   struct impl {
     PUSHMI_TEMPLATE (class In)
       (requires Sender<In>)
-    auto operator()(In in) const {
+    auto operator()(In& in) const {
       return ::pushmi::executor(in);
     }
   };
@@ -319,7 +319,7 @@ private:
     Out out_;
     PUSHMI_TEMPLATE (class In)
       (requires SenderTo<In, Out>)
-    void operator()(In in) {
+    void operator()(In& in) {
       ::pushmi::submit(in, std::move(out_));
     }
   };
@@ -329,7 +329,7 @@ private:
     Out out_;
     PUSHMI_TEMPLATE (class In)
       (requires TimeSenderTo<In, Out>)
-    void operator()(In in) {
+    void operator()(In& in) {
       ::pushmi::submit(in, std::move(tp_), std::move(out_));
     }
   };
@@ -351,7 +351,7 @@ private:
   struct impl {
     PUSHMI_TEMPLATE (class In)
       (requires ConstrainedSender<In>)
-    auto operator()(In in) const {
+    auto operator()(In& in) const {
       return ::pushmi::top(in);
     }
   };
@@ -366,7 +366,7 @@ private:
   struct impl {
     PUSHMI_TEMPLATE (class In)
       (requires TimeSender<In>)
-    auto operator()(In in) const {
+    auto operator()(In& in) const {
       return ::pushmi::now(in);
     }
   };

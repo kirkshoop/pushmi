@@ -182,7 +182,7 @@ private:
   template <class T>
   using wrapped_t = detail::not_any_constrained_executor_ref_t<T>;
 public:
-  using properties = property_set<is_sender<>, is_executor<>, is_single<>>;
+  using properties = property_set<is_constrained<>, is_executor<>, is_single<>>;
 
   any_constrained_executor_ref() = delete;
   any_constrained_executor_ref(const any_constrained_executor_ref&) = default;
@@ -277,6 +277,7 @@ using not_any_constrained_executor =
 
 template <class E, class CV>
 struct any_constrained_executor : detail::any_constrained_executor_base<E, CV> {
+  using properties = property_set<is_constrained<>, is_executor<>, is_single<>>;
   constexpr any_constrained_executor() = default;
   using detail::any_constrained_executor_base<E, CV>::any_constrained_executor_base;
 };
@@ -440,6 +441,7 @@ using not_any_time_executor =
 
 template <class E, class TP>
 struct any_time_executor : detail::any_time_executor_base<E, TP> {
+  using properties = property_set<is_time<>, is_executor<>, is_single<>>;
   constexpr any_time_executor() = default;
   using detail::any_time_executor_base<E, TP>::any_time_executor_base;
 };

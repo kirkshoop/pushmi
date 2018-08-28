@@ -25,7 +25,7 @@ public:
       : any_constrained_single_sender<V, E, TP>(std::move(t0), std::move(t1), std::move(tn)...) {}
 
   any_time_executor<E, TP> executor() {
-    return {any_constrained_single_sender<V, E, TP>::executor()};
+    return any_time_executor<E, TP>{any_constrained_single_sender<V, E, TP>::executor()};
   }
 
 };
