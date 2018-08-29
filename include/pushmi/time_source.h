@@ -54,6 +54,8 @@ template<class E, class TP>
 class time_source_queue_base : public std::enable_shared_from_this<time_source_queue_base<E, TP>>{
 public:
   using time_point = std::decay_t<TP>;
+  bool dispatching_ = false;
+  bool pending_ = false;
   std::priority_queue<time_heap_item<E, TP>, std::vector<time_heap_item<E, TP>>, std::greater<>> heap_;
 
   time_heap_item<E, TP>& top() {
@@ -68,6 +70,8 @@ template<class E, class TP, class NF, class Executor>
 class time_source_queue : public time_source_queue_base<E, TP> {
 public:
   using time_point = std::decay_t<TP>;
+  ~time_source_queue() {
+  }
   time_source_queue(std::weak_ptr<time_source_shared<E, time_point>> source, NF nf, Executor ex) :
     source_(std::move(source)), nf_(std::move(nf)), ex_(std::move(ex)) {}
   std::weak_ptr<time_source_shared<E, time_point>> source_;
@@ -91,61 +95,111 @@ public:
       std::abort();
     }
 
-    // pul ready items from the heap in order.
-    auto start = nf_();
+    //
+    // pull ready items from the heap in order.
+
+    // drain anything queued within the next 50ms before
+    // going back to the pending queue.
+    auto start = nf_() + std::chrono::milliseconds(50);
+
     std::unique_lock<std::mutex> guard{s->lock_};
+
+    if (!this->dispatching_ || this->pending_) {
+      std::abort();
+    }
+
     if (this->heap_.empty()) { return; }
     auto subEx = time_source_executor<E, TP, NF, Executor>{s, shared_from_that()};
     while (!this->heap_.empty() && this->heap_.top().when <= start) {
-      auto what{std::move(this->top().what)};
+      auto item{std::move(this->top())};
       this->heap_.pop();
       guard.unlock();
-      ::pushmi::set_value(what, subEx);
+      std::this_thread::sleep_until(item.when);
+      ::pushmi::set_value(item.what, subEx);
       guard.lock();
+      // allows set_value to queue nested items
+      --s->items_;
     }
+    this->dispatching_ = false;
 
     if (this->heap_.empty()) {
       // if this is empty, tell worker to check for the done condition.
       ++s->dirty_;
       s->wake_.notify_one();
-    } else if (this->heap_.top().when <= s->earliest_) {
-      // this is the earliest, tell worker to reset earliest_
-      ++s->dirty_;
-      s->wake_.notify_one();
+    } else {
+      if (!!s->error_) {
+        while(!this->heap_.empty()) {
+          try {
+            auto what{std::move(this->top().what)};
+            this->heap_.pop();
+            --s->items_;
+            guard.unlock();
+            ::pushmi::set_error(what, *s->error_);
+            guard.lock();
+          } catch(...) {
+            // we already have an error, ignore this one.
+          }
+        }
+      } else {
+        // add back to pending_ to get the remaining items dispatched
+        s->pending_.push_back(this->shared_from_this());
+        this->pending_ = true;
+        if (this->heap_.top().when <= s->earliest_) {
+          // this is the earliest, tell worker to reset earliest_
+          ++s->dirty_;
+          s->wake_.notify_one();
+        }
+      }
     }
-
   }
   template<class AE>
   void error(AE e) noexcept {
     auto s = source_.lock();
     std::unique_lock<std::mutex> guard{s->lock_};
+
+    if (!this->dispatching_ || this->pending_) {
+      std::abort();
+    }
+
     while (!this->heap_.empty()) {
       auto what{std::move(this->top().what)};
       this->heap_.pop();
+      --s->items_;
       guard.unlock();
       ::pushmi::set_error(what, detail::as_const(e));
       guard.lock();
     }
+    this->dispatching_ = false;
   }
   void done() {
     auto s = source_.lock();
     auto done = false;
     std::unique_lock<std::mutex> guard{s->lock_};
+
+    if (!this->dispatching_ || this->pending_) {
+      std::abort();
+    }
+
     while (!this->heap_.empty()) {
       auto what{std::move(this->top().what)};
       this->heap_.pop();
+      --s->items_;
       guard.unlock();
       ::pushmi::set_done(what);
       guard.lock();
     }
+    this->dispatching_ = false;
   }
 };
 
 template<class E, class TP, class NF, class Executor>
 struct time_source_queue_receiver : std::shared_ptr<time_source_queue<E, TP, NF, Executor>> {
+  ~time_source_queue_receiver() {
+  }
   explicit time_source_queue_receiver(std::shared_ptr<time_source_queue<E, TP, NF, Executor>> that) :
     std::shared_ptr<time_source_queue<E, TP, NF, Executor>>(that),
-    source_(that->source_.lock()) {}
+    source_(that->source_.lock()) {
+    }
   using properties = property_set<is_receiver<>, is_single<>>;
   std::shared_ptr<time_source_shared<E, TP>> source_;
 };
@@ -158,25 +212,27 @@ void time_source_queue<E, TP, NF, Executor>::dispatch() {
 }
 
 template<class E, class TP>
-class time_queue_empty_pred_fn {
+class time_queue_dispatch_pred_fn {
 public:
   bool operator()(std::shared_ptr<time_source_queue_base<E, TP>>& q){
-    return q->heap_.empty();
+    return !q->heap_.empty();
   }
 };
 
 template<class E, class TP>
-class time_item_ready_pred_fn {
+class time_item_process_pred_fn {
 public:
   using time_point = std::decay_t<TP>;
   const time_point* start_;
   time_point* earliest_;
-  bool operator()(std::shared_ptr<time_source_queue_base<E, TP>>& q){
+  bool operator()(const std::shared_ptr<time_source_queue_base<E, TP>>& q){
     // ready for dispatch if it has a ready item
-    bool ready = !q->heap_.empty() && q->heap_.top().when <= *start_;
+    bool ready = !q->dispatching_ && !q->heap_.empty() && q->heap_.top().when <= *start_;
+    q->dispatching_ = ready;
+    q->pending_ = !ready && !q->heap_.empty();
     // ready queues are ignored, they will update earliest_ after they have processed the ready items
     *earliest_ = !ready && !q->heap_.empty() ? min(*earliest_, q->heap_.top().when) : *earliest_;
-    return ready;
+    return q->pending_;
   }
 };
 
@@ -191,22 +247,28 @@ public:
   bool done_;
   bool joined_;
   int dirty_;
+  int items_;
   detail::opt<E> error_;
-  std::deque<std::shared_ptr<time_source_queue_base<E, TP>>> queues_;
+  std::deque<std::shared_ptr<time_source_queue_base<E, TP>>> pending_;
 
   time_source_shared_base() :
     earliest_(std::chrono::system_clock::now() + std::chrono::hours(24)),
     done_(false),
     joined_(false),
-    dirty_(0) {}
+    dirty_(0),
+    items_(0) {}
 };
 
 template<class E, class TP>
 class time_source_shared : public time_source_shared_base<E, TP> {
 public:
   std::thread t_;
+  // this is safe to reuse as long as there is only one thread in the time_source_shared
+  std::vector<std::shared_ptr<time_source_queue_base<E, TP>>> ready_;
 
   ~time_source_shared() {
+    // not allowed to be discarded without joining and completing all queued items
+    if (t_.joinable() || this->items_ != 0) { std::abort(); }
   }
   time_source_shared() {
   }
@@ -228,7 +290,7 @@ public:
       std::unique_lock<std::mutex> guard{that->lock_};
 
       // once done_, keep going until empty
-      while (!that->done_ || that->queues_.size() > 0) {
+      while (!that->done_ || that->items_ > 0) {
 
         // wait for something to do
         that->wake_.wait_until(
@@ -241,44 +303,51 @@ public:
         that->dirty_ = 0;
 
         //
-        // clean out empty queues
+        // select ready and empty queues and reset earliest_
 
-        that->queues_.erase( std::remove_if(that->queues_.begin(), that->queues_.end(), time_queue_empty_pred_fn<E, TP>{}), that->queues_.end() );
+        auto start = std::chrono::system_clock::now();
+        auto earliest = start + std::chrono::hours(24);
+        auto process = time_item_process_pred_fn<E, TP>{&start, &earliest};
 
-        //
-        // dispatch work to executors and reset earliest_
+        auto process_begin = std::partition(that->pending_.begin(), that->pending_.end(), process);
+        that->earliest_ = earliest;
 
         // copy out the queues that have ready items so that the lock
         // is not held during dispatch
 
-        auto start = std::chrono::system_clock::now();
-        auto earliest = start + std::chrono::hours(24);
-        std::vector<std::shared_ptr<time_source_queue_base<E, TP>>> queues;
-        auto ready = time_item_ready_pred_fn<E, TP>{&start, &earliest};
+        std::copy_if(process_begin, that->pending_.end(), std::back_inserter(that->ready_), time_queue_dispatch_pred_fn<E, TP>{});
 
-        std::copy_if(that->queues_.begin(), that->queues_.end(), std::back_inserter(queues), ready);
-        that->earliest_ = earliest;
+        // remove processed queues from pending queue.
+        that->pending_.erase(process_begin, that->pending_.end());
 
-        // printf("d %d, %d, %f\n", that->queues_.size(), queues.size(), std::chrono::duration_cast<std::chrono::milliseconds>(earliest - start).count());
+        // printf("d %d, %d, %d, %f\n", that->pending_.size(), that->ready_.size(), that->items_, std::chrono::duration_cast<std::chrono::milliseconds>(earliest - start).count());
 
         // dispatch to queues with ready items
         guard.unlock();
-        for (auto& q : queues) {
+        for (auto& q : that->ready_) {
           q->dispatch();
         }
         guard.lock();
+        that->ready_.clear();
       }
       that->joined_ = true;
     } catch(...) {
+      //
+      // block any more items from being enqueued, all new items will be sent
+      // this error on the same context that calls submit
+      //
+      // also dispatch errors to all items already in the queues from the
+      // time thread
       std::unique_lock<std::mutex> guard{that->lock_};
       // creates a dependency that std::exception_ptr must be ConvertibleTo E
       // TODO: break this dependency rather than enforce it with concepts
       that->error_ = std::current_exception();
-      for(auto& q : that->queues_) {
+      for(auto& q : that->pending_) {
         while(!q->heap_.empty()) {
           try {
             auto what{std::move(q->top().what)};
             q->heap_.pop();
+            --that->items_;
             guard.unlock();
             ::pushmi::set_error(what, *that->error_);
             guard.lock();
@@ -299,13 +368,12 @@ public:
     if (!!this->joined_) { std::abort(); };
 
     queue->heap_.push(std::move(item));
+    ++this->items_;
 
-    if (queue->heap_.size() == 1) {
-      // add queue to pending queues_ list if it is not already there
-      auto q = std::find(this->queues_.begin(), this->queues_.end(), queue);
-      if (q == this->queues_.end()) {
-        this->queues_.push_back(queue);
-      }
+    if (!queue->dispatching_ && !queue->pending_) {
+      // add queue to pending pending_ list if it is not already there
+      this->pending_.push_back(queue);
+      queue->pending_ = true;
     }
 
     if (queue->heap_.top().when < this->earliest_) {
@@ -313,11 +381,6 @@ public:
       ++this->dirty_;
       this->wake_.notify_one();
     }
-  }
-
-  void insert(std::shared_ptr<time_source_queue_base<E, TP>> queue){
-    std::unique_lock<std::mutex> guard{this->lock_};
-    this->queues_.push_back(queue);
   }
 
 };

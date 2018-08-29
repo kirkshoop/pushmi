@@ -12,6 +12,7 @@
 
 #include "pushmi/trampoline.h"
 #include "pushmi/new_thread.h"
+#include "pushmi/time_source.h"
 
 #include "pushmi/none.h"
 #include "pushmi/entangle.h"
@@ -502,4 +503,21 @@ NONIUS_BENCHMARK("new thread submit 1'000", [](nonius::chronometer meter){
     while(counter.load() > 0);
     return counter.load();
   });
+})
+
+NONIUS_BENCHMARK("new thread + time submit 1'000", [](nonius::chronometer meter){
+  auto nt = mi::new_thread();
+  using NT = decltype(nt);
+  auto time = mi::time_source<>{};
+  auto tnt = time.make(mi::systemNowF{}, [nt](){ return nt; })();
+  using TNT = decltype(tnt);
+  std::atomic<int> counter{0};
+  countdownsingle single{counter};
+  meter.measure([&]{
+    counter.store(1'000);
+    tnt | op::submit(single);
+    while(counter.load() > 0);
+    return counter.load();
+  });
+  time.join();
 })
