@@ -505,6 +505,18 @@ NONIUS_BENCHMARK("new thread submit 1'000", [](nonius::chronometer meter){
   });
 })
 
+NONIUS_BENCHMARK("new thread blocking_submit 1'000", [](nonius::chronometer meter){
+  auto nt = mi::new_thread();
+  using NT = decltype(nt);
+  std::atomic<int> counter{0};
+  countdownsingle single{counter};
+  meter.measure([&]{
+    counter.store(1'000);
+    nt | op::blocking_submit(single);
+    return counter.load();
+  });
+})
+
 NONIUS_BENCHMARK("new thread + time submit 1'000", [](nonius::chronometer meter){
   auto nt = mi::new_thread();
   using NT = decltype(nt);
