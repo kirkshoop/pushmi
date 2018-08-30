@@ -135,35 +135,8 @@ private:
     std::mutex lock;
     std::condition_variable signaled;
   };
-  PUSHMI_TEMPLATE (class Out)
-    (requires Receiver<Out, is_single<>>)
-  struct nested_receiver_impl : Out {
-    nested_receiver_impl(lock_state* state, Out out) :
-      Out(std::move(out)),
-      state_(state) {}
-    lock_state* state_;
-
-    template<class V>
-    void value(V&& v);
-    template<class E>
-    void error(E&& e) noexcept {
-      ::pushmi::set_error(static_cast<Out*>(this), (E&&) e);
-      if(--state_->nested == 0) {
-        state_->signaled.notify_all();
-      }
-    }
-    void done() {
-      std::exception_ptr e;
-      try{
-        ::pushmi::set_done(static_cast<Out*>(this));
-      }
-      catch(...) {e = std::current_exception();}
-      if(--state_->nested == 0) {
-        state_->signaled.notify_all();
-      }
-      if (e) {std::rethrow_exception(e);}
-    }
-  };
+  template<class Out>
+  struct nested_receiver_impl;
   PUSHMI_TEMPLATE (class Exec)
     (requires Sender<Exec> && Executor<Exec>)
   struct nested_executor_impl : Exec {
@@ -184,6 +157,53 @@ private:
       ::pushmi::submit(static_cast<Exec*>(this), nested_receiver_impl<Receiver>{state_, std::move(out)});
     }
   };
+  template<class Out>
+  struct nested_receiver_impl : Out {
+    nested_receiver_impl(lock_state* state, Out out) :
+      Out(std::move(out)),
+      state_(state) {}
+    lock_state* state_;
+
+    template<class V>
+    void value(V&& v) {
+      std::exception_ptr e;
+      try{
+        using executor_t = remove_cvref_t<V>;
+        auto n = nested_executor_impl<executor_t>{state_, (V&&) v};
+        ::pushmi::set_value(static_cast<Out*>(this), any_executor_ref<>{n});
+      }
+      catch(...) {e = std::current_exception();}
+      if(--state_->nested == 0) {
+        state_->signaled.notify_all();
+      }
+      if (e) {std::rethrow_exception(e);}
+    }
+    template<class E>
+    void error(E&& e) noexcept {
+      ::pushmi::set_error(static_cast<Out*>(this), (E&&) e);
+      if(--state_->nested == 0) {
+        state_->signaled.notify_all();
+      }
+    }
+    void done() {
+      std::exception_ptr e;
+      try{
+        ::pushmi::set_done(static_cast<Out*>(this));
+      }
+      catch(...) {e = std::current_exception();}
+      if(--state_->nested == 0) {
+        state_->signaled.notify_all();
+      }
+      if (e) {std::rethrow_exception(e);}
+    }
+  };
+  struct nested_executor_impl_fn {
+    PUSHMI_TEMPLATE (class Exec)
+      (requires Executor<Exec>)
+    auto operator()(lock_state* state, Exec ex) const {
+      return nested_executor_impl<Exec>{state, std::move(ex)};
+    }
+  };
   struct on_value_impl {
     lock_state* state_;
     PUSHMI_TEMPLATE (class Out, class Value)
@@ -192,9 +212,9 @@ private:
       using V = remove_cvref_t<Value>;
       ++state_->nested;
       PUSHMI_IF_CONSTEXPR( ((bool)Executor<V>) (
-        ::pushmi::set_value(out, nested_executor_impl<V>{state_, id((Value&&) v)});
+        id(::pushmi::set_value)(out, id(nested_executor_impl_fn{})(state_, id((Value&&) v)));
       ) else (
-        ::pushmi::set_value(out, id((Value&&) v));
+        id(::pushmi::set_value)(out, id((Value&&) v));
       ))
       std::unique_lock<std::mutex> guard{state_->lock};
       state_->done = true;
@@ -308,21 +328,6 @@ public:
     return blocking_submit_fn::fn<AN...>{{(AN&&) an...}};
   }
 };
-template<class Out>
-template<class V>
-void blocking_submit_fn::nested_receiver_impl<Out>::value(V&& v) {
-  std::exception_ptr e;
-  try{
-    using executor_t = remove_cvref_t<V>;
-    auto n = nested_executor_impl<executor_t>{state_, (V&&) v};
-    ::pushmi::set_value(static_cast<Out*>(this), any_executor_ref<>{n});
-  }
-  catch(...) {e = std::current_exception();}
-  if(--state_->nested == 0) {
-    state_->signaled.notify_all();
-  }
-  if (e) {std::rethrow_exception(e);}
-}
 
 template <class T>
 struct get_fn {
