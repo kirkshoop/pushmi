@@ -320,7 +320,7 @@ public:
         // remove processed queues from pending queue.
         that->pending_.erase(process_begin, that->pending_.end());
 
-        // printf("d %d, %d, %d, %f\n", that->pending_.size(), that->ready_.size(), that->items_, std::chrono::duration_cast<std::chrono::milliseconds>(earliest - start).count());
+        // printf("d %lu, %lu, %d, %ld\n", that->pending_.size(), that->ready_.size(), that->items_, std::chrono::duration_cast<std::chrono::milliseconds>(earliest - start).count());
 
         // dispatch to queues with ready items
         guard.unlock();

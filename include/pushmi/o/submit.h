@@ -139,30 +139,38 @@ private:
   struct nested_receiver_impl;
   PUSHMI_TEMPLATE (class Exec)
     (requires Sender<Exec> && Executor<Exec>)
-  struct nested_executor_impl : Exec {
+  struct nested_executor_impl {
     nested_executor_impl(lock_state* state, Exec ex) :
-      Exec(std::move(ex)),
-      state_(state) {}
+      state_(state),
+      ex_(std::move(ex)) {}
     lock_state* state_;
+    Exec ex_;
+
+    using properties = properties_t<Exec>;
+
+    auto executor() { return ::pushmi::executor(ex_); }
 
     template<class CV, class Receiver>
     void submit(CV cv, Receiver out) {
       ++state_->nested;
-      ::pushmi::submit(static_cast<Exec*>(this), cv, nested_receiver_impl<Receiver>{state_, std::move(out)});
+      ::pushmi::submit(ex_, cv, nested_receiver_impl<Receiver>{state_, std::move(out)});
     }
 
     template<class Receiver>
     void submit(Receiver out) {
       ++state_->nested;
-      ::pushmi::submit(static_cast<Exec*>(this), nested_receiver_impl<Receiver>{state_, std::move(out)});
+      ::pushmi::submit(ex_, nested_receiver_impl<Receiver>{state_, std::move(out)});
     }
   };
   template<class Out>
-  struct nested_receiver_impl : Out {
+  struct nested_receiver_impl {
     nested_receiver_impl(lock_state* state, Out out) :
-      Out(std::move(out)),
-      state_(state) {}
+      state_(state),
+      out_(std::move(out)) {}
     lock_state* state_;
+    Out out_;
+
+    using properties = properties_t<Out>;
 
     template<class V>
     void value(V&& v) {
@@ -170,7 +178,7 @@ private:
       try{
         using executor_t = remove_cvref_t<V>;
         auto n = nested_executor_impl<executor_t>{state_, (V&&) v};
-        ::pushmi::set_value(static_cast<Out*>(this), any_executor_ref<>{n});
+        ::pushmi::set_value(out_, any_executor_ref<>{n});
       }
       catch(...) {e = std::current_exception();}
       if(--state_->nested == 0) {
@@ -180,7 +188,7 @@ private:
     }
     template<class E>
     void error(E&& e) noexcept {
-      ::pushmi::set_error(static_cast<Out*>(this), (E&&) e);
+      ::pushmi::set_error(out_, (E&&) e);
       if(--state_->nested == 0) {
         state_->signaled.notify_all();
       }
@@ -188,7 +196,7 @@ private:
     void done() {
       std::exception_ptr e;
       try{
-        ::pushmi::set_done(static_cast<Out*>(this));
+        ::pushmi::set_done(out_);
       }
       catch(...) {e = std::current_exception();}
       if(--state_->nested == 0) {
