@@ -40,9 +40,9 @@ public:
 
   PUSHMI_TEMPLATE (class Wrapped)
     (requires Sender<wrapped_t<Wrapped>, is_executor<>, is_single<>>)
-    // (requires TimeSenderTo<wrapped_t<Wrapped>, single<This, E>>)
+    // (requires SenderTo<wrapped_t<Wrapped>, single<This, E>>)
   any_executor_ref(Wrapped& w) {
-    // This can't be a requirement because it asks if submit(w, now(w), single<T,E>)
+    // This can't be a requirement because it asks if submit(w, single<T,E>)
     // is well-formed (where T is an alias for any_executor_ref). If w
     // has a submit that is constrained with SingleReceiver<single<T, E>, T'&, E'>, that
     // will ask whether value(single<T,E>, T'&) is well-formed. And *that* will
@@ -191,7 +191,7 @@ public:
     (requires ConstrainedSender<wrapped_t<Wrapped>, is_single<>>)
     // (requires ConstrainedSenderTo<wrapped_t<Wrapped>, single<This, E>>)
   any_constrained_executor_ref(Wrapped& w) {
-    // This can't be a requirement because it asks if submit(w, now(w), single<T,E>)
+    // This can't be a requirement because it asks if submit(w, top(w), single<T,E>)
     // is well-formed (where T is an alias for any_constrained_executor_ref). If w
     // has a submit that is constrained with SingleReceiver<single<T, E>, T'&, E'>, that
     // will ask whether value(single<T,E>, T'&) is well-formed. And *that* will

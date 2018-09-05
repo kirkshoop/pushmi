@@ -49,6 +49,14 @@ template<class E, class TP>
 bool operator!=(const time_heap_item<E, TP>& l, const time_heap_item<E, TP>& r) {
   return !(l == r);
 }
+template<class E, class TP>
+bool operator<=(const time_heap_item<E, TP>& l, const time_heap_item<E, TP>& r) {
+  return !(l > r);
+}
+template<class E, class TP>
+bool operator>=(const time_heap_item<E, TP>& l, const time_heap_item<E, TP>& r) {
+  return !(l < r);
+}
 
 template<class E, class TP>
 class time_source_queue_base : public std::enable_shared_from_this<time_source_queue_base<E, TP>>{
@@ -57,6 +65,8 @@ public:
   bool dispatching_ = false;
   bool pending_ = false;
   std::priority_queue<time_heap_item<E, TP>, std::vector<time_heap_item<E, TP>>, std::greater<>> heap_;
+
+  virtual ~time_source_queue_base() {}
 
   time_heap_item<E, TP>& top() {
     // :(

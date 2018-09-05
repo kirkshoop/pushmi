@@ -150,16 +150,22 @@ private:
 
     auto executor() { return ::pushmi::executor(ex_); }
 
-    template<class CV, class Receiver>
-    void submit(CV cv, Receiver out) {
+    PUSHMI_TEMPLATE (class CV, class Out)
+      (requires Receiver<Out> && Constrained<Exec>)
+    auto top() { return ::pushmi::top(ex_); }
+
+    PUSHMI_TEMPLATE (class CV, class Out)
+      (requires Receiver<Out> && Constrained<Exec>)
+    void submit(CV cv, Out out) {
       ++state_->nested;
-      ::pushmi::submit(ex_, cv, nested_receiver_impl<Receiver>{state_, std::move(out)});
+      ::pushmi::submit(ex_, cv, nested_receiver_impl<Out>{state_, std::move(out)});
     }
 
-    template<class Receiver>
-    void submit(Receiver out) {
+    PUSHMI_TEMPLATE (class Out)
+      (requires Receiver<Out> && not Constrained<Exec>)
+    void submit(Out out) {
       ++state_->nested;
-      ::pushmi::submit(ex_, nested_receiver_impl<Receiver>{state_, std::move(out)});
+      ::pushmi::submit(ex_, nested_receiver_impl<Out>{state_, std::move(out)});
     }
   };
   template<class Out>

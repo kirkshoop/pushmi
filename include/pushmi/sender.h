@@ -26,7 +26,7 @@ class sender<detail::erase_sender_t, E> {
   }
   struct vtable {
     static void s_op(data&, data*) {}
-    static any_executor<E /* hmm, TP will be invasive */> s_executor(data&) { return {}; }
+    static any_executor<E> s_executor(data&) { return {}; }
     static void s_submit(data&, any_none<E>) {}
     void (*op_)(data&, data*) = vtable::s_op;
     any_executor<E> (*executor_)(data&) = vtable::s_executor;

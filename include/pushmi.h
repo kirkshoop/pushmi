@@ -5022,9 +5022,9 @@ public:
 
   PUSHMI_TEMPLATE (class Wrapped)
     (requires Sender<wrapped_t<Wrapped>, is_executor<>, is_single<>>)
-    // (requires TimeSenderTo<wrapped_t<Wrapped>, single<This, E>>)
+    // (requires SenderTo<wrapped_t<Wrapped>, single<This, E>>)
   any_executor_ref(Wrapped& w) {
-    // This can't be a requirement because it asks if submit(w, now(w), single<T,E>)
+    // This can't be a requirement because it asks if submit(w, single<T,E>)
     // is well-formed (where T is an alias for any_executor_ref). If w
     // has a submit that is constrained with SingleReceiver<single<T, E>, T'&, E'>, that
     // will ask whether value(single<T,E>, T'&) is well-formed. And *that* will
@@ -5173,7 +5173,7 @@ public:
     (requires ConstrainedSender<wrapped_t<Wrapped>, is_single<>>)
     // (requires ConstrainedSenderTo<wrapped_t<Wrapped>, single<This, E>>)
   any_constrained_executor_ref(Wrapped& w) {
-    // This can't be a requirement because it asks if submit(w, now(w), single<T,E>)
+    // This can't be a requirement because it asks if submit(w, top(w), single<T,E>)
     // is well-formed (where T is an alias for any_constrained_executor_ref). If w
     // has a submit that is constrained with SingleReceiver<single<T, E>, T'&, E'>, that
     // will ask whether value(single<T,E>, T'&) is well-formed. And *that* will
@@ -6324,6 +6324,14 @@ template<class E, class TP>
 bool operator!=(const time_heap_item<E, TP>& l, const time_heap_item<E, TP>& r) {
   return !(l == r);
 }
+template<class E, class TP>
+bool operator<=(const time_heap_item<E, TP>& l, const time_heap_item<E, TP>& r) {
+  return !(l > r);
+}
+template<class E, class TP>
+bool operator>=(const time_heap_item<E, TP>& l, const time_heap_item<E, TP>& r) {
+  return !(l < r);
+}
 
 template<class E, class TP>
 class time_source_queue_base : public std::enable_shared_from_this<time_source_queue_base<E, TP>>{
@@ -6332,6 +6340,8 @@ public:
   bool dispatching_ = false;
   bool pending_ = false;
   std::priority_queue<time_heap_item<E, TP>, std::vector<time_heap_item<E, TP>>, std::greater<>> heap_;
+
+  virtual ~time_source_queue_base() {}
 
   time_heap_item<E, TP>& top() {
     // :(
@@ -6782,7 +6792,7 @@ class sender<detail::erase_sender_t, E> {
   }
   struct vtable {
     static void s_op(data&, data*) {}
-    static any_executor<E /* hmm, TP will be invasive */> s_executor(data&) { return {}; }
+    static any_executor<E> s_executor(data&) { return {}; }
     static void s_submit(data&, any_none<E>) {}
     void (*op_)(data&, data*) = vtable::s_op;
     any_executor<E> (*executor_)(data&) = vtable::s_executor;
@@ -7498,7 +7508,7 @@ class any_many_sender {
   }
   struct vtable {
     static void s_op(data&, data*) {}
-    static any_executor<E /* hmm, TP will be invasive */> s_executor(data&) { return {}; }
+    static any_executor<E> s_executor(data&) { return {}; }
     static void s_submit(data&, many<V, E>) {}
     void (*op_)(data&, data*) = vtable::s_op;
     any_executor<E> (*executor_)(data&) = vtable::s_executor;
@@ -8498,16 +8508,22 @@ private:
 
     auto executor() { return ::pushmi::executor(ex_); }
 
-    template<class CV, class Receiver>
-    void submit(CV cv, Receiver out) {
+    PUSHMI_TEMPLATE (class CV, class Out)
+      (requires Receiver<Out> && Constrained<Exec>)
+    auto top() { return ::pushmi::top(ex_); }
+
+    PUSHMI_TEMPLATE (class CV, class Out)
+      (requires Receiver<Out> && Constrained<Exec>)
+    void submit(CV cv, Out out) {
       ++state_->nested;
-      ::pushmi::submit(ex_, cv, nested_receiver_impl<Receiver>{state_, std::move(out)});
+      ::pushmi::submit(ex_, cv, nested_receiver_impl<Out>{state_, std::move(out)});
     }
 
-    template<class Receiver>
-    void submit(Receiver out) {
+    PUSHMI_TEMPLATE (class Out)
+      (requires Receiver<Out> && not Constrained<Exec>)
+    void submit(Out out) {
       ++state_->nested;
-      ::pushmi::submit(ex_, nested_receiver_impl<Receiver>{state_, std::move(out)});
+      ::pushmi::submit(ex_, nested_receiver_impl<Out>{state_, std::move(out)});
     }
   };
   template<class Out>
