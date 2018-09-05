@@ -40,68 +40,6 @@ SCENARIO( "trampoline executor", "[trampoline][sender]" ) {
     auto tr = v::trampoline();
     using TR = decltype(tr);
 
-    // WHEN( "submit now" ) {
-    //   auto signals = 0;
-    //   auto start = v::now(tr);
-    //   auto signaled = v::now(tr);
-    //   tr |
-    //     op::transform([](auto tr){ return v::now(tr); }) |
-    //     op::submit(
-    //       [&](auto at){ signaled = at;
-    //         signals += 100; },
-    //       [&](auto e) noexcept { signals += 1000; },
-    //       [&](){ signals += 10; });
-    //
-    //   THEN( "the value signal is recorded once and the signal did not drift much" ) {
-    //     REQUIRE( signals == 100 );
-    //     INFO("The delay is " << ::Catch::Detail::stringify(signaled - start));
-    //     REQUIRE( signaled - start < 10s );
-    //   }
-    // }
-
-    // WHEN( "blocking get now" ) {
-    //   auto start = v::now(tr);
-    //   auto signaled = tr |
-    //     op::transform([](auto tr){ return v::now(tr); }) |
-    //     op::get<decltype(v::now(tr))>;
-    //
-    //   THEN( "the signal did not drift much" ) {
-    //     INFO("The delay is " << ::Catch::Detail::stringify(signaled - start));
-    //     REQUIRE( signaled - start < 10s );
-    //   }
-    // }
-
-    // WHEN( "submissions are ordered in time" ) {
-    //   std::vector<std::string> times;
-    //   auto push = [&](int time) {
-    //     return v::on_value([&, time](auto) { times.push_back(std::to_string(time)); });
-    //   };
-    //   tr | op::submit(v::on_value([push](auto tr) {
-    //     tr |
-    //         op::submit_after(40ms, push(40)) |
-    //         op::submit_after(10ms, push(10)) |
-    //         op::submit_after(20ms, push(20)) |
-    //         op::submit_after(10ms, push(11));
-    //   }));
-    //
-    //   THEN( "the items were pushed in time order not insertion order" ) {
-    //     REQUIRE( times == std::vector<std::string>{"10", "11", "20", "40"});
-    //   }
-    // }
-
-    // WHEN( "now is called" ) {
-    //   bool done = false;
-    //   tr | ep::now();
-    //   tr | op::submit([&](auto tr) {
-    //     tr | ep::now();
-    //     done = true;
-    //   });
-    //
-    //   THEN( "both calls to now() complete" ) {
-    //     REQUIRE( done == true );
-    //   }
-    // }
-
     WHEN( "submit" ) {
       auto signals = 0;
       tr |
