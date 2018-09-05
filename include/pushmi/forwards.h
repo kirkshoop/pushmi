@@ -48,6 +48,9 @@ struct is_constrained;
 // implementation types
 
 template <PUSHMI_TYPE_CONSTRAINT(SemiMovable)... TN>
+class receiver;
+
+template <PUSHMI_TYPE_CONSTRAINT(SemiMovable)... TN>
 class none;
 
 template <PUSHMI_TYPE_CONSTRAINT(SemiMovable)... TN>
@@ -83,6 +86,10 @@ class flow_many;
 template <PUSHMI_TYPE_CONSTRAINT(SemiMovable)... TN>
 class flow_many_sender;
 
+template <
+  class E = std::exception_ptr,
+  class... VN>
+class any_receiver;
 
 template<
   class V,

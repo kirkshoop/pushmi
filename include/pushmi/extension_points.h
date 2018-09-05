@@ -146,16 +146,19 @@ inline void set_done(std::promise<void>& p) noexcept(noexcept(p.set_value())) {
   p.set_value();
 }
 template <class T>
-void set_error(std::promise<T>& s, std::exception_ptr e) noexcept {
-  s.set_exception(std::move(e));
+void set_error(std::promise<T>& p, std::exception_ptr e) noexcept {
+  p.set_exception(std::move(e));
 }
 template <class T, class E>
-void set_error(std::promise<T>& s, E e) noexcept {
-  s.set_exception(std::make_exception_ptr(std::move(e)));
+void set_error(std::promise<T>& p, E e) noexcept {
+  p.set_exception(std::make_exception_ptr(std::move(e)));
 }
 template <class T>
-void set_value(std::promise<T>& s, T t) {
-  s.set_value(std::move(t));
+void set_value(std::promise<T>& p, T t) noexcept(noexcept(p.set_value(std::move(t)))) {
+  p.set_value(std::move(t));
+}
+inline void set_value(std::promise<void>& p) noexcept(noexcept(p.set_value())) {
+  p.set_value();
 }
 
 //

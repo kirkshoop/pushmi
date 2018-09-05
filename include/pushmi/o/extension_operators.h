@@ -210,19 +210,19 @@ constexpr bool sender_requires_from() {
 
 struct set_value_fn {
 private:
-  template <class V>
+  template <class... VN>
   struct impl {
-    V v_;
+    std::tuple<VN...> vn_;
     PUSHMI_TEMPLATE(class Out)
       (requires Receiver<Out, is_single<>>)
     void operator()(Out out) {
-      ::pushmi::set_value(out, std::move(v_));
+      ::pushmi::apply(std::tuple_cat(std::tuple<Out>{std::move(out)}, std::move(vn_)), ::pushmi::set_value);
     }
   };
 public:
-  template <class V>
-  auto operator()(V&& v) const {
-    return impl<std::decay_t<V>>{(V&&) v};
+  template <class... VN>
+  auto operator()(VN&&... vn) const {
+    return impl<std::decay_t<VN>...>{(VN&&) vn...};
   }
 };
 

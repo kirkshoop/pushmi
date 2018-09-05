@@ -69,7 +69,9 @@ template <template <class...> class T, class... AN>
 using deduced_type_t = pushmi::invoke_result_t<construct_deduced<T>, AN...>;
 
 struct ignoreVF {
-  void operator()(detail::any) {}
+  PUSHMI_TEMPLATE(class... VN)
+    (requires And<ConvertibleTo<VN&&, detail::any>...>)
+  void operator()(VN&&...) {}
 };
 
 struct abortEF {
@@ -110,12 +112,12 @@ struct priorityZeroF {
 };
 
 struct passDVF {
-  PUSHMI_TEMPLATE(class V, class Data)
+  PUSHMI_TEMPLATE(class Data, class... VN)
     (requires requires (
-      ::pushmi::set_value(std::declval<Data&>(), std::declval<V>())
+      ::pushmi::set_value(std::declval<Data&>(), std::declval<VN>()...)
     ) && Receiver<Data>)
-  void operator()(Data& out, V&& v) const {
-    ::pushmi::set_value(out, (V&&) v);
+  void operator()(Data& out, VN&&... vn) const {
+    ::pushmi::set_value(out, (VN&&) vn...);
   }
 };
 

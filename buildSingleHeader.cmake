@@ -33,6 +33,7 @@ set(header_files
     "${CMAKE_CURRENT_SOURCE_DIR}/include/pushmi/concepts.h"
     "${CMAKE_CURRENT_SOURCE_DIR}/include/pushmi/boosters.h"
     "${CMAKE_CURRENT_SOURCE_DIR}/include/pushmi/piping.h"
+    "${CMAKE_CURRENT_SOURCE_DIR}/include/pushmi/receiver.h"
     "${CMAKE_CURRENT_SOURCE_DIR}/include/pushmi/none.h"
     "${CMAKE_CURRENT_SOURCE_DIR}/include/pushmi/single.h"
     "${CMAKE_CURRENT_SOURCE_DIR}/include/pushmi/flow_single.h"
