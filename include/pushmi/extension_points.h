@@ -26,10 +26,10 @@ PUSHMI_TEMPLATE (class S, class E)
 void set_error(S& s, E e) noexcept(noexcept(s.error(std::move(e)))) {
   s.error(std::move(e));
 }
-PUSHMI_TEMPLATE (class S, class V)
-  (requires requires (std::declval<S&>().value(std::declval<V&&>())))
-void set_value(S& s, V&& v) noexcept(noexcept(s.value((V&&) v))) {
-  s.value((V&&) v);
+PUSHMI_TEMPLATE (class S, class... VN)
+  (requires requires (std::declval<S&>().value(std::declval<VN&&>()...)))
+void set_value(S& s, VN&&... vn) noexcept(noexcept(s.value((VN&&) vn...))) {
+  s.value((VN&&) vn...);
 }
 PUSHMI_TEMPLATE (class S, class V)
   (requires requires (std::declval<S&>().next(std::declval<V&&>())))
@@ -86,10 +86,10 @@ PUSHMI_TEMPLATE (class S, class E)
 void set_error(S& s, E e) noexcept(noexcept(s->error(std::move(e)))) {
   s->error(std::move(e));
 }
-PUSHMI_TEMPLATE (class S, class V)
-  (requires requires (std::declval<S&>()->value(std::declval<V&&>())))
-void set_value(S& s, V&& v) noexcept(noexcept(s->value((V&&) v))) {
-  s->value((V&&) v);
+PUSHMI_TEMPLATE (class S, class... VN)
+  (requires requires (std::declval<S&>()->value(std::declval<VN&&>()...)))
+void set_value(S& s, VN&&... vn) noexcept(noexcept(s->value((VN&&) vn...))) {
+  s->value((VN&&) vn...);
 }
 PUSHMI_TEMPLATE (class S, class V)
   (requires requires (std::declval<S&>()->next(std::declval<V&&>())))
@@ -173,11 +173,11 @@ PUSHMI_TEMPLATE (class S, class E)
 void set_error(std::reference_wrapper<S> s, E e) noexcept {
   set_error(s.get(), std::move(e));
 }
-PUSHMI_TEMPLATE (class S, class V)
-  (requires requires ( set_value(std::declval<S&>(), std::declval<V&&>()) ))
-void set_value(std::reference_wrapper<S> s, V&& v) noexcept(
-  noexcept(set_value(s.get(), (V&&) v))) {
-  set_value(s.get(), (V&&) v);
+PUSHMI_TEMPLATE (class S, class... VN)
+  (requires requires ( set_value(std::declval<S&>(), std::declval<VN&&>()...) ))
+void set_value(std::reference_wrapper<S> s, VN&&... vn) noexcept(
+  noexcept(set_value(s.get(), (VN&&) vn...))) {
+  set_value(s.get(), (VN&&) vn...);
 }
 PUSHMI_TEMPLATE (class S, class V)
   (requires requires ( set_next(std::declval<S&>(), std::declval<V&&>()) ))
@@ -248,15 +248,15 @@ struct set_error_fn {
   }
 };
 struct set_value_fn {
-  PUSHMI_TEMPLATE (class S, class V)
+  PUSHMI_TEMPLATE (class S, class... VN)
     (requires requires (
-      set_value(std::declval<S&>(), std::declval<V&&>()),
+      set_value(std::declval<S&>(), std::declval<VN&&>()...),
       set_error(std::declval<S&>(), std::current_exception())
     ))
-  void operator()(S&& s, V&& v) const
-      noexcept(noexcept(set_value(s, (V&&) v))) {
+  void operator()(S&& s, VN&&... vn) const
+      noexcept(noexcept(set_value(s, (VN&&) vn...))) {
     try {
-      set_value(s, (V&&) v);
+      set_value(s, (VN&&) vn...);
     } catch (...) {
       set_error(s, std::current_exception());
     }
