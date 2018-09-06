@@ -123,7 +123,7 @@ struct passDVF {
 
 struct passDEF {
   PUSHMI_TEMPLATE(class E, class Data)
-    (requires NoneReceiver<Data, E>)
+    (requires ReceiveError<Data, E>)
   void operator()(Data& out, E e) const noexcept {
     ::pushmi::set_error(out, e);
   }

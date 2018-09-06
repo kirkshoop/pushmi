@@ -304,12 +304,12 @@ struct construct_deduced<none> : make_none_fn {};
 //   return none<E>{std::move(w)};
 // }
 
-PUSHMI_TEMPLATE (class Out)
-  (requires SenderTo<Out, std::promise<void>, is_none<>>)
-std::future<void> future_from(Out out) {
+PUSHMI_TEMPLATE (class In)
+  (requires PUSHMI_EXP(lazy::SenderTo<In, std::promise<void>, is_none<>> PUSHMI_BROKEN_SUBSUMPTION(PUSHMI_AND not lazy::Sender<In, is_single<>>)))
+std::future<void> future_from(In in) {
   std::promise<void> p;
   auto result = p.get_future();
-  submit(out, std::move(p));
+  submit(in, std::move(p));
   return result;
 }
 

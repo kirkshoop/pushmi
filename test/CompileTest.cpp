@@ -37,16 +37,21 @@ void receiver_0_test() {
   auto proxy2 = pushmi::MAKE(receiver)(out0, pushmi::passDVF{}, pushmi::passDEF{});
   auto proxy3 = pushmi::MAKE(receiver)(
       out0, pushmi::passDVF{}, pushmi::passDEF{}, pushmi::passDDF{});
-  auto proxy4 = pushmi::MAKE(receiver)(out0, [](auto d){}, [](auto d, auto e)noexcept {
-    d.error(e.get());
+  auto proxy4 = pushmi::MAKE(receiver)(out0, [](Out0&){}, [](Out0& d, auto e)noexcept {
+    d.error(e);
   });
   auto proxy5 = pushmi::MAKE(receiver)(
+      out0,
+      pushmi::on_value(
+        [](Out0&) { }
+      ));
+  auto proxy6 = pushmi::MAKE(receiver)(
       out0,
       pushmi::on_error(
         [](Out0&, std::exception_ptr e) noexcept{},
         [](Out0&, auto e) noexcept{ e.get(); }
       ));
-  auto proxy6 = pushmi::MAKE(receiver)(
+  auto proxy7 = pushmi::MAKE(receiver)(
       out0,
       pushmi::on_done([](Out0&) { }));
 
@@ -61,6 +66,7 @@ void receiver_0_test() {
   auto any2 = pushmi::any_receiver<>(out0);
   auto any3 = pushmi::any_receiver<>(proxy0);
 }
+
 void receiver_1_test(){
   auto out0 = pushmi::MAKE(receiver)();
   auto out1 = pushmi::MAKE(receiver)(pushmi::ignoreVF{});
