@@ -180,7 +180,7 @@ struct select<false> {
 
 // disable buggy compatibility warning about "requires" and "concept" being
 // C++20 keywords.
-#if defined(__clang__)
+#if defined(__clang__) && not defined(__APPLE__)
 #define PUSHMI_PP_IGNORE_CXX2A_COMPAT_BEGIN \
     _Pragma("GCC diagnostic push") \
     _Pragma("GCC diagnostic ignored \"-Wunknown-pragmas\"") \
@@ -190,7 +190,17 @@ struct select<false> {
     /**/
 #define PUSHMI_PP_IGNORE_CXX2A_COMPAT_END \
     _Pragma("GCC diagnostic pop")
+#elif defined(__clang__) && defined(__APPLE__)
+#define PUSHMI_PP_IGNORE_CXX2A_COMPAT_BEGIN \
+    _Pragma("GCC diagnostic push") \
+    _Pragma("GCC diagnostic ignored \"-Wunknown-pragmas\"") \
+    _Pragma("GCC diagnostic ignored \"-Wpragmas\"") \
+    _Pragma("GCC diagnostic ignored \"-Wfloat-equal\"") \
+    /**/
+#define PUSHMI_PP_IGNORE_CXX2A_COMPAT_END \
+    _Pragma("GCC diagnostic pop")
 #else
+
 #define PUSHMI_PP_IGNORE_CXX2A_COMPAT_BEGIN
 #define PUSHMI_PP_IGNORE_CXX2A_COMPAT_END
 // #pragma GCC diagnostic push
@@ -2338,11 +2348,11 @@ PUSHMI_CONCEPT_DEF(
 PUSHMI_CONCEPT_DEF(
   template (class R, class... VN)
   (concept ReceiveValue)(R, VN...),
-    requires(R& r, VN&&... vn) (
-      ::pushmi::set_value(r, (VN &&) vn...)
+    requires(R& r) (
+      ::pushmi::set_value(r, std::declval<VN &&>()...)
     ) &&
     Receiver<R> &&
-    // ICE on SemiMovable<VN>...
+    // GCC w/-fconcepts ICE on SemiMovable<VN>...
     True<> // And<SemiMovable<VN>...>
 );
 

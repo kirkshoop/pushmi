@@ -220,11 +220,11 @@ PUSHMI_CONCEPT_DEF(
 PUSHMI_CONCEPT_DEF(
   template (class R, class... VN)
   (concept ReceiveValue)(R, VN...),
-    requires(R& r, VN&&... vn) (
-      ::pushmi::set_value(r, (VN &&) vn...)
+    requires(R& r) (
+      ::pushmi::set_value(r, std::declval<VN &&>()...)
     ) &&
     Receiver<R> &&
-    // ICE on SemiMovable<VN>...
+    // GCC w/-fconcepts ICE on SemiMovable<VN>...
     True<> // And<SemiMovable<VN>...>
 );
 
