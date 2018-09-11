@@ -9,6 +9,7 @@
 #include <tuple>
 #include "../piping.h"
 #include "../boosters.h"
+#include "../receiver.h"
 #include "../single.h"
 #include "../sender.h"
 #include "../single_sender.h"
@@ -53,7 +54,7 @@ namespace detail {
 template <class Cardinality, bool IsFlow = false>
 struct make_receiver;
 template <>
-struct make_receiver<is_none<>> : construct_deduced<none> {};
+struct make_receiver<is_none<>> : construct_deduced<receiver> {};
 template <>
 struct make_receiver<is_single<>> : construct_deduced<single> {};
 template <>
@@ -80,7 +81,7 @@ struct receiver_from_impl {
     return This()(This()(std::move(args)), std::move(fns)...);
   }
   PUSHMI_TEMPLATE(class Out, class...Fns)
-    (requires Receiver<Out, Cardinality> && And<SemiMovable<Fns>...>)
+    (requires Receiver<Out> && And<SemiMovable<Fns>...>)
   auto operator()(Out out, Fns... fns) const {
     return MakeReceiver()(std::move(out), std::move(fns)...);
   }
@@ -96,7 +97,7 @@ template <class In, class FN>
 struct submit_transform_out_1 {
   FN fn_;
   PUSHMI_TEMPLATE(class Out)
-    (requires Receiver<Out>)
+    (requires Receiver<Out> && Invocable<FN, Out> && SenderTo<In, pushmi::invoke_result_t<const FN&, Out>>)
   void operator()(In& in, Out out) const {
     ::pushmi::submit(in, fn_(std::move(out)));
   }
@@ -105,7 +106,7 @@ template <class In, class FN>
 struct submit_transform_out_2 {
   FN fn_;
   PUSHMI_TEMPLATE(class TP, class Out)
-    (requires Receiver<Out>)
+    (requires Receiver<Out> && Invocable<FN, Out> && ConstrainedSenderTo<In, pushmi::invoke_result_t<const FN&, Out>>)
   void operator()(In& in, TP tp, Out out) const {
     ::pushmi::submit(in, tp, fn_(std::move(out)));
   }
@@ -137,22 +138,22 @@ auto submit_transform_out(FN fn) {
 }
 
 PUSHMI_TEMPLATE(class In, class FN)
-  (requires TimeSender<In> && SemiMovable<FN>)
+  (requires ConstrainedSender<In> && SemiMovable<FN>)
 auto submit_transform_out(FN fn){
-  return on_submit(submit_transform_out_2<In, FN>{std::move(fn)});
+  return submit_transform_out_2<In, FN>{std::move(fn)};
 }
 
 PUSHMI_TEMPLATE(class In, class SDSF, class TSDSF)
   (requires Sender<In> && SemiMovable<SDSF> && SemiMovable<TSDSF>
     PUSHMI_BROKEN_SUBSUMPTION(&& not TimeSender<In>))
 auto submit_transform_out(SDSF sdsf, TSDSF) {
-  return on_submit(submit_transform_out_3<In, SDSF>{std::move(sdsf)});
+  return submit_transform_out_3<In, SDSF>{std::move(sdsf)};
 }
 
 PUSHMI_TEMPLATE(class In, class SDSF, class TSDSF)
   (requires TimeSender<In> && SemiMovable<SDSF> && SemiMovable<TSDSF>)
 auto submit_transform_out(SDSF, TSDSF tsdsf) {
-  return on_submit(submit_transform_out_4<In, TSDSF>{std::move(tsdsf)});
+  return submit_transform_out_4<In, TSDSF>{std::move(tsdsf)};
 }
 
 template <class Cardinality, bool IsConstrained = false, bool IsTime = false, bool IsFlow = false>
@@ -232,7 +233,7 @@ private:
   struct impl {
     E e_;
     PUSHMI_TEMPLATE(class Out)
-      (requires NoneReceiver<Out, E>)
+      (requires ReceiveError<Out, E>)
     void operator()(Out out) {
       ::pushmi::set_error(out, std::move(e_));
     }

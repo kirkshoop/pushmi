@@ -38,22 +38,22 @@ SCENARIO("flow single immediate cancellation", "[flow][sender]") {
       auto tokens = mi::shared_entangle(stop, set_stop);
 
       using Stopper = decltype(tokens.second);
-      struct Data : mi::none<> {
+      struct Data : mi::receiver<> {
         explicit Data(Stopper stopper) : stopper(std::move(stopper)) {}
         Stopper stopper;
       };
-      auto up = mi::MAKE(none)(
+      auto up = mi::MAKE(receiver)(
           Data{std::move(tokens.second)},
           [&](auto& data, auto e) noexcept {
             signals += 100000;
             auto both = lock_both(data.stopper);
             (*(both.first))(both.second);
           },
-          [&](auto& data) {
+          mi::on_done([&](auto& data) {
             signals += 10000;
             auto both = lock_both(data.stopper);
             (*(both.first))(both.second);
-          });
+          }));
 
       // pass reference for cancellation.
       ::mi::set_starting(out, std::move(up));
@@ -124,22 +124,22 @@ SCENARIO("flow single shared cancellation new thread", "[flow][sender]") {
       auto tokens = mi::shared_entangle(stop, set_stop);
 
       using Stopper = decltype(tokens.second);
-      struct Data : mi::none<> {
+      struct Data : mi::receiver<> {
         explicit Data(Stopper stopper) : stopper(std::move(stopper)) {}
         Stopper stopper;
       };
-      auto up = mi::MAKE(none)(
+      auto up = mi::MAKE(receiver)(
           Data{std::move(tokens.second)},
           [&](auto& data, auto e) noexcept {
             signals += 100000;
             auto both = lock_both(data.stopper);
             (*(both.first))(both.second);
           },
-          [&](auto& data) {
+          mi::on_done([&](auto& data) {
             signals += 10000;
             auto both = lock_both(data.stopper);
             (*(both.first))(both.second);
-          });
+          }));
 
       // make all the signals come from the same thread
       tnt |
@@ -299,22 +299,22 @@ SCENARIO("flow single entangled cancellation new thread", "[flow][sender]") {
       auto tokens = mi::entangle(stop, set_stop);
 
       using Stopper = decltype(tokens.second);
-      struct Data : mi::none<> {
+      struct Data : mi::receiver<> {
         explicit Data(Stopper stopper) : stopper(std::move(stopper)) {}
         Stopper stopper;
       };
-      auto up = mi::MAKE(none)(
+      auto up = mi::MAKE(receiver)(
           Data{std::move(tokens.second)},
           [&](auto& data, auto e) noexcept {
             signals += 100000;
             auto both = lock_both(data.stopper);
             (*(both.first))(both.second);
           },
-          [&](auto& data) {
+          mi::on_done([&](auto& data) {
             signals += 10000;
             auto both = lock_both(data.stopper);
             (*(both.first))(both.second);
-          });
+          }));
 
       // make all the signals come from the same thread
       tnt |

@@ -5,7 +5,7 @@
 // LICENSE file in the root directory of this source tree.
 
 #include <future>
-#include "none.h"
+#include "boosters.h"
 
 namespace pushmi {
 
@@ -25,13 +25,11 @@ class single<V, E> {
     static void s_op(data&, data*) {}
     static void s_done(data&) {}
     static void s_error(data&, E) noexcept { std::terminate(); }
-    static void s_rvalue(data&, V&&) {}
-    static void s_lvalue(data&, V&) {}
+    static void s_value(data&, V) {}
     void (*op_)(data&, data*) = vtable::s_op;
     void (*done_)(data&) = vtable::s_done;
     void (*error_)(data&, E) noexcept = vtable::s_error;
-    void (*rvalue_)(data&, V&&) = vtable::s_rvalue;
-    void (*lvalue_)(data&, V&) = vtable::s_lvalue;
+    void (*value_)(data&, V) = vtable::s_value;
   };
   static constexpr vtable const noop_ {};
   vtable const* vptr_ = &noop_;
@@ -61,14 +59,11 @@ class single<V, E> {
       static void error(data& src, E e) noexcept {
         ::pushmi::set_error(*static_cast<Wrapped*>(src.pobj_), std::move(e));
       }
-      static void rvalue(data& src, V&& v) {
-        ::pushmi::set_value(*static_cast<Wrapped*>(src.pobj_), (V&&) v);
-      }
-      static void lvalue(data& src, V& v) {
-        ::pushmi::set_value(*static_cast<Wrapped*>(src.pobj_), v);
+      static void value(data& src, V v) {
+        ::pushmi::set_value(*static_cast<Wrapped*>(src.pobj_), std::move(v));
       }
     };
-    static const vtable vtbl{s::op, s::done, s::error, s::rvalue, s::lvalue};
+    static const vtable vtbl{s::op, s::done, s::error, s::value};
     data_.pobj_ = new Wrapped(std::move(obj));
     vptr_ = &vtbl;
   }
@@ -89,14 +84,11 @@ class single<V, E> {
           *static_cast<Wrapped*>((void*)src.buffer_),
           std::move(e));
       }
-      static void rvalue(data& src, V&& v) {
-        ::pushmi::set_value(*static_cast<Wrapped*>((void*)src.buffer_), (V&&) v);
-      }
-      static void lvalue(data& src, V& v) {
-        ::pushmi::set_value(*static_cast<Wrapped*>((void*)src.buffer_), v);
+      static void value(data& src, V v) {
+        ::pushmi::set_value(*static_cast<Wrapped*>((void*)src.buffer_), std::move(v));
       }
     };
-    static const vtable vtbl{s::op, s::done, s::error, s::rvalue, s::lvalue};
+    static const vtable vtbl{s::op, s::done, s::error, s::value};
     new ((void*)data_.buffer_) Wrapped(std::move(obj));
     vptr_ = &vtbl;
   }
@@ -123,19 +115,11 @@ public:
     return *this;
   }
   PUSHMI_TEMPLATE (class T)
-    (requires ConvertibleTo<T&&, V&&>)
+    (requires ConvertibleTo<T&&, V>)
   void value(T&& t) {
     if (!done_) {
       done_ = true;
-      vptr_->rvalue_(data_, (T&&) t);
-    }
-  }
-  PUSHMI_TEMPLATE (class T)
-    (requires ConvertibleTo<T&, V&>)
-  void value(T& t) {
-    if (!done_) {
-      done_ = true;
-      vptr_->lvalue_(data_, t);
+      vptr_->value_(data_, (T&&) t);
     }
   }
   void error(E e) noexcept {
@@ -325,10 +309,10 @@ PUSHMI_INLINE_VAR constexpr struct make_single_fn {
   auto operator()(Data d, on_error_fn<DEFN...> ef) const {
     return single<Data, passDVF, on_error_fn<DEFN...>, passDDF>{std::move(d), std::move(ef)};
   }
-  PUSHMI_TEMPLATE(class Data, class DDF)
-    (requires PUSHMI_EXP(lazy::True<> PUSHMI_AND lazy::Receiver<Data, is_single<>> PUSHMI_AND lazy::Invocable<DDF&, Data&>))
-  auto operator()(Data d, DDF df) const {
-    return single<Data, passDVF, passDEF, DDF>{std::move(d), std::move(df)};
+  PUSHMI_TEMPLATE(class Data, class... DFN)
+    (requires PUSHMI_EXP(lazy::True<> PUSHMI_AND lazy::Receiver<Data, is_single<>>))
+  auto operator()(Data d, on_done_fn<DFN...> df) const {
+    return single<Data, passDVF, passDEF, on_done_fn<DFN...>>{std::move(d), std::move(df)};
   }
   PUSHMI_TEMPLATE(class Data, class DVF, class DEF)
     (requires PUSHMI_EXP(lazy::Receiver<Data, is_single<>> PUSHMI_BROKEN_SUBSUMPTION(PUSHMI_AND not lazy::Invocable<DEF&, Data&>)))
@@ -416,14 +400,5 @@ struct construct_deduced<single> : make_single_fn {};
 // auto erase_cast(Wrapped w) {
 //   return single<V, E>{std::move(w)};
 // }
-
-PUSHMI_TEMPLATE (class T, class Out)
-  (requires SenderTo<Out, std::promise<T>, is_none<>>)
-std::future<T> future_from(Out singleSender) {
-  std::promise<T> p;
-  auto result = p.get_future();
-  submit(singleSender, std::move(p));
-  return result;
-}
 
 } // namespace pushmi

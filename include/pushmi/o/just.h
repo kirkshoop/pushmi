@@ -20,7 +20,7 @@ private:
   struct impl {
     V v_;
     PUSHMI_TEMPLATE (class Out)
-      (requires SingleReceiver<Out, V>)
+      (requires ReceiveValue<Out, V>)
     void operator()(Out out) {
       ::pushmi::set_value(out, std::move(v_));
     }

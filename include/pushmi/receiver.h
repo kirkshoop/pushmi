@@ -93,7 +93,7 @@ class any_receiver {
     vptr_ = &vtbl;
   }
 public:
-  using properties = property_set<is_receiver<>, is_receiver<>>;
+  using properties = property_set<is_receiver<>>;
 
   any_receiver() = default;
   any_receiver(any_receiver&& that) noexcept : any_receiver() {
@@ -310,52 +310,48 @@ PUSHMI_INLINE_VAR constexpr struct make_receiver_fn {
   }
   PUSHMI_TEMPLATE(class Data)
     (requires PUSHMI_EXP(
-      lazy::ReceiveError<Data, std::exception_ptr>))
+      lazy::Receiver<Data>))
   auto operator()(Data d) const {
     return receiver<Data, passDVF, passDEF, passDDF>{std::move(d)};
   }
   PUSHMI_TEMPLATE(class Data, class DVF)
     (requires PUSHMI_EXP(
       lazy::Callable<DVF> PUSHMI_AND
-      lazy::ReceiveError<Data, std::exception_ptr>))
+      lazy::Receiver<Data>))
   auto operator()(Data d, DVF vf) const {
     return receiver<Data, DVF, passDEF, passDDF>{std::move(d), std::move(vf)};
   }
   PUSHMI_TEMPLATE(class Data, class... DEFN)
     (requires PUSHMI_EXP(
-      lazy::ReceiveError<Data, std::exception_ptr>))
+      lazy::Receiver<Data>))
   auto operator()(Data d, on_error_fn<DEFN...> ef) const {
     return receiver<Data, passDVF, on_error_fn<DEFN...>, passDDF>{std::move(d), std::move(ef)};
   }
   PUSHMI_TEMPLATE(class Data, class... DDFN)
     (requires PUSHMI_EXP(
-      lazy::ReceiveError<Data, std::exception_ptr>))
+      lazy::Receiver<Data>))
   auto operator()(Data d, on_done_fn<DDFN...> df) const {
     return receiver<Data, passDVF, passDEF, on_done_fn<DDFN...>>{std::move(d), std::move(df)};
   }
-  PUSHMI_TEMPLATE(class Data, class DVF, class DEF)
+  PUSHMI_TEMPLATE(class Data, class DVF, class... DEFN)
     (requires PUSHMI_EXP(
       lazy::Callable<DVF> PUSHMI_AND
-      lazy::Callable<DEF> PUSHMI_AND
-      lazy::ReceiveError<Data, std::exception_ptr>
-      PUSHMI_BROKEN_SUBSUMPTION(PUSHMI_AND not lazy::Invocable<DEF&, Data&>)))
-  auto operator()(Data d, DVF vf, DEF ef) const {
-    return receiver<Data, DVF, DEF, passDDF>{std::move(d), std::move(vf), std::move(ef)};
+      lazy::Receiver<Data>))
+  auto operator()(Data d, DVF vf, on_error_fn<DEFN...> ef) const {
+    return receiver<Data, DVF, on_error_fn<DEFN...>, passDDF>{std::move(d), std::move(vf), std::move(ef)};
   }
-  PUSHMI_TEMPLATE(class Data, class DEF, class DDF)
+  PUSHMI_TEMPLATE(class Data, class DEF, class... DDFN)
     (requires PUSHMI_EXP(
       lazy::Callable<DEF> PUSHMI_AND
-      lazy::Invocable<DDF&, Data&> PUSHMI_AND
-      lazy::ReceiveError<Data, std::exception_ptr>
-      PUSHMI_BROKEN_SUBSUMPTION(PUSHMI_AND not lazy::Invocable<DEF&, Data&>)))
-  auto operator()(Data d, DEF ef, DDF df) const {
-    return receiver<Data, passDVF, DEF, DDF>{std::move(d), std::move(ef), std::move(df)};
+      lazy::Receiver<Data>))
+  auto operator()(Data d, DEF ef, on_done_fn<DDFN...> df) const {
+    return receiver<Data, passDVF, DEF, on_done_fn<DDFN...>>{std::move(d), std::move(ef), std::move(df)};
   }
   PUSHMI_TEMPLATE(class Data, class DVF, class DEF, class DDF)
     (requires PUSHMI_EXP(
       lazy::Callable<DVF> PUSHMI_AND
       lazy::Callable<DEF> PUSHMI_AND
-      lazy::ReceiveError<Data, std::exception_ptr> PUSHMI_AND
+      lazy::Receiver<Data> PUSHMI_AND
       lazy::Invocable<DDF&, Data&>))
   auto operator()(Data d, DVF vf, DEF ef, DDF df) const {
     return receiver<Data, DVF, DEF, DDF>{std::move(d), std::move(vf), std::move(ef), std::move(df)};
@@ -405,13 +401,13 @@ receiver(VF, EF, DF) -> receiver<VF, EF, DF>;
 
 PUSHMI_TEMPLATE(class Data)
   (requires PUSHMI_EXP(
-    lazy::ReceiveError<Data, std::exception_ptr>))
+    lazy::Receiver<Data>))
 receiver(Data d) -> receiver<Data, passDVF, passDEF, passDDF>;
 
 PUSHMI_TEMPLATE(class Data, class DVF)
   (requires PUSHMI_EXP(
     lazy::Callable<DVF> PUSHMI_AND
-    lazy::ReceiveError<Data, std::exception_ptr>))
+    lazy::Receiver<Data>))
 receiver(Data d, DVF vf) -> receiver<Data, DVF, passDEF, passDDF>;
 
 PUSHMI_TEMPLATE(class Data, class... DEFN)
@@ -426,27 +422,24 @@ PUSHMI_TEMPLATE(class Data, class... DDFN)
 receiver(Data d, on_done_fn<DDFN...>) ->
     receiver<Data, passDVF, passDEF, on_done_fn<DDFN...>>;
 
-PUSHMI_TEMPLATE(class Data, class DVF, class DEF)
+PUSHMI_TEMPLATE(class Data, class DVF, class... DEFN)
   (requires PUSHMI_EXP(
     lazy::Callable<DVF> PUSHMI_AND
-    lazy::Callable<DEF> PUSHMI_AND
-    lazy::ReceiveError<Data, std::exception_ptr>
-    PUSHMI_BROKEN_SUBSUMPTION(PUSHMI_AND not lazy::Invocable<DEF&, Data&>)))
-receiver(Data d, DVF vf, DEF ef) -> receiver<Data, DVF, DEF, passDDF>;
+    lazy::Receiver<Data>))
+receiver(Data d, DVF vf, on_error_fn<DEFN...> ef) -> receiver<Data, DVF, on_error_fn<DEFN...>, passDDF>;
 
-PUSHMI_TEMPLATE(class Data, class DEF, class DDF)
+PUSHMI_TEMPLATE(class Data, class DEF, class... DDFN)
   (requires PUSHMI_EXP(
     lazy::Callable<DEF> PUSHMI_AND
-    lazy::ReceiveError<Data, std::exception_ptr> PUSHMI_AND
-    lazy::Invocable<DDF&, Data&>
+    lazy::Receiver<Data>
     PUSHMI_BROKEN_SUBSUMPTION(PUSHMI_AND not lazy::Invocable<DEF&, Data&>)))
-receiver(Data d, DEF, DDF) -> receiver<Data, passDVF, DEF, DDF>;
+receiver(Data d, DEF, on_done_fn<DDFN...>) -> receiver<Data, passDVF, DEF, on_done_fn<DDFN...>>;
 
 PUSHMI_TEMPLATE(class Data, class DVF, class DEF, class DDF)
   (requires PUSHMI_EXP(
     lazy::Callable<DVF> PUSHMI_AND
     lazy::Callable<DEF> PUSHMI_AND
-    lazy::ReceiveError<Data, std::exception_ptr> PUSHMI_AND
+    lazy::Receiver<Data> PUSHMI_AND
     lazy::Invocable<DDF&, Data&>))
 receiver(Data d, DVF vf, DEF ef, DDF df) -> receiver<Data, DVF, DEF, DDF>;
 #endif
@@ -463,7 +456,7 @@ std::future<T> future_from(In in) {
   return result;
 }
 PUSHMI_TEMPLATE (class In)
-  (requires SenderTo<In, std::promise<void>, is_single<>>)
+  (requires SenderTo<In, std::promise<void>, is_none<>> && not Sender<In, is_single<>>)
 std::future<void> future_from(In in) {
   std::promise<void> p;
   auto result = p.get_future();

@@ -30,6 +30,9 @@ template<template <class...> class T>
 struct construct_deduced;
 
 template<>
+struct construct_deduced<receiver>;
+
+template<>
 struct construct_deduced<none>;
 
 template<>

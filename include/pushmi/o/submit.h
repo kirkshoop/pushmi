@@ -28,12 +28,12 @@ using receiver_type_t =
 PUSHMI_CONCEPT_DEF(
   template (class In, class ... AN)
   (concept AutoSenderTo)(In, AN...),
-    SenderTo<In, receiver_type_t<In, AN...>>
+    Sender<In> && not Constrained<In> && SenderTo<In, receiver_type_t<In, AN...>>
 );
 PUSHMI_CONCEPT_DEF(
   template (class In, class ... AN)
   (concept AutoConstrainedSenderTo)(In, AN...),
-    ConstrainedSenderTo<In, receiver_type_t<In, AN...>> && not Time<In>
+    ConstrainedSenderTo<In, receiver_type_t<In, AN...>>
 );
 PUSHMI_CONCEPT_DEF(
   template (class In, class ... AN)
@@ -51,24 +51,22 @@ private:
   struct fn {
     std::tuple<AN...> args_;
     PUSHMI_TEMPLATE(class In)
-      (requires submit_detail::AutoSenderTo<In, AN...>)
+      (requires
+        submit_detail::AutoSenderTo<In, AN...> &&
+        Invocable<::pushmi::detail::receiver_from_fn<In>&, std::tuple<AN...>>
+      )
     In operator()(In in) {
       auto out{::pushmi::detail::receiver_from_fn<In>()(std::move(args_))};
       ::pushmi::submit(in, std::move(out));
       return in;
     }
     PUSHMI_TEMPLATE(class In)
-      (requires submit_detail::AutoConstrainedSenderTo<In, AN...>)
+      (requires
+        submit_detail::AutoConstrainedSenderTo<In, AN...> &&
+        Invocable<::pushmi::detail::receiver_from_fn<In>&, std::tuple<AN...>>)
     In operator()(In in) {
       auto out{::pushmi::detail::receiver_from_fn<In>()(std::move(args_))};
       ::pushmi::submit(in, ::pushmi::top(in), std::move(out));
-      return in;
-    }
-    PUSHMI_TEMPLATE(class In)
-      (requires submit_detail::AutoTimeSenderTo<In, AN...>)
-    In operator()(In in) {
-      auto out{::pushmi::detail::receiver_from_fn<In>()(std::move(args_))};
-      ::pushmi::submit(in, ::pushmi::now(in), std::move(out));
       return in;
     }
   };
@@ -138,7 +136,7 @@ private:
   template<class Out>
   struct nested_receiver_impl;
   PUSHMI_TEMPLATE (class Exec)
-    (requires Sender<Exec> && Executor<Exec>)
+    (requires Sender<Exec> && Executor<Exec> )
   struct nested_executor_impl {
     nested_executor_impl(lock_state* state, Exec ex) :
       state_(state),
@@ -146,12 +144,28 @@ private:
     lock_state* state_;
     Exec ex_;
 
+    template<class U>
+    using test_for_this = nested_executor_impl<U>;
+
+    PUSHMI_TEMPLATE (class Ex)
+      (requires Sender<Ex> && Executor<Ex> && detail::is_v<Ex, test_for_this>)
+    static auto make(lock_state*, Ex ex) {
+      return ex;
+    }
+    PUSHMI_TEMPLATE (class Ex)
+      (requires Sender<Ex> && Executor<Ex> && not detail::is_v<Ex, test_for_this>)
+    static auto make(lock_state* state, Ex ex) {
+      return nested_executor_impl<Ex>{state, ex};
+    }
+
     using properties = properties_t<Exec>;
 
-    auto executor() { return ::pushmi::executor(ex_); }
+    auto executor() {
+      return make(state_, ::pushmi::executor(ex_));
+    }
 
-    PUSHMI_TEMPLATE (class CV, class Out)
-      (requires Receiver<Out> && Constrained<Exec>)
+    PUSHMI_TEMPLATE (class... ZN)
+      (requires Constrained<Exec>)
     auto top() { return ::pushmi::top(ex_); }
 
     PUSHMI_TEMPLATE (class CV, class Out)
@@ -183,7 +197,7 @@ private:
       std::exception_ptr e;
       try{
         using executor_t = remove_cvref_t<V>;
-        auto n = nested_executor_impl<executor_t>{state_, (V&&) v};
+        auto n = nested_executor_impl<executor_t>::make(state_, (V&&) v);
         ::pushmi::set_value(out_, any_executor_ref<>{n});
       }
       catch(...) {e = std::current_exception();}
@@ -215,21 +229,30 @@ private:
     PUSHMI_TEMPLATE (class Exec)
       (requires Executor<Exec>)
     auto operator()(lock_state* state, Exec ex) const {
-      return nested_executor_impl<Exec>{state, std::move(ex)};
+      return nested_executor_impl<Exec>::make(state, std::move(ex));
     }
   };
   struct on_value_impl {
     lock_state* state_;
     PUSHMI_TEMPLATE (class Out, class Value)
-      (requires Receiver<Out, is_single<>>)
+      (requires Executor<std::decay_t<Value>> &&
+        ReceiveValue<Out,
+          pushmi::invoke_result_t<nested_executor_impl_fn, lock_state*, std::decay_t<Value>>>)
     void operator()(Out out, Value&& v) const {
-      using V = remove_cvref_t<Value>;
       ++state_->nested;
-      PUSHMI_IF_CONSTEXPR( ((bool)Executor<V>) (
-        id(::pushmi::set_value)(out, id(nested_executor_impl_fn{})(state_, id((Value&&) v)));
-      ) else (
-        id(::pushmi::set_value)(out, id((Value&&) v));
-      ))
+      ::pushmi::set_value(out, nested_executor_impl_fn{}(state_, (Value&&) v));
+      std::unique_lock<std::mutex> guard{state_->lock};
+      state_->done = true;
+      if (--state_->nested == 0){
+        state_->signaled.notify_all();
+      }
+    }
+    PUSHMI_TEMPLATE (class Out, class Value)
+      (requires True<> && ReceiveValue<Out, Value> &&
+        not Executor<std::decay_t<Value>>)
+    void operator()(Out out, Value&& v) const {
+      ++state_->nested;
+      ::pushmi::set_value(out, (Value&&) v);
       std::unique_lock<std::mutex> guard{state_->lock};
       state_->done = true;
       if (--state_->nested == 0){
@@ -248,7 +271,7 @@ private:
   struct on_error_impl {
     lock_state* state_;
     PUSHMI_TEMPLATE(class Out, class E)
-      (requires NoneReceiver<Out, E>)
+      (requires ReceiveError<Out, E>)
     void operator()(Out out, E e) const noexcept {
       ::pushmi::set_error(out, std::move(e));
       std::unique_lock<std::mutex> guard{state_->lock};
@@ -267,20 +290,41 @@ private:
       state_->signaled.notify_all();
     }
   };
-  template <bool IsConstrainedSender, bool IsTimeSender, class In>
+
+  template <class In>
+  struct receiver_impl {
+    PUSHMI_TEMPLATE(class... AN)
+      (requires Sender<In> && Many<In>)
+    auto operator()(lock_state* state, std::tuple<AN...> args) const {
+      return ::pushmi::detail::receiver_from_fn<In>()(
+        std::move(args),
+        on_next_impl{},
+        on_error_impl{state},
+        on_done_impl{state}
+      );
+    }
+    PUSHMI_TEMPLATE(class... AN)
+      (requires Sender<In> && not Many<In>)
+    auto operator()(lock_state* state, std::tuple<AN...> args) const {
+      return ::pushmi::detail::receiver_from_fn<In>()(
+        std::move(args),
+        on_value_impl{state},
+        on_error_impl{state},
+        on_done_impl{state}
+      );
+    }
+  };
+  template <class In>
   struct submit_impl {
     PUSHMI_TEMPLATE(class Out)
-      (requires Receiver<Out>)
+      (requires Receiver<Out> && ConstrainedSenderTo<In, Out>)
     void operator()(In& in, Out out) const {
-      PUSHMI_IF_CONSTEXPR( (IsTimeSender) (
-        id(::pushmi::submit)(in, id(::pushmi::now)(in), std::move(out));
-      ) else (
-        PUSHMI_IF_CONSTEXPR( (IsConstrainedSender) (
-          id(::pushmi::submit)(in, id(::pushmi::top)(in), std::move(out));
-        ) else (
-          id(::pushmi::submit)(in, std::move(out));
-        ))
-      ))
+     ::pushmi::submit(in, ::pushmi::top(in), std::move(out));
+    }
+    PUSHMI_TEMPLATE(class Out)
+      (requires Receiver<Out> && SenderTo<In, Out> && not Constrained<In>)
+    void operator()(In& in, Out out) const {
+      ::pushmi::submit(in, std::move(out));
     }
   };
   // TODO - only move, move-only types..
@@ -290,50 +334,20 @@ private:
   struct fn {
     std::tuple<AN...> args_;
 
-    template <bool IsConstrainedSender, bool IsTimeSender, class In>
-    In impl_(In in) {
+    PUSHMI_TEMPLATE(class In)
+      (requires Sender<In>)// && Invocable<submit_impl<In>&, In&, pushmi::invoke_result_t<receiver_impl<In>, lock_state*, std::tuple<AN...>&&>>)
+    In operator()(In in) {
       lock_state state{};
 
-      auto submit = submit_impl<IsConstrainedSender, IsTimeSender, In>{};
-      PUSHMI_IF_CONSTEXPR( ((bool)Many<In>) (
-        auto out{::pushmi::detail::receiver_from_fn<In>()(
-          std::move(args_),
-          on_next(on_next_impl{}),
-          on_error(on_error_impl{&state}),
-          on_done(on_done_impl{&state})
-        )};
-        submit(in, std::move(out));
-      ) else (
-        auto out{::pushmi::detail::receiver_from_fn<In>()(
-          std::move(args_),
-          on_value(on_value_impl{&state}),
-          on_error(on_error_impl{&state}),
-          on_done(on_done_impl{&state})
-        )};
-        submit(in, std::move(out));
-      ))
+      auto make = receiver_impl<In>{};
+      auto submit = submit_impl<In>{};
+      submit(in, make(&state, std::move(args_)));
 
       std::unique_lock<std::mutex> guard{state.lock};
       state.signaled.wait(guard, [&]{
         return state.done && state.nested.load() == 0;
       });
       return in;
-    }
-
-    PUSHMI_TEMPLATE(class In)
-      (requires submit_detail::AutoSenderTo<In, AN...>)
-    In operator()(In in) {
-      return this->impl_<false, false>(std::move(in));
-    }
-    PUSHMI_TEMPLATE(class In)
-      (requires submit_detail::AutoConstrainedSenderTo<In, AN...>)
-    In operator()(In in) {
-      return this->impl_<true, false>(std::move(in));
-    }
-    PUSHMI_TEMPLATE(class In)
-      (requires submit_detail::AutoTimeSenderTo<In, AN...>)
-    In operator()(In in) {
-      return this->impl_<true, true>(std::move(in));
     }
   };
 public:
@@ -364,8 +378,8 @@ public:
     pushmi::detail::opt<T> result_;
     std::exception_ptr ep_;
     auto out = make_single(
-      on_value(on_value_impl{&result_}),
-      on_error(on_error_impl{&ep_})
+      on_value_impl{&result_},
+      on_error_impl{&ep_}
     );
     using Out = decltype(out);
     static_assert(SenderTo<In, Out, is_single<>> ||

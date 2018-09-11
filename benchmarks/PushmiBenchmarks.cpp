@@ -14,7 +14,7 @@
 #include "pushmi/new_thread.h"
 #include "pushmi/time_source.h"
 
-#include "pushmi/none.h"
+#include "pushmi/receiver.h"
 #include "pushmi/entangle.h"
 
 #include "pool.h"
@@ -45,7 +45,7 @@ struct countdown {
     mi::set_next(up, 1);
   }
   PUSHMI_TEMPLATE (class Up)
-    (requires mi::None<Up> && not mi::Many<Up>)
+    (requires mi::True<> && not mi::Many<Up>)
   void starting(Up up) {
   }
 };
@@ -106,13 +106,14 @@ struct inline_executor_none {
     auto executor() { return inline_time_executor{}; }
     template<class Out>
     void submit(Out out) {
+      ::mi::set_value(out);
       ::mi::set_done(out);
     }
 };
 
 void countdownnone::operator()() const {
   if (--*counter >= 0) {
-    inline_executor_none{} | op::submit(mi::make_none(*this));
+    inline_executor_none{} | op::submit(mi::make_receiver(*this));
   }
 }
 
@@ -128,12 +129,16 @@ struct inline_executor_flow_single {
       auto tokens = cf();
 
       using Stopper = decltype(tokens.second);
-      struct Data : mi::none<> {
+      struct Data : mi::receiver<> {
         explicit Data(Stopper stopper) : stopper(std::move(stopper)) {}
         Stopper stopper;
       };
-      auto up = mi::MAKE(none)(
+      auto up = mi::MAKE(receiver)(
           Data{std::move(tokens.second)},
+          [](auto& data) {
+            // TODO: think about how to implement value() AND done()
+            std::abort();
+          },
           [](auto& data, auto e) noexcept {
             auto both = lock_both(data.stopper);
             (*(both.first))(both.second);
@@ -190,7 +195,7 @@ struct inline_executor_flow_single_ignore {
     template<class Out>
     void submit(Out out) {
       // pass reference for cancellation.
-      ::mi::set_starting(out, mi::none<>{});
+      ::mi::set_starting(out, mi::receiver<>{});
 
       ::mi::set_value(out, *this);
     }
@@ -284,7 +289,7 @@ NONIUS_BENCHMARK("inline 1'000 none", [](nonius::chronometer meter){
   countdownnone none{counter};
   meter.measure([&]{
     counter.store(1'000);
-    ie | op::submit(mi::make_none(none));
+    ie | op::submit(mi::make_receiver(none));
     while(counter.load() > 0);
     return counter.load();
   });

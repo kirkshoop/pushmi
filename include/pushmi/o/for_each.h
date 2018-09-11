@@ -25,7 +25,7 @@ private:
       pull(1);
     }
     PUSHMI_TEMPLATE(class Up)
-      (requires ManyReceiver<Up, std::ptrdiff_t>)
+      (requires Receiver<Up>)
     void starting(Up up){
       pull = [up = std::move(up)](std::ptrdiff_t requested) mutable {
         ::pushmi::set_next(up, requested);
@@ -33,7 +33,7 @@ private:
       pull(1);
     }
     PUSHMI_TEMPLATE(class Up)
-      (requires None<Up> && not Many<Up>)
+      (requires ReceiveValue<Up>)
     void starting(Up up){}
   };
   template <class... AN>
@@ -48,11 +48,11 @@ private:
       return in;
     }
     PUSHMI_TEMPLATE(class In)
-      (requires Sender<In> && Time<In> && Flow<In> && Many<In>)
+      (requires Sender<In> && Constrained<In> && Flow<In> && Many<In>)
     In operator()(In in) {
       auto out{::pushmi::detail::receiver_from_fn<subset<is_sender<>, property_set_index_t<properties_t<In>, is_silent<>>>>()(std::move(args_))};
       using Out = decltype(out);
-      ::pushmi::submit(in, ::pushmi::now(in), ::pushmi::detail::receiver_from_fn<In>()(Pull<In, Out>{std::move(out)}));
+      ::pushmi::submit(in, ::pushmi::top(in), ::pushmi::detail::receiver_from_fn<In>()(Pull<In, Out>{std::move(out)}));
       return in;
     }
   };

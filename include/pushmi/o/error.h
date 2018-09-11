@@ -16,7 +16,7 @@ namespace detail {
   struct error_impl {
     E e_;
     PUSHMI_TEMPLATE(class Out)
-      (requires NoneReceiver<Out, E>)
+      (requires ReceiveError<Out, E>)
     void operator()(Out out) {
       ::pushmi::set_error(out, std::move(e_));
     }
@@ -25,7 +25,7 @@ namespace detail {
   struct single_error_impl {
     E e_;
     PUSHMI_TEMPLATE(class Out)
-      (requires SingleReceiver<Out, V, E>)
+      (requires ReceiveError<Out, E> && ReceiveValue<Out, V>)
     void operator()(Out out) {
       ::pushmi::set_error(out, std::move(e_));
     }

@@ -34,12 +34,12 @@ void receiver_0_test() {
 
   auto proxy0 = pushmi::MAKE(receiver)(out0);
   auto proxy1 = pushmi::MAKE(receiver)(out0, pushmi::passDVF{});
-  auto proxy2 = pushmi::MAKE(receiver)(out0, pushmi::passDVF{}, pushmi::passDEF{});
+  auto proxy2 = pushmi::MAKE(receiver)(out0, pushmi::passDVF{}, pushmi::on_error(pushmi::passDEF{}));
   auto proxy3 = pushmi::MAKE(receiver)(
       out0, pushmi::passDVF{}, pushmi::passDEF{}, pushmi::passDDF{});
-  auto proxy4 = pushmi::MAKE(receiver)(out0, [](Out0&){}, [](Out0& d, auto e)noexcept {
+  auto proxy4 = pushmi::MAKE(receiver)(out0, [](Out0&){}, pushmi::on_error([](Out0& d, auto e)noexcept {
     d.error(e);
-  });
+  }));
   auto proxy5 = pushmi::MAKE(receiver)(
       out0,
       pushmi::on_value(
@@ -92,7 +92,7 @@ void receiver_1_test(){
 
   auto proxy0 = pushmi::MAKE(receiver)(out0);
   auto proxy1 = pushmi::MAKE(receiver)(out0, pushmi::passDVF{});
-  auto proxy2 = pushmi::MAKE(receiver)(out0, pushmi::passDVF{}, pushmi::passDEF{});
+  auto proxy2 = pushmi::MAKE(receiver)(out0, pushmi::passDVF{}, pushmi::on_error(pushmi::passDEF{}));
   auto proxy3 = pushmi::MAKE(receiver)(
       out0, pushmi::passDVF{}, pushmi::passDEF{}, pushmi::passDDF{});
   auto proxy4 = pushmi::MAKE(receiver)(out0, [](auto d, auto v) {
@@ -152,7 +152,7 @@ void receiver_n_test() {
 
   auto proxy0 = pushmi::MAKE(receiver)(out0);
   auto proxy1 = pushmi::MAKE(receiver)(out0, pushmi::passDNXF{});
-  auto proxy2 = pushmi::MAKE(receiver)(out0, pushmi::passDNXF{}, pushmi::passDEF{});
+  auto proxy2 = pushmi::MAKE(receiver)(out0, pushmi::passDNXF{}, pushmi::on_error(pushmi::passDEF{}));
   auto proxy3 = pushmi::MAKE(receiver)(
       out0, pushmi::passDNXF{}, pushmi::passDEF{}, pushmi::passDDF{});
   auto proxy4 = pushmi::MAKE(receiver)(out0, [](auto d, auto v) {
@@ -179,67 +179,23 @@ void receiver_n_test() {
   auto any1 = pushmi::any_receiver<std::exception_ptr, int>(proxy0);
 }
 
-void none_test() {
-  auto out0 = pushmi::MAKE(none)();
-  auto out1 = pushmi::MAKE(none)(pushmi::abortEF{});
-  auto out2 = pushmi::MAKE(none)(pushmi::abortEF{}, pushmi::ignoreDF{});
-  auto out3 = pushmi::MAKE(none)([](auto e) noexcept{ e.get(); });
-  auto out5 = pushmi::MAKE(none)(
-      pushmi::on_error(
-        [](std::exception_ptr e) noexcept {},
-        [](auto e) noexcept { e.get(); }
-      ));
-  auto out6 = pushmi::MAKE(none)(
-      pushmi::on_done([]() {  }));
-
-  using Out0 = decltype(out0);
-
-  auto proxy0 = pushmi::MAKE(none)(out0);
-  auto proxy2 = pushmi::MAKE(none)(out0, pushmi::passDEF{});
-  auto proxy3 = pushmi::MAKE(none)(
-      out0, pushmi::passDEF{}, pushmi::passDDF{});
-  auto proxy4 = pushmi::MAKE(none)(out0, [](auto d, auto e)noexcept {
-    d.error(e.get());
-  });
-  auto proxy5 = pushmi::MAKE(none)(
-      out0,
-      pushmi::on_error(
-        [](Out0&, std::exception_ptr e) noexcept{},
-        [](Out0&, auto e) noexcept{ e.get(); }
-      ));
-  auto proxy6 = pushmi::MAKE(none)(
-      out0,
-      pushmi::on_done([](Out0&) { }));
-
-  std::promise<void> p0;
-  auto promise0 = pushmi::MAKE(none)(std::move(p0));
-  promise0.done();
-
-  std::promise<void> p1;
-
-  auto any0 = pushmi::any_none<>(std::move(p1));
-  auto any1 = pushmi::any_none<>(std::move(promise0));
-  auto any2 = pushmi::any_none<>(out0);
-  auto any3 = pushmi::any_none<>(proxy0);
-}
-
 void sender_test(){
   auto in0 = pushmi::MAKE(sender)();
   auto in1 = pushmi::MAKE(sender)(pushmi::ignoreSF{});
   auto in2 = pushmi::MAKE(sender)(pushmi::ignoreSF{}, pushmi::trampolineEXF{});
   auto in3 = pushmi::MAKE(sender)([&](auto out){
-    in0.submit(pushmi::MAKE(none)(std::move(out), [](auto d, auto e) noexcept {
+    in0.submit(pushmi::MAKE(receiver)(std::move(out), [](auto d, auto e) noexcept {
       pushmi::set_error(d, e);
     }));
   }, [](){ return pushmi::trampoline(); });
-  in3.submit(pushmi::MAKE(none)());
+  in3.submit(pushmi::MAKE(receiver)());
 
   std::promise<void> p0;
-  auto promise0 = pushmi::MAKE(none)(std::move(p0));
+  auto promise0 = pushmi::MAKE(receiver)(std::move(p0));
   in0 | ep::submit(std::move(promise0));
 
-  auto out0 = pushmi::MAKE(none)([](auto e) noexcept {  });
-  auto out1 = pushmi::MAKE(none)(out0, [](auto d, auto e) noexcept {});
+  auto out0 = pushmi::MAKE(receiver)([](auto e) noexcept {  });
+  auto out1 = pushmi::MAKE(receiver)(out0, [](auto d, auto e) noexcept {});
   out1.error(std::exception_ptr{});
   in3.submit(out1);
 

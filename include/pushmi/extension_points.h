@@ -358,7 +358,7 @@ struct property_set_traits<std::promise<T>> {
 };
 template <>
 struct property_set_traits<std::promise<void>> {
-  using properties = property_set<is_receiver<>, is_none<>>;
+  using properties = property_set<is_receiver<>>;
 };
 
 } // namespace pushmi

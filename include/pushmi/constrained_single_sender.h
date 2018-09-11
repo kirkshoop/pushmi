@@ -151,7 +151,7 @@ class constrained_single_sender<SF, ZF, EXF> {
   }
   auto executor() { return exf_(); }
   PUSHMI_TEMPLATE(class CV, class Out)
-    (requires Regular<CV> && Receiver<Out, is_single<>> &&
+    (requires Regular<CV> && Receiver<Out> &&
       Invocable<SF&, CV, Out>)
   void submit(CV cv, Out out) {
     sf_(std::move(cv), std::move(out));
@@ -184,7 +184,7 @@ class constrained_single_sender<Data, DSF, DZF, DEXF> {
   }
   auto executor() { return exf_(data_); }
   PUSHMI_TEMPLATE(class CV, class Out)
-    (requires Regular<CV> && Receiver<Out, is_single<>> &&
+    (requires Regular<CV> && Receiver<Out> &&
       Invocable<DSF&, Data&, CV, Out>)
   void submit(CV cv, Out out) {
     sf_(data_, std::move(cv), std::move(out));

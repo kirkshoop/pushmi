@@ -4,7 +4,7 @@
 // This source code is licensed under the MIT license found in the
 // LICENSE file in the root directory of this source tree.
 
-#include "none.h"
+#include "receiver.h"
 #include "executor.h"
 #include "trampoline.h"
 
@@ -27,10 +27,10 @@ class sender<detail::erase_sender_t, E> {
   struct vtable {
     static void s_op(data&, data*) {}
     static any_executor<E> s_executor(data&) { return {}; }
-    static void s_submit(data&, any_none<E>) {}
+    static void s_submit(data&, any_receiver<E>) {}
     void (*op_)(data&, data*) = vtable::s_op;
     any_executor<E> (*executor_)(data&) = vtable::s_executor;
-    void (*submit_)(data&, any_none<E>) = vtable::s_submit;
+    void (*submit_)(data&, any_receiver<E>) = vtable::s_submit;
   };
   static constexpr vtable const noop_ {};
   vtable const* vptr_ = &noop_;
@@ -45,7 +45,7 @@ class sender<detail::erase_sender_t, E> {
       static any_executor<E> executor(data& src) {
         return any_executor<E>{::pushmi::executor(*static_cast<Wrapped*>(src.pobj_))};
       }
-      static void submit(data& src, any_none<E> out) {
+      static void submit(data& src, any_receiver<E> out) {
         ::pushmi::submit(*static_cast<Wrapped*>(src.pobj_), std::move(out));
       }
     };
@@ -65,7 +65,7 @@ class sender<detail::erase_sender_t, E> {
       static any_executor<E> executor(data& src) {
         return any_executor<E>{::pushmi::executor(*static_cast<Wrapped*>((void*)src.buffer_))};
       }
-      static void submit(data& src, any_none<E> out) {
+      static void submit(data& src, any_receiver<E> out) {
         ::pushmi::submit(
             *static_cast<Wrapped*>((void*)src.buffer_), std::move(out));
       }
@@ -86,7 +86,7 @@ class sender<detail::erase_sender_t, E> {
     std::swap(that.vptr_, vptr_);
   }
   PUSHMI_TEMPLATE(class Wrapped)
-    (requires SenderTo<wrapped_t<Wrapped>, any_none<E>, is_none<>>)
+    (requires SenderTo<wrapped_t<Wrapped>, any_receiver<E>, is_none<>>)
   explicit sender(Wrapped obj) noexcept(insitu<Wrapped>())
     : sender{std::move(obj), bool_<insitu<Wrapped>()>{}} {}
   ~sender() {
@@ -100,7 +100,7 @@ class sender<detail::erase_sender_t, E> {
   any_executor<E> executor() {
     return vptr_->executor_(data_);
   }
-  void submit(any_none<E> out) {
+  void submit(any_receiver<E> out) {
     vptr_->submit_(data_, std::move(out));
   }
 };
@@ -124,7 +124,7 @@ class sender<SF, EXF> {
 
   auto executor() { return exf_(); }
   PUSHMI_TEMPLATE(class Out)
-    (requires Receiver<Out, is_none<>> && Invocable<SF&, Out>)
+    (requires Receiver<Out> && Invocable<SF&, Out>)
   void submit(Out out) {
     sf_(std::move(out));
   }
@@ -151,7 +151,7 @@ class sender<Data, DSF, DEXF> {
 
   auto executor() { return exf_(data_); }
   PUSHMI_TEMPLATE(class Out)
-    (requires Receiver<Out, is_none<>> && Invocable<DSF&, Data&, Out>)
+    (requires Receiver<Out> && Invocable<DSF&, Data&, Out>)
   void submit(Out out) {
     sf_(data_, std::move(out));
   }
@@ -230,12 +230,12 @@ using any_sender = sender<detail::erase_sender_t, E>;
 template<>
 struct construct_deduced<sender> : make_sender_fn {};
 
-// template <SenderTo<any_none<std::exception_ptr>, is_none<>> Wrapped>
+// template <SenderTo<any_receiver<std::exception_ptr>, is_none<>> Wrapped>
 // auto erase_cast(Wrapped w) {
 //   return sender<detail::erase_sender_t, std::exception_ptr>{std::move(w)};
 // }
 //
-// template <class E, SenderTo<any_none<E>, is_none<>> Wrapped>
+// template <class E, SenderTo<any_receiver<E>, is_none<>> Wrapped>
 //   requires Same<is_none<>, properties_t<Wrapped>>
 // auto erase_cast(Wrapped w) {
 //   return sender<detail::erase_sender_t, E>{std::move(w)};

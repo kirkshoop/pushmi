@@ -4,7 +4,7 @@
 // This source code is licensed under the MIT license found in the
 // LICENSE file in the root directory of this source tree.
 
-#include "single.h"
+#include "receiver.h"
 
 namespace pushmi {
 
@@ -24,12 +24,12 @@ class flow_single<V, PE, E> {
     static void s_done(data&) {}
     static void s_error(data&, E) noexcept { std::terminate(); }
     static void s_value(data&, V) {}
-    static void s_starting(data&, any_none<PE>) {}
+    static void s_starting(data&, any_receiver<PE>) {}
     void (*op_)(data&, data*) = vtable::s_op;
     void (*done_)(data&) = vtable::s_done;
     void (*error_)(data&, E) noexcept = vtable::s_error;
     void (*value_)(data&, V) = vtable::s_value;
-    void (*starting_)(data&, any_none<PE>) = vtable::s_starting;
+    void (*starting_)(data&, any_receiver<PE>) = vtable::s_starting;
   };
   static constexpr vtable const noop_ {};
   vtable const* vptr_ = &noop_;
@@ -50,7 +50,7 @@ class flow_single<V, PE, E> {
       static void value(data& src, V v) {
         ::pushmi::set_value(*static_cast<Wrapped*>(src.pobj_), std::move(v));
       }
-      static void starting(data& src, any_none<PE> up) {
+      static void starting(data& src, any_receiver<PE> up) {
         ::pushmi::set_starting(*static_cast<Wrapped*>(src.pobj_), std::move(up));
       }
     };
@@ -78,7 +78,7 @@ class flow_single<V, PE, E> {
         ::pushmi::set_value(
             *static_cast<Wrapped*>((void*)src.buffer_), std::move(v));
       }
-      static void starting(data& src, any_none<PE> up) {
+      static void starting(data& src, any_receiver<PE> up) {
         ::pushmi::set_starting(*static_cast<Wrapped*>((void*)src.buffer_), std::move(up));
       }
     };
@@ -98,7 +98,7 @@ public:
     std::swap(that.vptr_, vptr_);
   }
   PUSHMI_TEMPLATE(class Wrapped)
-    (requires FlowSingleReceiver<wrapped_t<Wrapped>, any_none<PE>, V, PE, E>)
+    (requires FlowSingleReceiver<wrapped_t<Wrapped>, any_receiver<PE>, V, PE, E>)
   explicit flow_single(Wrapped obj) noexcept(insitu<Wrapped>())
     : flow_single{std::move(obj), bool_<insitu<Wrapped>()>{}} {}
   ~flow_single() {
@@ -119,7 +119,7 @@ public:
     vptr_->done_(data_);
   }
 
-  void starting(any_none<PE> up) {
+  void starting(any_receiver<PE> up) {
     vptr_->starting_(data_, std::move(up));
   }
 };
@@ -182,7 +182,7 @@ class flow_single<VF, EF, DF, StrtF> {
     df_();
   }
   PUSHMI_TEMPLATE(class Up)
-    (requires Receiver<Up, is_none<>> && Invocable<StrtF&, Up&&>)
+    (requires Receiver<Up> && Invocable<StrtF&, Up&&>)
   void starting(Up&& up) {
     strtf_( (Up &&) up);
   }

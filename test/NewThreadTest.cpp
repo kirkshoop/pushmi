@@ -105,7 +105,7 @@ SCENARIO( "new_thread executor", "[new_thread][sender]" ) {
     WHEN( "now is called" ) {
       bool done = false;
       tnt | ep::now();
-      tnt | op::blocking_submit([&](auto nt) {
+      tnt | op::blocking_submit([&](auto tnt) {
         tnt | ep::now();
         done = true;
       });
@@ -176,7 +176,7 @@ SCENARIO( "new_thread executor", "[new_thread][sender]" ) {
         ::pushmi::set_value(out, std::numeric_limits<int8_t>::max());
       });
       sender | op::on([&](){return nt;}) |
-          op::blocking_submit(v::on_value([&](auto v) { values.push_back(std::to_string(v)); }));
+        op::blocking_submit(v::on_value([&](auto v) { values.push_back(std::to_string(v)); }));
       THEN( "only the first item was pushed" ) {
         REQUIRE(values == std::vector<std::string>{"2.000000"});
       }

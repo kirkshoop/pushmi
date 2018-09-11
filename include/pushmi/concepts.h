@@ -224,7 +224,8 @@ PUSHMI_CONCEPT_DEF(
       ::pushmi::set_value(r, (VN &&) vn...)
     ) &&
     Receiver<R> &&
-    And<SemiMovable<VN>...>
+    // ICE on SemiMovable<VN>...
+    True<> // And<SemiMovable<VN>...>
 );
 
 PUSHMI_CONCEPT_DEF(
@@ -238,18 +239,10 @@ PUSHMI_CONCEPT_DEF(
 );
 
 PUSHMI_CONCEPT_DEF(
-  template (class N, class E = std::exception_ptr)
-  (concept NoneReceiver)(N, E),
-    ReceiveError<N, E> &&
-    None<N> &&
-    SemiMovable<E>
-);
-
-PUSHMI_CONCEPT_DEF(
   template (class S, class T, class E = std::exception_ptr)
   (concept SingleReceiver)(S, T, E),
+    ReceiveError<S, E> &&
     ReceiveValue<S, T> &&
-    NoneReceiver<S, E> &&
     SemiMovable<T> &&
     SemiMovable<E> &&
     Single<S>
@@ -261,7 +254,7 @@ PUSHMI_CONCEPT_DEF(
     requires(S& s, T&& t) (
       ::pushmi::set_next(s, (T &&) t) // Semantics: called 0-N times.
     ) &&
-    NoneReceiver<S, E> &&
+    ReceiveError<S, E> &&
     SemiMovable<T> &&
     SemiMovable<E> &&
     Many<S>
@@ -326,8 +319,8 @@ PUSHMI_CONCEPT_DEF(
     Receiver<Up> &&
     SemiMovable<PE> &&
     SemiMovable<E> &&
-    NoneReceiver<Up, PE> &&
-    NoneReceiver<N, E>
+    ReceiveError<Up, PE> &&
+    ReceiveError<N, E>
 );
 
 PUSHMI_CONCEPT_DEF(

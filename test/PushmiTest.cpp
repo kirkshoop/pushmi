@@ -28,15 +28,17 @@ SCENARIO( "empty can be used with tap and submit", "[empty][sender]" ) {
     auto e = op::empty();
     using E = decltype(e);
 
-    REQUIRE( v::SenderTo<E, v::any_none<>, v::is_none<>> );
+    REQUIRE( v::SenderTo<E, v::any_receiver<>, v::is_none<>> );
 
     WHEN( "tap and submit are applied" ) {
       int signals = 0;
       e |
         op::tap(
+          [&](){ signals += 100; },
           [&](auto e) noexcept { signals += 1000; },
           [&](){ signals += 10; }) |
         op::submit(
+          [&](){ signals += 100; },
           [&](auto e) noexcept { signals += 1000; },
           [&](){ signals += 10; });
 

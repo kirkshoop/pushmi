@@ -65,44 +65,6 @@ using void_t = void;
 template <class T>
 using remove_cvref_t = std::remove_cv_t<std::remove_reference_t<T>>;
 
-//
-// courtesy of Eric Niebler
-// check_functor does not work for types marked final.
-//
-
-struct check_functor_base {
-    void operator()() {}
-};
-
-template <class T>
-struct check_functor : check_functor_base, T {};
-
-PUSHMI_CONCEPT_DEF(
-  template (class T)
-  (concept NotFunctor) (T),
-    requires(T) (
-      &check_functor<T>::operator()
-    )
-);
-
-PUSHMI_CONCEPT_DEF(
-  template (class T)
-  (concept Functor) (T),
-    not NotFunctor<T>
-);
-
-PUSHMI_CONCEPT_DEF(
-  template (class T)
-  (concept Function) (T),
-    std::is_function<T>::value
-);
-
-PUSHMI_CONCEPT_DEF(
-  template (class T)
-  (concept Callable) (T),
-    Functor<T> || Function<T>
-);
-
 PUSHMI_CONCEPT_DEF(
   template(class... Args)
   (concept True)(Args...),
@@ -228,6 +190,44 @@ PUSHMI_CONCEPT_DEF(
   template (class T)
   concept Regular,
     Semiregular<T> && EqualityComparable<T>
+);
+
+//
+// courtesy of Eric Niebler
+// check_functor does not work for types marked final.
+//
+
+struct check_functor_base {
+    void operator()() {}
+};
+
+template <class T>
+struct check_functor : check_functor_base, T {};
+
+PUSHMI_CONCEPT_DEF(
+  template (class T)
+  (concept NotFunctor) (T),
+    requires(T) (
+      &check_functor<T>::operator()
+    )
+);
+
+PUSHMI_CONCEPT_DEF(
+  template (class T)
+  (concept Functor) (T),
+    not NotFunctor<T>
+);
+
+PUSHMI_CONCEPT_DEF(
+  template (class T)
+  (concept Function) (T),
+    std::is_function<T>::value
+);
+
+PUSHMI_CONCEPT_DEF(
+  template (class T)
+  (concept Callable) (T),
+    Or<Functor<T>, Function<T>>
 );
 
 namespace detail {

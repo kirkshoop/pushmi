@@ -22,7 +22,7 @@ namespace detail {
   };
   struct empty_impl {
     PUSHMI_TEMPLATE(class Out)
-      (requires NoneReceiver<Out>)
+      (requires Receiver<Out>)
     void operator()(Out out) {
       ::pushmi::set_done(out);
     }

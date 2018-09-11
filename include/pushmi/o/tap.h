@@ -27,8 +27,8 @@ struct tap_ {
 
   PUSHMI_TEMPLATE(class V, class UV = std::remove_reference_t<V>)
     (requires
-      SingleReceiver<SideEffects, const UV> &&
-      SingleReceiver<Out, UV>)
+      ReceiveValue<SideEffects, const UV> &&
+      ReceiveValue<Out, UV>)
   void value(V&& v) {
     ::pushmi::set_value(sideEffects, as_const(v));
     ::pushmi::set_value(out, (V&&) v);
@@ -43,8 +43,8 @@ struct tap_ {
   }
   PUSHMI_TEMPLATE(class E)
     (requires
-      NoneReceiver<SideEffects, const E> &&
-      NoneReceiver<Out, E>)
+      ReceiveError<SideEffects, const E> &&
+      ReceiveError<Out, E>)
   void error(E e) noexcept {
     ::pushmi::set_error(sideEffects, as_const(e));
     ::pushmi::set_error(out, std::move(e));
@@ -67,7 +67,7 @@ struct tap_ {
 PUSHMI_INLINE_VAR constexpr struct make_tap_fn {
   PUSHMI_TEMPLATE(class SideEffects, class Out)
     (requires Receiver<SideEffects> && Receiver<Out> &&
-      Receiver<tap_<SideEffects, Out>, property_set_index_t<properties_t<Out>, is_silent<>>>)
+      Receiver<tap_<SideEffects, Out>>)
   auto operator()(SideEffects se, Out out) const {
     return tap_<SideEffects, Out>{std::move(se), std::move(out)};
   }
@@ -86,15 +86,9 @@ inline void do_assert(bool condition, char const*) {
 
 struct tap_fn {
 private:
-  template <class In, class SideEffects>
+  PUSHMI_TEMPLATE (class In, class SideEffects)
+    (requires Sender<In> && Receiver<SideEffects>)
   static auto impl(In in, SideEffects sideEffects) {
-    // PUSHMI_STATIC_ASSERT(
-    //   ::pushmi::detail::sender_requires_from<In, SideEffects,
-    //     SenderTo<In, SideEffects, is_none<>>,
-    //     SenderTo<In, SideEffects, is_single<>>,
-    //     TimeSenderTo<In, SideEffects, is_single<>> >(),
-    //     "'In' is not deliverable to 'SideEffects'");
-
     return ::pushmi::detail::sender_from(
       std::move(in),
       ::pushmi::detail::submit_transform_out<In>(
@@ -114,27 +108,17 @@ private:
         ::pushmi::detail::receiver_from_fn<In>()(std::move(args_)));
     }
   };
-  template <class In, class SideEffects>
+  PUSHMI_TEMPLATE (class In, class SideEffects)
+    (requires Sender<In> && Receiver<SideEffects>)
   struct out_impl {
     SideEffects sideEffects_;
     PUSHMI_TEMPLATE (class Out)
-      (requires Receiver<Out>)
+      (requires Receiver<Out> && SenderTo<In, Out> &&
+        SenderTo<In, decltype(::pushmi::detail::receiver_from_fn<In>()(
+            detail::make_tap(std::declval<SideEffects>(), std::declval<Out>())))>)
     auto operator()(Out out) const {
-      // PUSHMI_STATIC_ASSERT(
-      //   ::pushmi::detail::sender_requires_from<In, SideEffects,
-      //     SenderTo<In, Out, is_none<>>,
-      //     SenderTo<In, Out, is_single<>>,
-      //     TimeSenderTo<In, Out, is_single<>> >(),
-      //     "'In' is not deliverable to 'Out'");
       auto gang{::pushmi::detail::receiver_from_fn<In>()(
           detail::make_tap(sideEffects_, std::move(out)))};
-      using Gang = decltype(gang);
-      // PUSHMI_STATIC_ASSERT(
-      //   ::pushmi::detail::sender_requires_from<In, SideEffects,
-      //     SenderTo<In, Gang>,
-      //     SenderTo<In, Gang, is_single<>>,
-      //     TimeSenderTo<In, Gang, is_single<>> >(),
-      //     "'In' is not deliverable to 'Out' & 'SideEffects'");
       return gang;
     }
   };

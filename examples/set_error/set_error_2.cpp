@@ -32,6 +32,7 @@ int main()
   op::error(std::exception_ptr{}) |
     op::submit();
 
+#if 0
   op::error(std::errc::argument_list_too_long) |
     op::submit();
 
@@ -72,7 +73,7 @@ int main()
     }) |
     concat<int> |
     op::submit();
-
+#endif
 // retry on error
 
   // http.get(ex) |
