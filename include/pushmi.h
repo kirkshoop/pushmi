@@ -4962,7 +4962,7 @@ class flow_many<Data, DNF, DEF, DDF, DStrtF> {
     df_(data_);
   }
   PUSHMI_TEMPLATE (class Up)
-    (requires Invocable<DStrtF&, Data&, Up>)
+    (requires Invocable<DStrtF&, Data&, Up&&>)
   void starting(Up&& up) {
     if (started_) {std::abort();}
     started_ = true;
@@ -8881,7 +8881,7 @@ private:
     std::tuple<AN...> args_;
 
     PUSHMI_TEMPLATE(class In)
-      (requires Sender<In>)// && Invocable<submit_impl<In>&, In&, pushmi::invoke_result_t<receiver_impl<In>, lock_state*, std::tuple<AN...>&&>>)
+      (requires Sender<In> && Invocable<submit_impl<In>&, In&, pushmi::invoke_result_t<receiver_impl<In>, lock_state*, std::tuple<AN...>&&>>)
     In operator()(In in) {
       lock_state state{};
 

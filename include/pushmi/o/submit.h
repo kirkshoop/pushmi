@@ -335,7 +335,7 @@ private:
     std::tuple<AN...> args_;
 
     PUSHMI_TEMPLATE(class In)
-      (requires Sender<In>)// && Invocable<submit_impl<In>&, In&, pushmi::invoke_result_t<receiver_impl<In>, lock_state*, std::tuple<AN...>&&>>)
+      (requires Sender<In> && Invocable<submit_impl<In>&, In&, pushmi::invoke_result_t<receiver_impl<In>, lock_state*, std::tuple<AN...>&&>>)
     In operator()(In in) {
       lock_state state{};
 

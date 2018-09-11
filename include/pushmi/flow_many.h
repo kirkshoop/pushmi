@@ -285,7 +285,7 @@ class flow_many<Data, DNF, DEF, DDF, DStrtF> {
     df_(data_);
   }
   PUSHMI_TEMPLATE (class Up)
-    (requires Invocable<DStrtF&, Data&, Up>)
+    (requires Invocable<DStrtF&, Data&, Up&&>)
   void starting(Up&& up) {
     if (started_) {std::abort();}
     started_ = true;
