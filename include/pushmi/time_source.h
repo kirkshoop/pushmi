@@ -27,11 +27,11 @@ class time_heap_item
 public:
   using time_point = std::decay_t<TP>;
 
-  time_heap_item(time_point at, any_single<any_time_executor_ref<E, TP>, E> out) :
+  time_heap_item(time_point at, any_receiver<E, any_time_executor_ref<E, TP>> out) :
     when(std::move(at)), what(std::move(out)) {}
 
   time_point when;
-  any_single<any_time_executor_ref<E, TP>, E> what;
+  any_receiver<E, any_time_executor_ref<E, TP>> what;
 };
 template<class E, class TP>
 bool operator<(const time_heap_item<E, TP>& l, const time_heap_item<E, TP>& r) {
@@ -211,7 +211,7 @@ struct time_source_queue_receiver : std::shared_ptr<time_source_queue<E, TP, NF,
     std::shared_ptr<time_source_queue<E, TP, NF, Executor>>(that),
     source_(that->source_.lock()) {
     }
-  using properties = property_set<is_receiver<>, is_single<>>;
+  using properties = property_set<is_receiver<>>;
   std::shared_ptr<time_source_shared<E, TP>> source_;
 };
 
@@ -421,7 +421,7 @@ public:
     (requires Regular<TPA> && ReceiveValue<Out, any_time_executor_ref<E, TP>> && ReceiveError<Out, E>)
   void submit(TPA tp, Out out) {
     // queue for later
-    source_->insert(queue_, time_heap_item<E, TP>{tp, any_single<any_time_executor_ref<E, TP>, E>{std::move(out)}});
+    source_->insert(queue_, time_heap_item<E, TP>{tp, any_receiver<E, any_time_executor_ref<E, TP>>{std::move(out)}});
   }
 };
 

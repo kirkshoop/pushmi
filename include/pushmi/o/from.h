@@ -81,7 +81,7 @@ struct flow_from_up {
     if (requested < 1) {return;}
     // submit work to exec
     ::pushmi::submit(p->exec,
-      make_single([p = p, requested](auto) {
+      make_receiver([p = p, requested](auto) {
         auto remaining = requested;
         // this loop is structured to work when there is re-entrancy
         // out.next in the loop may call up.next. to handle this the
@@ -101,7 +101,7 @@ struct flow_from_up {
   void error(E e) noexcept {
     p->stop.store(true);
     ::pushmi::submit(p->exec,
-      make_single([p = p](auto) {
+      make_receiver([p = p](auto) {
         ::pushmi::set_done(p->out);
       }));
   }
@@ -109,7 +109,7 @@ struct flow_from_up {
   void done() {
     p->stop.store(true);
     ::pushmi::submit(p->exec,
-      make_single([p = p](auto) {
+      make_receiver([p = p](auto) {
         ::pushmi::set_done(p->out);
       }));
   }
@@ -129,7 +129,7 @@ private:
       auto p = std::make_shared<Producer>(begin_, end_, std::move(out), exec_, false);
 
       ::pushmi::submit(exec_,
-        make_single([p](auto exec) {
+        make_receiver([p](auto exec) {
           // pass reference for cancellation.
           ::pushmi::set_starting(p->out, make_many(flow_from_up<Producer>{p}));
         }));

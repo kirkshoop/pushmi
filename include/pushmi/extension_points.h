@@ -354,7 +354,7 @@ PUSHMI_INLINE_VAR constexpr __adl::get_top_fn top{};
 
 template <class T>
 struct property_set_traits<std::promise<T>> {
-  using properties = property_set<is_receiver<>, is_single<>>;
+  using properties = property_set<is_receiver<>>;
 };
 template <>
 struct property_set_traits<std::promise<void>> {

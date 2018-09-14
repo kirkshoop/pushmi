@@ -18,9 +18,9 @@ auto concat =
   [](auto in){
     return mi::make_single_sender(
       [in](auto out) mutable {
-        ::pushmi::submit(in, mi::make_single(out,
+        ::pushmi::submit(in, mi::make_receiver(out,
         [](auto out, auto v){
-          ::pushmi::submit(v, mi::any_single<T, E>(out));
+          ::pushmi::submit(v, mi::any_receiver<E, T>(out));
         }));
       });
   };
@@ -63,7 +63,7 @@ int main()
 
   op::just(42) |
     op::transform([](auto v) {
-      using r_t = mi::any_single_sender<int>;
+      using r_t = mi::any_single_sender<std::exception_ptr, int>;
       if (v < 40) {
         return r_t{op::error<int>(std::exception_ptr{})};
       } else {

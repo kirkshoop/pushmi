@@ -25,13 +25,13 @@ struct tap_ {
   // side effect has no effect on the properties.
   using properties = properties_t<Out>;
 
-  PUSHMI_TEMPLATE(class V, class UV = std::remove_reference_t<V>)
+  PUSHMI_TEMPLATE(class... VN)
     (requires
-      ReceiveValue<SideEffects, const UV> &&
-      ReceiveValue<Out, UV>)
-  void value(V&& v) {
-    ::pushmi::set_value(sideEffects, as_const(v));
-    ::pushmi::set_value(out, (V&&) v);
+      ReceiveValue<SideEffects, const std::remove_reference_t<VN>...> &&
+      ReceiveValue<Out, std::remove_reference_t<VN>...>)
+  void value(VN&&... vn) {
+    ::pushmi::set_value(sideEffects, as_const(vn)...);
+    ::pushmi::set_value(out, (VN&&) vn...);
   }
   PUSHMI_TEMPLATE(class V, class UV = std::remove_reference_t<V>)
     (requires

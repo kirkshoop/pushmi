@@ -10,7 +10,6 @@
 #include "../piping.h"
 #include "../boosters.h"
 #include "../receiver.h"
-#include "../single.h"
 #include "../sender.h"
 #include "../single_sender.h"
 #include "../many.h"
@@ -56,7 +55,7 @@ struct make_receiver;
 template <>
 struct make_receiver<is_none<>> : construct_deduced<receiver> {};
 template <>
-struct make_receiver<is_single<>> : construct_deduced<single> {};
+struct make_receiver<is_single<>> : construct_deduced<receiver> {};
 template <>
 struct make_receiver<is_many<>> : construct_deduced<many> {};
 template <>
@@ -75,8 +74,8 @@ struct receiver_from_impl {
   PUSHMI_TEMPLATE (class... Ts, class... Fns,
     class This = std::enable_if_t<sizeof...(Fns) != 0, receiver_from_impl>)
     (requires And<SemiMovable<Fns>...> &&
-      Invocable<MakeReceiver, std::tuple<Ts...>> &&
-      Invocable<This, pushmi::invoke_result_t<MakeReceiver, std::tuple<Ts...>>, Fns...>)
+      Invocable<MakeReceiver, Ts...> &&
+      Invocable<This, pushmi::invoke_result_t<MakeReceiver, Ts...>, Fns...>)
   auto operator()(std::tuple<Ts...> args, Fns...fns) const {
     return This()(This()(std::move(args)), std::move(fns)...);
   }
@@ -195,10 +194,10 @@ PUSHMI_TEMPLATE(
     bool TimeSingleSenderRequires)
   (requires Sender<In> && Receiver<Out>)
 constexpr bool sender_requires_from() {
-  PUSHMI_IF_CONSTEXPR_RETURN( ((bool) TimeSenderTo<In, Out, is_single<>>) (
+  PUSHMI_IF_CONSTEXPR_RETURN( ((bool) TimeSenderTo<In, Out>) (
     return TimeSingleSenderRequires;
   ) else (
-    PUSHMI_IF_CONSTEXPR_RETURN( ((bool) SenderTo<In, Out, is_single<>>) (
+    PUSHMI_IF_CONSTEXPR_RETURN( ((bool) SenderTo<In, Out>) (
       return SingleSenderRequires;
     ) else (
       PUSHMI_IF_CONSTEXPR_RETURN( ((bool) SenderTo<In, Out>) (
@@ -215,9 +214,9 @@ private:
   struct impl {
     std::tuple<VN...> vn_;
     PUSHMI_TEMPLATE(class Out)
-      (requires Receiver<Out, is_single<>>)
+      (requires ReceiveValue<Out, VN...>)
     void operator()(Out out) {
-      ::pushmi::apply(std::tuple_cat(std::tuple<Out>{std::move(out)}, std::move(vn_)), ::pushmi::set_value);
+      ::pushmi::apply(::pushmi::set_value, std::tuple_cat(std::tuple<Out>{std::move(out)}, std::move(vn_)));
     }
   };
 public:

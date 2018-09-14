@@ -41,7 +41,7 @@ private:
     void operator()(Data& data, V&& v) const {
       ::pushmi::submit(
         data.exec,
-        ::pushmi::make_single(
+        ::pushmi::make_receiver(
           impl<std::decay_t<V>>{(V&&) v, std::move(static_cast<Out&>(data))}
         )
       );
@@ -61,7 +61,7 @@ private:
     void operator()(Data& data, E e) const noexcept {
       ::pushmi::submit(
         data.exec,
-        ::pushmi::make_single(
+        ::pushmi::make_receiver(
           impl<E>{std::move(e), std::move(static_cast<Out&>(data))}
         )
       );
@@ -79,7 +79,7 @@ private:
     void operator()(Data& data) const {
       ::pushmi::submit(
         data.exec,
-        ::pushmi::make_single(
+        ::pushmi::make_receiver(
           impl{std::move(static_cast<Out&>(data))}
         )
       );

@@ -60,7 +60,7 @@ SCENARIO( "empty can be used with tap and submit", "[empty][sender]" ) {
     auto e = op::empty<int>();
     using E = decltype(e);
 
-    REQUIRE( v::SenderTo<E, v::any_single<int>, v::is_single<>> );
+    REQUIRE( v::SenderTo<E, v::any_receiver<std::exception_ptr, int>, v::is_single<>> );
 
     WHEN( "tap and submit are applied" ) {
 
@@ -88,7 +88,7 @@ SCENARIO( "just() can be used with transform and submit", "[just][sender]" ) {
     auto j = op::just(20);
     using J = decltype(j);
 
-    REQUIRE( v::SenderTo<J, v::any_single<int>, v::is_single<>> );
+    REQUIRE( v::SenderTo<J, v::any_receiver<std::exception_ptr, int>, v::is_single<>> );
 
     WHEN( "transform and submit are applied" ) {
       int signals = 0;

@@ -377,13 +377,13 @@ public:
   T operator()(In in) const {
     pushmi::detail::opt<T> result_;
     std::exception_ptr ep_;
-    auto out = make_single(
+    auto out = ::pushmi::make_receiver(
       on_value_impl{&result_},
       on_error_impl{&ep_}
     );
     using Out = decltype(out);
-    static_assert(SenderTo<In, Out, is_single<>> ||
-        TimeSenderTo<In, Out, is_single<>>,
+    static_assert(SenderTo<In, Out> ||
+        TimeSenderTo<In, Out>,
         "'In' does not deliver value compatible with 'T' to 'Out'");
     blocking_submit_fn{}(std::move(out))(in);
     if (!!ep_) { std::rethrow_exception(ep_); }

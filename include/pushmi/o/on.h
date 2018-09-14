@@ -30,7 +30,7 @@ private:
     void operator()(In& in, Out out) const {
       auto exec = ef_();
       ::pushmi::submit(exec,
-        ::pushmi::make_single(on_value_impl<In, Out>{in, std::move(out)})
+        ::pushmi::make_receiver(on_value_impl<In, Out>{in, std::move(out)})
       );
     }
   };
@@ -51,7 +51,7 @@ private:
     void operator()(In& in, TP at, Out out) const {
       auto exec = ef_();
       ::pushmi::submit(exec, at,
-        ::pushmi::make_single(
+        ::pushmi::make_receiver(
           time_on_value_impl<In, TP, Out>{in, at, std::move(out)}
         )
       );

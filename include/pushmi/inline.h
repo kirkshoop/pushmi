@@ -17,7 +17,7 @@ class inline_constrained_executor_t {
     }
     auto executor() { return *this; }
     PUSHMI_TEMPLATE(class CV, class Out)
-      (requires Regular<CV> && Receiver<Out, is_single<>>)
+      (requires Regular<CV> && Receiver<Out>)
     void submit(CV, Out out) {
       ::pushmi::set_value(std::move(out), *this);
     }
@@ -42,7 +42,7 @@ class inline_time_executor_t {
     }
     auto executor() { return *this; }
     PUSHMI_TEMPLATE(class TP, class Out)
-      (requires Regular<TP> && Receiver<Out, is_single<>>)
+      (requires Regular<TP> && Receiver<Out>)
     void submit(TP tp, Out out) {
       std::this_thread::sleep_until(tp);
       ::pushmi::set_value(std::move(out), *this);
@@ -65,7 +65,7 @@ class inline_executor_t {
 
     auto executor() { return *this; }
     PUSHMI_TEMPLATE(class Out)
-      (requires Receiver<Out, is_single<>>)
+      (requires Receiver<Out>)
     void submit(Out out) {
       ::pushmi::set_value(std::move(out), *this);
     }

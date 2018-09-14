@@ -66,7 +66,7 @@ void countdown<R>::value(ExecutorRef exec) {
   }
 }
 
-using countdownsingle = countdown<mi::make_single_fn>;
+using countdownsingle = countdown<mi::make_receiver_fn>;
 using countdownflowsingle = countdown<mi::make_flow_single_fn>;
 using countdownmany = countdown<mi::make_many_fn>;
 using countdownflowmany = countdown<mi::make_flow_many_fn>;
@@ -302,7 +302,7 @@ NONIUS_BENCHMARK("inline 1'000 single", [](nonius::chronometer meter){
   countdownsingle single{counter};
   meter.measure([&]{
     counter.store(1'000);
-    ie | op::submit(mi::make_single(single));
+    ie | op::submit(mi::make_receiver(single));
     while(counter.load() > 0);
     return counter.load();
   });
@@ -315,7 +315,7 @@ NONIUS_BENCHMARK("inline 1'000 time single", [](nonius::chronometer meter){
   countdownsingle single{counter};
   meter.measure([&]{
     counter.store(1'000);
-    ie | op::submit(mi::make_single(single));
+    ie | op::submit(mi::make_receiver(single));
     while(counter.load() > 0);
     return counter.load();
   });

@@ -92,20 +92,20 @@ template <
 class any_receiver;
 
 template<
-  class V,
-  class E = std::exception_ptr>
-class any_single_sender;
+  class E = std::exception_ptr,
+  class... VN>
+struct any_single_sender;
 
 template<
-  class V,
   class E = std::exception_ptr,
-  class C = std::ptrdiff_t>
+  class C = std::ptrdiff_t,
+  class... VN>
 struct any_constrained_single_sender;
 
 template<
-  class V,
   class E = std::exception_ptr,
-  class TP = std::chrono::system_clock::time_point>
+  class TP = std::chrono::system_clock::time_point,
+  class... VN>
 class any_time_single_sender;
 
 template<

@@ -244,8 +244,7 @@ PUSHMI_CONCEPT_DEF(
     ReceiveError<S, E> &&
     ReceiveValue<S, T> &&
     SemiMovable<T> &&
-    SemiMovable<E> &&
-    Single<S>
+    SemiMovable<E>
 );
 
 PUSHMI_CONCEPT_DEF(
