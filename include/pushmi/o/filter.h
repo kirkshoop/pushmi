@@ -16,17 +16,17 @@ private:
   template <class Predicate>
   struct on_value_impl {
     Predicate p_;
-    template <class Out, class V>
-    void operator()(Out& out, V&& v) const {
-      if (p_(as_const(v))) {
-        ::pushmi::set_value(out, (V&&) v);
+    template <class Out, class... VN>
+    void operator()(Out& out, VN&&... vn) const {
+      if (p_(as_const(vn)...)) {
+        ::pushmi::set_value(out, (VN&&) vn...);
       } else {
         ::pushmi::set_done(out);
       }
     }
   };
   template <class In, class Predicate>
-  struct out_impl {
+  struct submit_impl {
     Predicate p_;
     PUSHMI_TEMPLATE(class Out)
       (requires Receiver<Out>)
@@ -34,19 +34,19 @@ private:
       return ::pushmi::detail::receiver_from_fn<In>()(
         std::move(out),
         // copy 'p' to allow multiple calls to submit
-        ::pushmi::on_value(on_value_impl<Predicate>{p_})
+        on_value_impl<Predicate>{p_}
       );
     }
   };
   template <class Predicate>
-  struct in_impl {
+  struct adapt_impl {
     Predicate p_;
     PUSHMI_TEMPLATE(class In)
       (requires Sender<In>)
     auto operator()(In in) const {
       return ::pushmi::detail::sender_from(
         std::move(in),
-        ::pushmi::detail::submit_transform_out<In>(out_impl<In, Predicate>{p_})
+        ::pushmi::detail::submit_transform_out<In>(submit_impl<In, Predicate>{p_})
       );
     }
   };
@@ -54,7 +54,7 @@ public:
   PUSHMI_TEMPLATE(class Predicate)
     (requires SemiMovable<Predicate>)
   auto operator()(Predicate p) const {
-    return in_impl<Predicate>{std::move(p)};
+    return adapt_impl<Predicate>{std::move(p)};
   }
 };
 
