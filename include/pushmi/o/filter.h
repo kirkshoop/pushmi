@@ -13,15 +13,21 @@ namespace detail {
 
 struct filter_fn {
 private:
-  template <class Predicate>
+  template <class In, class Predicate>
   struct on_value_impl {
     Predicate p_;
-    template <class Out, class... VN>
+    PUSHMI_TEMPLATE(class Out, class V)
+      (requires Receiver<Out> && Many<In>)
+    void operator()(Out& out, V&& v) const {
+      if (p_(as_const(v))) {
+        ::pushmi::set_next(out, (V&&) v);
+      }
+    }
+    PUSHMI_TEMPLATE(class Out, class... VN)
+      (requires Receiver<Out> && not Many<In>)
     void operator()(Out& out, VN&&... vn) const {
       if (p_(as_const(vn)...)) {
         ::pushmi::set_value(out, (VN&&) vn...);
-      } else {
-        ::pushmi::set_done(out);
       }
     }
   };
@@ -34,7 +40,7 @@ private:
       return ::pushmi::detail::receiver_from_fn<In>()(
         std::move(out),
         // copy 'p' to allow multiple calls to submit
-        on_value_impl<Predicate>{p_}
+        on_value_impl<In, Predicate>{p_}
       );
     }
   };

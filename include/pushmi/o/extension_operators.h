@@ -104,10 +104,10 @@ struct submit_transform_out_1 {
 template <class In, class FN>
 struct submit_transform_out_2 {
   FN fn_;
-  PUSHMI_TEMPLATE(class TP, class Out)
+  PUSHMI_TEMPLATE(class CV, class Out)
     (requires Receiver<Out> && Invocable<FN, Out> && ConstrainedSenderTo<In, pushmi::invoke_result_t<const FN&, Out>>)
-  void operator()(In& in, TP tp, Out out) const {
-    ::pushmi::submit(in, tp, fn_(std::move(out)));
+  void operator()(In& in, CV cv, Out out) const {
+    ::pushmi::submit(in, cv, fn_(std::move(out)));
   }
 };
 template <class In, class SDSF>
@@ -122,16 +122,16 @@ struct submit_transform_out_3 {
 template <class In, class TSDSF>
 struct submit_transform_out_4 {
   TSDSF tsdsf_;
-  PUSHMI_TEMPLATE(class TP, class Out)
-    (requires Receiver<Out> && Invocable<const TSDSF&, In&, TP, Out>)
-  void operator()(In& in, TP tp, Out out) const {
-    tsdsf_(in, tp, std::move(out));
+  PUSHMI_TEMPLATE(class CV, class Out)
+    (requires Receiver<Out> && Invocable<const TSDSF&, In&, CV, Out>)
+  void operator()(In& in, CV cv, Out out) const {
+    tsdsf_(in, cv, std::move(out));
   }
 };
 
 PUSHMI_TEMPLATE(class In, class FN)
   (requires Sender<In> && SemiMovable<FN>
-    PUSHMI_BROKEN_SUBSUMPTION(&& not TimeSender<In>))
+    PUSHMI_BROKEN_SUBSUMPTION(&& not ConstrainedSender<In>))
 auto submit_transform_out(FN fn) {
   return on_submit(submit_transform_out_1<In, FN>{std::move(fn)});
 }
@@ -144,13 +144,13 @@ auto submit_transform_out(FN fn){
 
 PUSHMI_TEMPLATE(class In, class SDSF, class TSDSF)
   (requires Sender<In> && SemiMovable<SDSF> && SemiMovable<TSDSF>
-    PUSHMI_BROKEN_SUBSUMPTION(&& not TimeSender<In>))
+    PUSHMI_BROKEN_SUBSUMPTION(&& not ConstrainedSender<In>))
 auto submit_transform_out(SDSF sdsf, TSDSF) {
   return submit_transform_out_3<In, SDSF>{std::move(sdsf)};
 }
 
 PUSHMI_TEMPLATE(class In, class SDSF, class TSDSF)
-  (requires TimeSender<In> && SemiMovable<SDSF> && SemiMovable<TSDSF>)
+  (requires ConstrainedSender<In> && SemiMovable<SDSF> && SemiMovable<TSDSF>)
 auto submit_transform_out(SDSF, TSDSF tsdsf) {
   return submit_transform_out_4<In, TSDSF>{std::move(tsdsf)};
 }
