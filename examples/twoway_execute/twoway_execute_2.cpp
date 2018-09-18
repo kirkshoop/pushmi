@@ -65,7 +65,9 @@ int main()
 
   p1055::twoway_execute(p.executor(), [](){return 42;}) | op::get<int>;
 
+  sp.stop();
   sp.wait();
+  p.stop();
   p.wait();
 
   std::cout << "OK" << std::endl;

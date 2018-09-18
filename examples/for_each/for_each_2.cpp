@@ -99,5 +99,6 @@ int main()
 
   std::cout << "OK" << std::endl;
 
+  p.stop();
   p.wait();
 }

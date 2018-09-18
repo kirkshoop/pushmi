@@ -96,7 +96,9 @@ int main()
 
   p1055::then_execute(p.executor(), [](int v){return v*2;}, op::just(21)) | op::get<int>;
 
+  sp.stop();
   sp.wait();
+  p.stop();
   p.wait();
 
   std::cout << "OK" << std::endl;

@@ -27,19 +27,20 @@ auto concat =
 
 int main()
 {
+  auto stop_abort = mi::on_error([](auto) noexcept {});
   // support all error value types
 
   op::error(std::exception_ptr{}) |
-    op::submit();
+    op::submit(stop_abort);
 
   op::error(std::errc::argument_list_too_long) |
-    op::submit();
+    op::submit(stop_abort);
 
 // transform an error
 
   op::error(std::errc::argument_list_too_long) |
     op::switch_on_error([](auto e) noexcept { return op::error(std::exception_ptr{}); }) |
-    op::submit();
+    op::submit(stop_abort);
 
 // use default value if an error occurs
 
