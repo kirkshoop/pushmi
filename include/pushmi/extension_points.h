@@ -50,7 +50,9 @@ auto executor(SD& sd) noexcept(noexcept(sd.executor())) {
 }
 
 PUSHMI_TEMPLATE (class SD, class Out)
-  (requires requires (std::declval<SD&>().submit(std::declval<Out>())))
+  (requires requires (
+    std::declval<SD&>().submit(std::declval<Out>())
+  ))
 void submit(SD& sd, Out out) noexcept(noexcept(sd.submit(std::move(out)))) {
   sd.submit(std::move(out));
 }
@@ -64,7 +66,7 @@ auto top(SD& sd) noexcept(noexcept(sd.top())) {
 PUSHMI_TEMPLATE (class SD, class TP, class Out)
   (requires requires (
     std::declval<SD&>().submit(
-        std::declval<TP(&)(TP)>()(std::declval<SD&>().top()),
+        std::declval<TP(&)(TP)>()(top(std::declval<SD&>())),
         std::declval<Out>())
   ))
 void submit(SD& sd, TP tp, Out out)
@@ -124,7 +126,7 @@ auto top(SD& sd) noexcept(noexcept(sd->top())) {
 PUSHMI_TEMPLATE (class SD, class TP, class Out)
   (requires requires (
     std::declval<SD&>()->submit(
-        std::declval<TP(&)(TP)>()(std::declval<SD&>()->top()),
+        std::declval<TP(&)(TP)>()(top(std::declval<SD&>())),
         std::declval<Out>())
   ))
 void submit(SD& sd, TP tp, Out out)
@@ -136,15 +138,11 @@ void submit(SD& sd, TP tp, Out out)
 // add support for std::promise externally
 //
 
+// std::promise does not support the done signal.
+// either set_value or set_error must be called
 template <class T>
-void set_done(std::promise<T>& p) noexcept(
-    noexcept(p.set_exception(std::make_exception_ptr(0)))) {
-  p.set_exception(std::make_exception_ptr(
-      std::logic_error("std::promise does not support done.")));
-}
-inline void set_done(std::promise<void>& p) noexcept(noexcept(p.set_value())) {
-  p.set_value();
-}
+void set_done(std::promise<T>& p) noexcept {}
+
 template <class T>
 void set_error(std::promise<T>& p, std::exception_ptr e) noexcept {
   p.set_exception(std::move(e));
@@ -205,6 +203,7 @@ void submit(std::reference_wrapper<SD> sd, Out out) noexcept(
   noexcept(submit(sd.get(), std::move(out)))) {
   submit(sd.get(), std::move(out));
 }
+
 PUSHMI_TEMPLATE (class SD)
   (requires requires ( top(std::declval<SD&>()) ))
 auto top(std::reference_wrapper<SD> sd) noexcept(noexcept(top(sd.get()))) {
@@ -315,6 +314,15 @@ struct do_submit_fn {
   void operator()(SD&& s, Out out) const
       noexcept(noexcept(submit(s, std::move(out)))) {
     submit(s, std::move(out));
+  }
+
+  PUSHMI_TEMPLATE (class SD, class Out)
+    (requires requires (
+      submit(std::declval<SD&>(), top(std::declval<SD&>()), std::declval<Out>())
+    ))
+  void operator()(SD&& s, Out out) const
+      noexcept(noexcept(submit(s, top(s), std::move(out)))) {
+    submit(s, top(s), std::move(out));
   }
 
   PUSHMI_TEMPLATE (class SD, class TP, class Out)

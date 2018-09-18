@@ -47,7 +47,7 @@ SCENARIO( "empty can be used with tap and submit", "[empty][sender]" ) {
       }
 
       WHEN( "future_from is applied" ) {
-        v::future_from(e).get();
+        REQUIRE_THROWS_AS(v::future_from(e).get(), std::future_error);
 
         THEN( "future_from(e) returns std::future<void>" ) {
           REQUIRE( std::is_same<std::future<void>, decltype(v::future_from(e))>::value );
@@ -104,8 +104,8 @@ SCENARIO( "just() can be used with transform and submit", "[just][sender]" ) {
           [&](auto e) noexcept { signals += 1000; },
           [&](){ signals += 10; });
 
-      THEN( "the transform signal is recorded twice, the value signal once and the result is correct" ) {
-        REQUIRE( signals == 20100 );
+      THEN( "the transform signal is recorded twice, the value and done signals once and the result is correct" ) {
+        REQUIRE( signals == 20110 );
         REQUIRE( value == 42 );
       }
     }

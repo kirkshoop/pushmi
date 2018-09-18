@@ -73,17 +73,6 @@ PUSHMI_INLINE_VAR constexpr struct make_tap_fn {
   }
 } const make_tap {};
 
-#if __NVCC__
-#define PUSHMI_STATIC_ASSERT(...)
-#elif __cpp_if_constexpr >= 201606
-#define PUSHMI_STATIC_ASSERT static_assert
-#else
-#define PUSHMI_STATIC_ASSERT detail::do_assert
-inline void do_assert(bool condition, char const*) {
-  assert(condition);
-}
-#endif
-
 struct tap_fn {
 private:
   PUSHMI_TEMPLATE (class In, class SideEffects)

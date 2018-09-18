@@ -22,7 +22,8 @@ private:
     PUSHMI_TEMPLATE (class Out)
       (requires ReceiveValue<Out, VN...>)
     void operator()(Out out) {
-      ::pushmi::apply(::pushmi::set_value, std::tuple_cat(std::tuple<Out>{std::move(out)}, std::move(vn_)));
+      ::pushmi::apply(::pushmi::set_value, std::tuple_cat(std::tuple<Out&>{out}, std::move(vn_)));
+      ::pushmi::set_done(std::move(out));
     }
   };
 public:

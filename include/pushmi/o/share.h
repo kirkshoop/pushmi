@@ -24,11 +24,7 @@ private:
       (requires Sender<In>)
     auto operator()(In in) const {
       subject<properties_t<In>, TN...> sub;
-      PUSHMI_IF_CONSTEXPR( ((bool)TimeSender<In>) (
-        ::pushmi::submit(in, ::pushmi::now(id(in)), sub.receiver());
-      ) else (
-        ::pushmi::submit(id(in), sub.receiver());
-      ));
+      ::pushmi::submit(in, sub.receiver());
       return sub;
     }
   };

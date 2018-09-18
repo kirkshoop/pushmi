@@ -1639,7 +1639,9 @@ auto executor(SD& sd) noexcept(noexcept(sd.executor())) {
 }
 
 PUSHMI_TEMPLATE (class SD, class Out)
-  (requires requires (std::declval<SD&>().submit(std::declval<Out>())))
+  (requires requires (
+    std::declval<SD&>().submit(std::declval<Out>())
+  ))
 void submit(SD& sd, Out out) noexcept(noexcept(sd.submit(std::move(out)))) {
   sd.submit(std::move(out));
 }
@@ -1653,7 +1655,7 @@ auto top(SD& sd) noexcept(noexcept(sd.top())) {
 PUSHMI_TEMPLATE (class SD, class TP, class Out)
   (requires requires (
     std::declval<SD&>().submit(
-        std::declval<TP(&)(TP)>()(std::declval<SD&>().top()),
+        std::declval<TP(&)(TP)>()(top(std::declval<SD&>())),
         std::declval<Out>())
   ))
 void submit(SD& sd, TP tp, Out out)
@@ -1713,7 +1715,7 @@ auto top(SD& sd) noexcept(noexcept(sd->top())) {
 PUSHMI_TEMPLATE (class SD, class TP, class Out)
   (requires requires (
     std::declval<SD&>()->submit(
-        std::declval<TP(&)(TP)>()(std::declval<SD&>()->top()),
+        std::declval<TP(&)(TP)>()(top(std::declval<SD&>())),
         std::declval<Out>())
   ))
 void submit(SD& sd, TP tp, Out out)
@@ -1725,15 +1727,11 @@ void submit(SD& sd, TP tp, Out out)
 // add support for std::promise externally
 //
 
+// std::promise does not support the done signal.
+// either set_value or set_error must be called
 template <class T>
-void set_done(std::promise<T>& p) noexcept(
-    noexcept(p.set_exception(std::make_exception_ptr(0)))) {
-  p.set_exception(std::make_exception_ptr(
-      std::logic_error("std::promise does not support done.")));
-}
-inline void set_done(std::promise<void>& p) noexcept(noexcept(p.set_value())) {
-  p.set_value();
-}
+void set_done(std::promise<T>& p) noexcept {}
+
 template <class T>
 void set_error(std::promise<T>& p, std::exception_ptr e) noexcept {
   p.set_exception(std::move(e));
@@ -1794,6 +1792,7 @@ void submit(std::reference_wrapper<SD> sd, Out out) noexcept(
   noexcept(submit(sd.get(), std::move(out)))) {
   submit(sd.get(), std::move(out));
 }
+
 PUSHMI_TEMPLATE (class SD)
   (requires requires ( top(std::declval<SD&>()) ))
 auto top(std::reference_wrapper<SD> sd) noexcept(noexcept(top(sd.get()))) {
@@ -1904,6 +1903,15 @@ struct do_submit_fn {
   void operator()(SD&& s, Out out) const
       noexcept(noexcept(submit(s, std::move(out)))) {
     submit(s, std::move(out));
+  }
+
+  PUSHMI_TEMPLATE (class SD, class Out)
+    (requires requires (
+      submit(std::declval<SD&>(), top(std::declval<SD&>()), std::declval<Out>())
+    ))
+  void operator()(SD&& s, Out out) const
+      noexcept(noexcept(submit(s, top(s), std::move(out)))) {
+    submit(s, top(s), std::move(out));
   }
 
   PUSHMI_TEMPLATE (class SD, class TP, class Out)
@@ -8161,7 +8169,7 @@ using receiver_type_t =
 PUSHMI_CONCEPT_DEF(
   template (class In, class ... AN)
   (concept AutoSenderTo)(In, AN...),
-    Sender<In> && not Constrained<In> && SenderTo<In, receiver_type_t<In, AN...>>
+    Sender<In> && SenderTo<In, receiver_type_t<In, AN...>>
 );
 PUSHMI_CONCEPT_DEF(
   template (class In, class ... AN)
@@ -8191,15 +8199,6 @@ private:
     In operator()(In in) {
       auto out{::pushmi::detail::receiver_from_fn<In>()(std::move(args_))};
       ::pushmi::submit(in, std::move(out));
-      return in;
-    }
-    PUSHMI_TEMPLATE(class In)
-      (requires
-        submit_detail::AutoConstrainedSenderTo<In, AN...> &&
-        Invocable<::pushmi::detail::receiver_from_fn<In>&, std::tuple<AN...>>)
-    In operator()(In in) {
-      auto out{::pushmi::detail::receiver_from_fn<In>()(std::move(args_))};
-      ::pushmi::submit(in, ::pushmi::top(in), std::move(out));
       return in;
     }
   };
@@ -8380,12 +8379,12 @@ private:
         state_->signaled.notify_all();
       }
     }
-    PUSHMI_TEMPLATE (class Out, class Value)
-      (requires True<> && ReceiveValue<Out, Value> &&
-        not Executor<std::decay_t<Value>>)
-    void operator()(Out out, Value&& v) const {
+    PUSHMI_TEMPLATE (class Out, class... VN)
+      (requires True<> && ReceiveValue<Out, VN...> &&
+        And<not Executor<std::decay_t<VN>>...>)
+    void operator()(Out out, VN&&... vn) const {
       ++state_->nested;
-      ::pushmi::set_value(out, (Value&&) v);
+      ::pushmi::set_value(out, (VN&&) vn...);
       std::unique_lock<std::mutex> guard{state_->lock};
       state_->done = true;
       if (--state_->nested == 0){
@@ -8450,12 +8449,7 @@ private:
   template <class In>
   struct submit_impl {
     PUSHMI_TEMPLATE(class Out)
-      (requires Receiver<Out> && ConstrainedSenderTo<In, Out>)
-    void operator()(In& in, Out out) const {
-     ::pushmi::submit(in, ::pushmi::top(in), std::move(out));
-    }
-    PUSHMI_TEMPLATE(class Out)
-      (requires Receiver<Out> && SenderTo<In, Out> && not Constrained<In>)
+      (requires Receiver<Out> && SenderTo<In, Out>)
     void operator()(In& in, Out out) const {
       ::pushmi::submit(in, std::move(out));
     }
@@ -8495,7 +8489,8 @@ struct get_fn {
 private:
   struct on_value_impl {
     pushmi::detail::opt<T>* result_;
-    void operator()(T t) const { *result_ = std::move(t); }
+    template<class... TN>
+    void operator()(TN&&... tn) const { *result_ = T{(TN&&) tn...}; }
   };
   struct on_error_impl {
     std::exception_ptr* ep_;
@@ -8515,8 +8510,7 @@ public:
       on_error_impl{&ep_}
     );
     using Out = decltype(out);
-    static_assert(SenderTo<In, Out> ||
-        TimeSenderTo<In, Out>,
+    static_assert(SenderTo<In, Out>,
         "'In' does not deliver value compatible with 'T' to 'Out'");
     blocking_submit_fn{}(std::move(out))(in);
     if (!!ep_) { std::rethrow_exception(ep_); }
@@ -8946,7 +8940,8 @@ private:
     PUSHMI_TEMPLATE (class Out)
       (requires ReceiveValue<Out, VN...>)
     void operator()(Out out) {
-      ::pushmi::apply(::pushmi::set_value, std::tuple_cat(std::tuple<Out>{std::move(out)}, std::move(vn_)));
+      ::pushmi::apply(::pushmi::set_value, std::tuple_cat(std::tuple<Out&>{out}, std::move(vn_)));
+      ::pushmi::set_done(std::move(out));
     }
   };
 public:
@@ -9218,17 +9213,6 @@ PUSHMI_INLINE_VAR constexpr struct make_tap_fn {
     return tap_<SideEffects, Out>{std::move(se), std::move(out)};
   }
 } const make_tap {};
-
-#if __NVCC__
-#define PUSHMI_STATIC_ASSERT(...)
-#elif __cpp_if_constexpr >= 201606
-#define PUSHMI_STATIC_ASSERT static_assert
-#else
-#define PUSHMI_STATIC_ASSERT detail::do_assert
-inline void do_assert(bool condition, char const*) {
-  assert(condition);
-}
-#endif
 
 struct tap_fn {
 private:
@@ -9817,11 +9801,7 @@ private:
       (requires Sender<In>)
     auto operator()(In in) const {
       subject<properties_t<In>, TN...> sub;
-      PUSHMI_IF_CONSTEXPR( ((bool)TimeSender<In>) (
-        ::pushmi::submit(in, ::pushmi::now(id(in)), sub.receiver());
-      ) else (
-        ::pushmi::submit(id(in), sub.receiver());
-      ));
+      ::pushmi::submit(in, sub.receiver());
       return sub;
     }
   };

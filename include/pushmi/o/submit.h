@@ -28,7 +28,7 @@ using receiver_type_t =
 PUSHMI_CONCEPT_DEF(
   template (class In, class ... AN)
   (concept AutoSenderTo)(In, AN...),
-    Sender<In> && not Constrained<In> && SenderTo<In, receiver_type_t<In, AN...>>
+    Sender<In> && SenderTo<In, receiver_type_t<In, AN...>>
 );
 PUSHMI_CONCEPT_DEF(
   template (class In, class ... AN)
@@ -58,15 +58,6 @@ private:
     In operator()(In in) {
       auto out{::pushmi::detail::receiver_from_fn<In>()(std::move(args_))};
       ::pushmi::submit(in, std::move(out));
-      return in;
-    }
-    PUSHMI_TEMPLATE(class In)
-      (requires
-        submit_detail::AutoConstrainedSenderTo<In, AN...> &&
-        Invocable<::pushmi::detail::receiver_from_fn<In>&, std::tuple<AN...>>)
-    In operator()(In in) {
-      auto out{::pushmi::detail::receiver_from_fn<In>()(std::move(args_))};
-      ::pushmi::submit(in, ::pushmi::top(in), std::move(out));
       return in;
     }
   };
@@ -247,12 +238,12 @@ private:
         state_->signaled.notify_all();
       }
     }
-    PUSHMI_TEMPLATE (class Out, class Value)
-      (requires True<> && ReceiveValue<Out, Value> &&
-        not Executor<std::decay_t<Value>>)
-    void operator()(Out out, Value&& v) const {
+    PUSHMI_TEMPLATE (class Out, class... VN)
+      (requires True<> && ReceiveValue<Out, VN...> &&
+        And<not Executor<std::decay_t<VN>>...>)
+    void operator()(Out out, VN&&... vn) const {
       ++state_->nested;
-      ::pushmi::set_value(out, (Value&&) v);
+      ::pushmi::set_value(out, (VN&&) vn...);
       std::unique_lock<std::mutex> guard{state_->lock};
       state_->done = true;
       if (--state_->nested == 0){
@@ -317,12 +308,7 @@ private:
   template <class In>
   struct submit_impl {
     PUSHMI_TEMPLATE(class Out)
-      (requires Receiver<Out> && ConstrainedSenderTo<In, Out>)
-    void operator()(In& in, Out out) const {
-     ::pushmi::submit(in, ::pushmi::top(in), std::move(out));
-    }
-    PUSHMI_TEMPLATE(class Out)
-      (requires Receiver<Out> && SenderTo<In, Out> && not Constrained<In>)
+      (requires Receiver<Out> && SenderTo<In, Out>)
     void operator()(In& in, Out out) const {
       ::pushmi::submit(in, std::move(out));
     }
@@ -362,7 +348,8 @@ struct get_fn {
 private:
   struct on_value_impl {
     pushmi::detail::opt<T>* result_;
-    void operator()(T t) const { *result_ = std::move(t); }
+    template<class... TN>
+    void operator()(TN&&... tn) const { *result_ = T{(TN&&) tn...}; }
   };
   struct on_error_impl {
     std::exception_ptr* ep_;
@@ -382,8 +369,7 @@ public:
       on_error_impl{&ep_}
     );
     using Out = decltype(out);
-    static_assert(SenderTo<In, Out> ||
-        TimeSenderTo<In, Out>,
+    static_assert(SenderTo<In, Out>,
         "'In' does not deliver value compatible with 'T' to 'Out'");
     blocking_submit_fn{}(std::move(out))(in);
     if (!!ep_) { std::rethrow_exception(ep_); }
