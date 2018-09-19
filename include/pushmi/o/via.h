@@ -25,7 +25,7 @@ struct via_fn_data : public Out, public via_fn_base<Executor> {
   via_fn_data(Out out, Executor exec) :
     Out(std::move(out)), via_fn_base<Executor>(std::move(exec)) {}
 
-  using Out::properties;
+  using typename Out::properties;
   using Out::error;
   using Out::done;
 };
