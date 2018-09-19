@@ -15,6 +15,7 @@
 
 #include <pushmi/sender.h>
 #include <pushmi/single_sender.h>
+#include <pushmi/strand.h>
 #include <pushmi/o/just.h>
 #include <pushmi/o/via.h>
 #include <pushmi/o/transform.h>
@@ -75,7 +76,7 @@ namespace p1055 {
 
 template<class Executor, class Function, class Future>
 auto then_execute(Executor&& e, Function&& f, Future&& pred) {
-    return pred | op::via([e](){return e;}) | op::transform([f](auto v){return f(v);});
+    return pred | op::via(mi::strands(e)) | op::transform([f](auto v){return f(v);});
 }
 
 

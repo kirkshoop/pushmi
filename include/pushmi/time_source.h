@@ -175,7 +175,6 @@ public:
   }
   void done() {
     auto s = source_.lock();
-    auto done = false;
     std::unique_lock<std::mutex> guard{s->lock_};
 
     if (!this->dispatching_ || this->pending_) {
@@ -398,7 +397,7 @@ class time_source_executor {
   std::shared_ptr<time_source_shared<E, time_point>> source_;
   std::shared_ptr<time_source_queue<E, time_point, NF, Executor>> queue_;
 public:
-  using properties = property_set<is_time<>, is_executor<>, is_single<>>;
+  using properties = property_set<is_time<>, is_executor<>, is_maybe_blocking<>, is_fifo_sequence<>, is_single<>>;
 
   time_source_executor(
     std::shared_ptr<time_source_shared<E, time_point>> source,
@@ -471,7 +470,7 @@ public:
   };
 
   PUSHMI_TEMPLATE(class NF, class ExecutorFactory)
-    (requires Invocable<ExecutorFactory&> && Executor<invoke_result_t<ExecutorFactory&>>)
+    (requires Invocable<ExecutorFactory&> && Executor<invoke_result_t<ExecutorFactory&>> && NeverBlocking<invoke_result_t<ExecutorFactory&>>)
   auto make(NF nf, ExecutorFactory ef) {
     return time_source_executor_factory_fn<E, time_point, NF, ExecutorFactory>{source_, std::move(nf), std::move(ef)};
   }

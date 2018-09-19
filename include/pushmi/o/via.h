@@ -140,7 +140,9 @@ private:
   };
 public:
   PUSHMI_TEMPLATE(class ExecutorFactory)
-    (requires Invocable<ExecutorFactory&> && Executor<invoke_result_t<ExecutorFactory&>>)
+    (requires Invocable<ExecutorFactory&> &&
+      Executor<invoke_result_t<ExecutorFactory&>> &&
+      FifoSequence<invoke_result_t<ExecutorFactory&>>)
   auto operator()(ExecutorFactory ef) const {
     return in_impl<ExecutorFactory>{std::move(ef)};
   }

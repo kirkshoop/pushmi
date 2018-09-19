@@ -41,6 +41,7 @@ set(header_files
     "${CMAKE_CURRENT_SOURCE_DIR}/include/pushmi/inline.h"
     "${CMAKE_CURRENT_SOURCE_DIR}/include/pushmi/trampoline.h"
     "${CMAKE_CURRENT_SOURCE_DIR}/include/pushmi/new_thread.h"
+    "${CMAKE_CURRENT_SOURCE_DIR}/include/pushmi/strand.h"
     "${CMAKE_CURRENT_SOURCE_DIR}/include/pushmi/constrained_single_sender.h"
     "${CMAKE_CURRENT_SOURCE_DIR}/include/pushmi/time_single_sender.h"
     "${CMAKE_CURRENT_SOURCE_DIR}/include/pushmi/time_source.h"

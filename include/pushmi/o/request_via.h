@@ -16,7 +16,9 @@ namespace pushmi {
 template<typename In>
 struct send_via {
     In in;
-    template<class... AN>
+    PUSHMI_TEMPLATE(class... AN)
+      (requires Invocable<decltype(::pushmi::operators::via), AN...> &&
+      Invocable<invoke_result_t<decltype(::pushmi::operators::via), AN...>, In>)
     auto via(AN&&... an) {
         return in | ::pushmi::operators::via((AN&&) an...);
     }

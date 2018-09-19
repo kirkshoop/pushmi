@@ -2169,6 +2169,13 @@ struct executor_category {};
 
 // time and constrained are mutually exclusive refinements of sender (time is a special case of constrained and may be folded in later)
 
+// blocking affects senders
+
+struct blocking_category {};
+
+// sequence affects senders
+
+struct sequence_category {};
 
 // Silent trait and tag
 template<class... TN>
@@ -2339,6 +2346,92 @@ PUSHMI_CONCEPT_DEF(
   concept Time,
     is_time_v<PS> && is_constrained_v<PS> && is_sender_v<PS>
 );
+
+// AlwaysBlocking trait and tag
+template<class... TN>
+struct is_always_blocking;
+// Tag
+template<>
+struct is_always_blocking<> { using property_category = blocking_category; };
+// Trait
+template<class PS>
+struct is_always_blocking<PS> : property_query<PS, is_always_blocking<>> {};
+template<class PS>
+PUSHMI_INLINE_VAR constexpr bool is_always_blocking_v = is_always_blocking<PS>::value;
+PUSHMI_CONCEPT_DEF(
+  template (class PS)
+  concept AlwaysBlocking,
+    is_always_blocking_v<PS> && is_sender_v<PS>
+);
+
+// NeverBlocking trait and tag
+template<class... TN>
+struct is_never_blocking;
+// Tag
+template<>
+struct is_never_blocking<> { using property_category = blocking_category; };
+// Trait
+template<class PS>
+struct is_never_blocking<PS> : property_query<PS, is_never_blocking<>> {};
+template<class PS>
+PUSHMI_INLINE_VAR constexpr bool is_never_blocking_v = is_never_blocking<PS>::value;
+PUSHMI_CONCEPT_DEF(
+  template (class PS)
+  concept NeverBlocking,
+    is_never_blocking_v<PS> && is_sender_v<PS>
+);
+
+// MaybeBlocking trait and tag
+template<class... TN>
+struct is_maybe_blocking;
+// Tag
+template<>
+struct is_maybe_blocking<> { using property_category = blocking_category; };
+// Trait
+template<class PS>
+struct is_maybe_blocking<PS> : property_query<PS, is_maybe_blocking<>> {};
+template<class PS>
+PUSHMI_INLINE_VAR constexpr bool is_maybe_blocking_v = is_maybe_blocking<PS>::value;
+PUSHMI_CONCEPT_DEF(
+  template (class PS)
+  concept MaybeBlocking,
+    is_maybe_blocking_v<PS> && is_sender_v<PS>
+);
+
+// FifoSequence trait and tag
+template<class... TN>
+struct is_fifo_sequence;
+// Tag
+template<>
+struct is_fifo_sequence<> { using property_category = sequence_category; };
+// Trait
+template<class PS>
+struct is_fifo_sequence<PS> : property_query<PS, is_fifo_sequence<>> {};
+template<class PS>
+PUSHMI_INLINE_VAR constexpr bool is_fifo_sequence_v = is_fifo_sequence<PS>::value;
+PUSHMI_CONCEPT_DEF(
+  template (class PS)
+  concept FifoSequence,
+    is_fifo_sequence_v<PS> && is_sender_v<PS>
+);
+
+// ConcurrentSequence trait and tag
+template<class... TN>
+struct is_concurrent_sequence;
+// Tag
+template<>
+struct is_concurrent_sequence<> { using property_category = sequence_category; };
+// Trait
+template<class PS>
+struct is_concurrent_sequence<PS> : property_query<PS, is_concurrent_sequence<>> {};
+template<class PS>
+PUSHMI_INLINE_VAR constexpr bool is_concurrent_sequence_v = is_concurrent_sequence<PS>::value;
+PUSHMI_CONCEPT_DEF(
+  template (class PS)
+  concept ConcurrentSequence,
+    is_concurrent_sequence_v<PS> && is_sender_v<PS>
+);
+
 
 PUSHMI_CONCEPT_DEF(
   template (class R, class... PropertyN)
@@ -5284,7 +5377,7 @@ namespace pushmi {
 
 class inline_constrained_executor_t {
   public:
-    using properties = property_set<is_constrained<>, is_executor<>, is_single<>>;
+    using properties = property_set<is_constrained<>, is_executor<>, is_always_blocking<>, is_fifo_sequence<>, is_single<>>;
 
     std::ptrdiff_t top() {
       return 0;
@@ -5310,7 +5403,7 @@ inline inline_constrained_executor_t inline_constrained_executor() {
 
 class inline_time_executor_t {
   public:
-    using properties = property_set<is_time<>, is_executor<>, is_single<>>;
+    using properties = property_set<is_time<>, is_executor<>, is_always_blocking<>, is_fifo_sequence<>, is_single<>>;
 
     auto top() {
       return std::chrono::system_clock::now();
@@ -5337,7 +5430,7 @@ inline inline_time_executor_t inline_time_executor() {
 
 class inline_executor_t {
   public:
-    using properties = property_set<is_sender<>, is_executor<>, is_single<>>;
+    using properties = property_set<is_sender<>, is_executor<>, is_always_blocking<>, is_fifo_sequence<>, is_single<>>;
 
     auto executor() { return *this; }
     PUSHMI_TEMPLATE(class Out)
@@ -5399,7 +5492,7 @@ class trampoline;
 template <class E = std::exception_ptr>
 class delegator : _pipeable_sender_ {
  public:
-  using properties = property_set<is_sender<>, is_executor<>, is_single<>>;
+  using properties = property_set<is_sender<>, is_executor<>, is_maybe_blocking<>, is_fifo_sequence<>, is_single<>>;
 
   delegator executor() { return {}; }
   PUSHMI_TEMPLATE (class SingleReceiver)
@@ -5413,7 +5506,7 @@ class delegator : _pipeable_sender_ {
 template <class E = std::exception_ptr>
 class nester : _pipeable_sender_ {
  public:
-  using properties = property_set<is_sender<>, is_executor<>, is_single<>>;
+  using properties = property_set<is_sender<>, is_executor<>, is_maybe_blocking<>, is_fifo_sequence<>, is_single<>>;
 
   nester executor() { return {}; }
   PUSHMI_TEMPLATE (class SingleReceiver)
@@ -5624,7 +5717,7 @@ namespace pushmi {
 //
 
 struct new_thread_executor {
-  using properties = property_set<is_sender<>, is_executor<>, is_single<>>;
+  using properties = property_set<is_sender<>, is_executor<>, is_never_blocking<>, is_concurrent_sequence<>, is_single<>>;
 
   new_thread_executor executor() { return {}; }
   PUSHMI_TEMPLATE(class Out)
@@ -5641,6 +5734,236 @@ struct new_thread_executor {
 
 inline new_thread_executor new_thread() {
   return {};
+}
+
+} // namespace pushmi
+//#pragma once
+// Copyright (c) 2018-present, Facebook, Inc.
+//
+// This source code is licensed under the MIT license found in the
+// LICENSE file in the root directory of this source tree.
+
+//#include "single_sender.h"
+//#include "executor.h"
+
+//#include <queue>
+
+namespace pushmi {
+
+template<class E, class Executor>
+class strand_executor;
+
+template<class E, class Executor>
+struct strand_queue_receiver;
+
+template<class E>
+class strand_item
+{
+public:
+
+  strand_item(any_receiver<E, any_executor_ref<E>> out) :
+    what(std::move(out)) {}
+
+  any_receiver<E, any_executor_ref<E>> what;
+};
+template<class E, class TP>
+bool operator<(const strand_item<E>& l, const strand_item<E>& r) {
+  return l.when < r.when;
+}
+template<class E, class TP>
+bool operator>(const strand_item<E>& l, const strand_item<E>& r) {
+  return l.when > r.when;
+}
+template<class E, class TP>
+bool operator==(const strand_item<E>& l, const strand_item<E>& r) {
+  return l.when == r.when;
+}
+template<class E, class TP>
+bool operator!=(const strand_item<E>& l, const strand_item<E>& r) {
+  return !(l == r);
+}
+template<class E, class TP>
+bool operator<=(const strand_item<E>& l, const strand_item<E>& r) {
+  return !(l > r);
+}
+template<class E, class TP>
+bool operator>=(const strand_item<E>& l, const strand_item<E>& r) {
+  return !(l < r);
+}
+
+template<class E>
+class strand_queue_base : public std::enable_shared_from_this<strand_queue_base<E>>{
+public:
+  std::mutex lock_;
+  size_t remaining_ = 0;
+  std::queue<strand_item<E>> items_;
+
+  virtual ~strand_queue_base() {}
+
+  strand_item<E>& front() {
+    // :(
+    return const_cast<strand_item<E>&>(this->items_.front());
+  }
+
+  virtual void dispatch()=0;
+};
+
+template<class E, class Executor>
+class strand_queue : public strand_queue_base<E> {
+public:
+  ~strand_queue() {
+  }
+  strand_queue(Executor ex) :
+    ex_(std::move(ex)) {}
+  Executor ex_;
+
+  void dispatch() override;
+
+  auto shared_from_that() {
+    return std::static_pointer_cast<
+            strand_queue<E, Executor>>(
+              this->shared_from_this());
+  }
+
+  template<class Exec>
+  void value(Exec&&) {
+    //
+    // pull ready items from the queue in order.
+
+    std::unique_lock<std::mutex> guard{this->lock_};
+
+    // only allow one at a time
+    if (this->remaining_ > 0) { return; }
+    // skip when empty
+    if (this->items_.empty()) { return; }
+
+    // do not allow recursive queueing to block this executor
+    this->remaining_ = this->items_.size();
+
+    auto that = shared_from_that();
+    auto subEx = strand_executor<E, Executor>{that};
+
+    while (!this->items_.empty() && --this->remaining_ >= 0) {
+      auto item{std::move(this->front())};
+      this->items_.pop();
+      guard.unlock();
+      ::pushmi::set_value(item.what, any_executor_ref<E>{subEx});
+      ::pushmi::set_done(item.what);
+      guard.lock();
+    }
+  }
+  template<class AE>
+  void error(AE e) noexcept {
+    std::unique_lock<std::mutex> guard{this->lock_};
+
+    this->remaining_ = 0;
+
+    while (!this->items_.empty()) {
+      auto what{std::move(this->front().what)};
+      this->items_.pop();
+      guard.unlock();
+      ::pushmi::set_error(what, detail::as_const(e));
+      guard.lock();
+    }
+  }
+  void done() {
+    std::unique_lock<std::mutex> guard{this->lock_};
+
+    // only allow one at a time
+    if (this->remaining_ > 0) { return; }
+    // skip when empty
+    if (this->items_.empty()) { return; }
+
+    auto that = shared_from_that();
+    ::pushmi::submit(ex_, strand_queue_receiver<E, Executor>{that});
+  }
+};
+
+template<class E, class Executor>
+struct strand_queue_receiver : std::shared_ptr<strand_queue<E, Executor>> {
+  ~strand_queue_receiver() {
+  }
+  explicit strand_queue_receiver(std::shared_ptr<strand_queue<E, Executor>> that) :
+    std::shared_ptr<strand_queue<E, Executor>>(that)
+    {}
+  using properties = property_set<is_receiver<>>;
+};
+
+template<class E, class Executor>
+void strand_queue<E, Executor>::dispatch() {
+  ::pushmi::submit(ex_,
+    strand_queue_receiver<E, Executor>{
+      shared_from_that()});
+}
+
+//
+// strand is used to build a fifo single_executor from a concurrent single_executor.
+//
+
+template<class E, class Executor>
+class strand_executor {
+  std::shared_ptr<strand_queue<E, Executor>> queue_;
+public:
+  using properties = property_set<is_sender<>, is_executor<>, property_set_index_t<properties_t<Executor>, is_never_blocking<>>, is_fifo_sequence<>, is_single<>>;
+
+  strand_executor(
+    std::shared_ptr<strand_queue<E, Executor>> queue) :
+    queue_(std::move(queue)) {}
+
+  auto executor() { return *this; }
+
+  PUSHMI_TEMPLATE(class Out)
+    (requires ReceiveValue<Out, any_executor_ref<E>> && ReceiveError<Out, E>)
+  void submit(Out out) {
+    // queue for later
+    std::unique_lock<std::mutex> guard{queue_->lock_};
+    queue_->items_.push(any_receiver<E, any_executor_ref<E>>{std::move(out)});
+    if (queue_->remaining_ == 0) {
+      // noone is minding the shop, send a worker
+      ::pushmi::submit(queue_->ex_, strand_queue_receiver<E, Executor>{queue_});
+    }
+  }
+};
+
+//
+// the strand executor factory produces a new fifo ordered queue each time that it is called.
+//
+
+template<class E, class ExecutorFactory>
+class strand_executor_factory_fn {
+  ExecutorFactory ef_;
+public:
+  explicit strand_executor_factory_fn(ExecutorFactory ef) : ef_(std::move(ef)) {}
+  auto operator()() const {
+    auto ex = ef_();
+    auto queue = std::make_shared<strand_queue<E, decltype(ex)>>(
+      std::move(ex));
+    return strand_executor<E, decltype(ex)>{queue};
+  }
+};
+
+template<class Exec>
+class same_executor_factory_fn {
+  Exec ex_;
+public:
+  explicit same_executor_factory_fn(Exec ex) : ex_(std::move(ex)) {}
+  auto operator()() const {
+    return ex_;
+  }
+};
+
+PUSHMI_TEMPLATE(class E = std::exception_ptr, class ExecutorFactory)
+  (requires Invocable<ExecutorFactory&> &&
+    Executor<invoke_result_t<ExecutorFactory&>> &&
+    ConcurrentSequence<invoke_result_t<ExecutorFactory&>>)
+auto strands(ExecutorFactory ef) {
+  return strand_executor_factory_fn<E, ExecutorFactory>{std::move(ef)};
+}
+PUSHMI_TEMPLATE(class E = std::exception_ptr, class Exec)
+  (requires Executor<Exec> &&
+    ConcurrentSequence<Exec>)
+auto strands(Exec ex) {
+  return strand_executor_factory_fn<E, same_executor_factory_fn<Exec>>{same_executor_factory_fn<Exec>{std::move(ex)}};
 }
 
 } // namespace pushmi
@@ -6246,7 +6569,6 @@ public:
   }
   void done() {
     auto s = source_.lock();
-    auto done = false;
     std::unique_lock<std::mutex> guard{s->lock_};
 
     if (!this->dispatching_ || this->pending_) {
@@ -6469,7 +6791,7 @@ class time_source_executor {
   std::shared_ptr<time_source_shared<E, time_point>> source_;
   std::shared_ptr<time_source_queue<E, time_point, NF, Executor>> queue_;
 public:
-  using properties = property_set<is_time<>, is_executor<>, is_single<>>;
+  using properties = property_set<is_time<>, is_executor<>, is_maybe_blocking<>, is_fifo_sequence<>, is_single<>>;
 
   time_source_executor(
     std::shared_ptr<time_source_shared<E, time_point>> source,
@@ -6542,7 +6864,7 @@ public:
   };
 
   PUSHMI_TEMPLATE(class NF, class ExecutorFactory)
-    (requires Invocable<ExecutorFactory&> && Executor<invoke_result_t<ExecutorFactory&>>)
+    (requires Invocable<ExecutorFactory&> && Executor<invoke_result_t<ExecutorFactory&>> && NeverBlocking<invoke_result_t<ExecutorFactory&>>)
   auto make(NF nf, ExecutorFactory ef) {
     return time_source_executor_factory_fn<E, time_point, NF, ExecutorFactory>{source_, std::move(nf), std::move(ef)};
   }
@@ -9703,7 +10025,9 @@ private:
   };
 public:
   PUSHMI_TEMPLATE(class ExecutorFactory)
-    (requires Invocable<ExecutorFactory&> && Executor<invoke_result_t<ExecutorFactory&>>)
+    (requires Invocable<ExecutorFactory&> &&
+      Executor<invoke_result_t<ExecutorFactory&>> &&
+      FifoSequence<invoke_result_t<ExecutorFactory&>>)
   auto operator()(ExecutorFactory ef) const {
     return in_impl<ExecutorFactory>{std::move(ef)};
   }
@@ -9734,7 +10058,9 @@ namespace pushmi {
 template<typename In>
 struct send_via {
     In in;
-    template<class... AN>
+    PUSHMI_TEMPLATE(class... AN)
+      (requires Invocable<decltype(::pushmi::operators::via), AN...> &&
+      Invocable<invoke_result_t<decltype(::pushmi::operators::via), AN...>, In>)
     auto via(AN&&... an) {
         return in | ::pushmi::operators::via((AN&&) an...);
     }

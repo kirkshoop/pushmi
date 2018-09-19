@@ -33,6 +33,13 @@ struct executor_category {};
 
 // time and constrained are mutually exclusive refinements of sender (time is a special case of constrained and may be folded in later)
 
+// blocking affects senders
+
+struct blocking_category {};
+
+// sequence affects senders
+
+struct sequence_category {};
 
 // Silent trait and tag
 template<class... TN>
@@ -203,6 +210,92 @@ PUSHMI_CONCEPT_DEF(
   concept Time,
     is_time_v<PS> && is_constrained_v<PS> && is_sender_v<PS>
 );
+
+// AlwaysBlocking trait and tag
+template<class... TN>
+struct is_always_blocking;
+// Tag
+template<>
+struct is_always_blocking<> { using property_category = blocking_category; };
+// Trait
+template<class PS>
+struct is_always_blocking<PS> : property_query<PS, is_always_blocking<>> {};
+template<class PS>
+PUSHMI_INLINE_VAR constexpr bool is_always_blocking_v = is_always_blocking<PS>::value;
+PUSHMI_CONCEPT_DEF(
+  template (class PS)
+  concept AlwaysBlocking,
+    is_always_blocking_v<PS> && is_sender_v<PS>
+);
+
+// NeverBlocking trait and tag
+template<class... TN>
+struct is_never_blocking;
+// Tag
+template<>
+struct is_never_blocking<> { using property_category = blocking_category; };
+// Trait
+template<class PS>
+struct is_never_blocking<PS> : property_query<PS, is_never_blocking<>> {};
+template<class PS>
+PUSHMI_INLINE_VAR constexpr bool is_never_blocking_v = is_never_blocking<PS>::value;
+PUSHMI_CONCEPT_DEF(
+  template (class PS)
+  concept NeverBlocking,
+    is_never_blocking_v<PS> && is_sender_v<PS>
+);
+
+// MaybeBlocking trait and tag
+template<class... TN>
+struct is_maybe_blocking;
+// Tag
+template<>
+struct is_maybe_blocking<> { using property_category = blocking_category; };
+// Trait
+template<class PS>
+struct is_maybe_blocking<PS> : property_query<PS, is_maybe_blocking<>> {};
+template<class PS>
+PUSHMI_INLINE_VAR constexpr bool is_maybe_blocking_v = is_maybe_blocking<PS>::value;
+PUSHMI_CONCEPT_DEF(
+  template (class PS)
+  concept MaybeBlocking,
+    is_maybe_blocking_v<PS> && is_sender_v<PS>
+);
+
+// FifoSequence trait and tag
+template<class... TN>
+struct is_fifo_sequence;
+// Tag
+template<>
+struct is_fifo_sequence<> { using property_category = sequence_category; };
+// Trait
+template<class PS>
+struct is_fifo_sequence<PS> : property_query<PS, is_fifo_sequence<>> {};
+template<class PS>
+PUSHMI_INLINE_VAR constexpr bool is_fifo_sequence_v = is_fifo_sequence<PS>::value;
+PUSHMI_CONCEPT_DEF(
+  template (class PS)
+  concept FifoSequence,
+    is_fifo_sequence_v<PS> && is_sender_v<PS>
+);
+
+// ConcurrentSequence trait and tag
+template<class... TN>
+struct is_concurrent_sequence;
+// Tag
+template<>
+struct is_concurrent_sequence<> { using property_category = sequence_category; };
+// Trait
+template<class PS>
+struct is_concurrent_sequence<PS> : property_query<PS, is_concurrent_sequence<>> {};
+template<class PS>
+PUSHMI_INLINE_VAR constexpr bool is_concurrent_sequence_v = is_concurrent_sequence<PS>::value;
+PUSHMI_CONCEPT_DEF(
+  template (class PS)
+  concept ConcurrentSequence,
+    is_concurrent_sequence_v<PS> && is_sender_v<PS>
+);
+
 
 PUSHMI_CONCEPT_DEF(
   template (class R, class... PropertyN)

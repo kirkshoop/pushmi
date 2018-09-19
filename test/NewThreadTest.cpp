@@ -17,6 +17,7 @@ using namespace std::literals;
 
 #include "pushmi/new_thread.h"
 #include "pushmi/time_source.h"
+#include "pushmi/strand.h"
 
 using namespace pushmi::aliases;
 
@@ -193,7 +194,7 @@ SCENARIO( "new_thread executor", "[new_thread][sender]" ) {
         ::pushmi::set_value(out, std::numeric_limits<int8_t>::min());
         ::pushmi::set_value(out, std::numeric_limits<int8_t>::max());
       });
-      sender | op::via([&](){return nt;}) |
+      sender | op::via(mi::strands(nt)) |
           op::blocking_submit(v::on_value([&](auto v) { values.push_back(std::to_string(v)); }));
       THEN( "only the first item was pushed" ) {
         REQUIRE(values == std::vector<std::string>{"2.000000"});

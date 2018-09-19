@@ -38,7 +38,7 @@ class trampoline;
 template <class E = std::exception_ptr>
 class delegator : _pipeable_sender_ {
  public:
-  using properties = property_set<is_sender<>, is_executor<>, is_single<>>;
+  using properties = property_set<is_sender<>, is_executor<>, is_maybe_blocking<>, is_fifo_sequence<>, is_single<>>;
 
   delegator executor() { return {}; }
   PUSHMI_TEMPLATE (class SingleReceiver)
@@ -52,7 +52,7 @@ class delegator : _pipeable_sender_ {
 template <class E = std::exception_ptr>
 class nester : _pipeable_sender_ {
  public:
-  using properties = property_set<is_sender<>, is_executor<>, is_single<>>;
+  using properties = property_set<is_sender<>, is_executor<>, is_maybe_blocking<>, is_fifo_sequence<>, is_single<>>;
 
   nester executor() { return {}; }
   PUSHMI_TEMPLATE (class SingleReceiver)
