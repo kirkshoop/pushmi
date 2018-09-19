@@ -57,8 +57,8 @@ SCENARIO( "new_thread executor", "[new_thread][sender]" ) {
           [&](auto e) noexcept {  signals += 1000; },
           [&](){ signals += 10; });
 
-      THEN( "the value signal is recorded once and the signal did not drift much" ) {
-        REQUIRE( signals == 100 );
+      THEN( "the value and done signals are recorded once and the value signal did not drift much" ) {
+        REQUIRE( signals == 110 );
         auto delay = std::chrono::duration_cast<std::chrono::milliseconds>((signaled - start)).count();
         INFO("The delay is " << ::Catch::Detail::stringify(delay));
         REQUIRE( delay < 1000 );
@@ -125,8 +125,8 @@ SCENARIO( "new_thread executor", "[new_thread][sender]" ) {
           [&](auto e) noexcept {  signals += 1000; },
           [&](){ signals += 10; });
 
-      THEN( "the value signal is recorded once" ) {
-        REQUIRE( signals == 100 );
+      THEN( "the value and done signals are recorded once" ) {
+        REQUIRE( signals == 110 );
       }
     }
 

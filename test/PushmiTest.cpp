@@ -12,7 +12,6 @@ using namespace std::literals;
 #include "pushmi/o/on.h"
 #include "pushmi/o/transform.h"
 #include "pushmi/o/tap.h"
-#include "pushmi/o/via.h"
 #include "pushmi/o/submit.h"
 #include "pushmi/o/extension_operators.h"
 

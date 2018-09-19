@@ -122,6 +122,7 @@ class trampoline {
           // dynamic recursion - optimization to balance queueing and
           // stack usage and value interleaving on the same thread.
           ::pushmi::set_value(awhat, any_executor_ref<E>(that));
+          ::pushmi::set_done(awhat);
         }
       } catch(...) {
         --depth(*owner());
@@ -180,6 +181,7 @@ class trampoline {
       while (go) {
         repeat(pending_store) = false;
         ::pushmi::set_value(awhat, any_executor_ref<E>(that));
+        ::pushmi::set_done(awhat);
         go = repeat(pending_store);
       }
     } else {
@@ -195,6 +197,7 @@ class trampoline {
       auto what = std::move(pending(pending_store).front());
       pending(pending_store).pop_front();
       ::pushmi::set_value(what, any_executor_ref<error_type>{that});
+      ::pushmi::set_done(what);
     }
   }
 };

@@ -160,6 +160,7 @@ SCENARIO("flow single shared cancellation new thread", "[flow][sender]") {
                       auto both = lock_both(stoppee);
                       if (!!both.first && !*(both.first)) {
                         ::mi::set_value(out, 42);
+                        ::mi::set_done(out);
                       } else {
                         // cancellation is not an error
                         ::mi::set_done(out);
@@ -216,15 +217,15 @@ SCENARIO("flow single shared cancellation new thread", "[flow][sender]") {
       std::this_thread::sleep_for(100ms);
 
       THEN(
-          "the starting, up.done and out.value signals are each recorded once") {
-        REQUIRE(signals == 10110);
+          "the starting, up.done, out.value and out.done signals are each recorded once") {
+        REQUIRE(signals == 10111);
       }
     }
 
     WHEN("submit is applied and cancels the producer at the same time") {
       // count known results
       int total = 0;
-      int cancellostrace = 0; // 10110
+      int cancellostrace = 0; // 10111
       int cancelled = 0; // 10011
 
       for (;;) {
@@ -251,7 +252,7 @@ SCENARIO("flow single shared cancellation new thread", "[flow][sender]") {
 
         // accumulate known signals
         ++total;
-        cancellostrace += signals == 10110;
+        cancellostrace += signals == 10111;
         cancelled += signals == 10011;
 
         if (total != cancellostrace + cancelled) {
@@ -335,6 +336,7 @@ SCENARIO("flow single entangled cancellation new thread", "[flow][sender]") {
                       auto both = lock_both(stoppee);
                       if (!!both.first && !*(both.first)) {
                         ::mi::set_value(out, 42);
+                        ::mi::set_done(out);
                       } else {
                         // cancellation is not an error
                         ::mi::set_done(out);
@@ -391,15 +393,15 @@ SCENARIO("flow single entangled cancellation new thread", "[flow][sender]") {
       std::this_thread::sleep_for(100ms);
 
       THEN(
-          "the starting, up.done and out.value signals are each recorded once") {
-        REQUIRE(signals == 10110);
+          "the starting, up.done, out.value and out.done signals are each recorded once") {
+        REQUIRE(signals == 10111);
       }
     }
 
     WHEN("submit is applied and cancels the producer at the same time") {
       // count known results
       int total = 0;
-      int cancellostrace = 0; // 10110
+      int cancellostrace = 0; // 10111
       int cancelled = 0; // 10011
 
       for (;;) {
@@ -426,7 +428,7 @@ SCENARIO("flow single entangled cancellation new thread", "[flow][sender]") {
 
         // accumulate known signals
         ++total;
-        cancellostrace += signals == 10110;
+        cancellostrace += signals == 10111;
         cancelled += signals == 10011;
 
         if (total != cancellostrace + cancelled) {

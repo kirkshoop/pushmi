@@ -5293,7 +5293,8 @@ class inline_constrained_executor_t {
     PUSHMI_TEMPLATE(class CV, class Out)
       (requires Regular<CV> && Receiver<Out>)
     void submit(CV, Out out) {
-      ::pushmi::set_value(std::move(out), *this);
+      ::pushmi::set_value(out, *this);
+      ::pushmi::set_done(out);
     }
 };
 
@@ -5319,7 +5320,8 @@ class inline_time_executor_t {
       (requires Regular<TP> && Receiver<Out>)
     void submit(TP tp, Out out) {
       std::this_thread::sleep_until(tp);
-      ::pushmi::set_value(std::move(out), *this);
+      ::pushmi::set_value(out, *this);
+      ::pushmi::set_done(out);
     }
 };
 
@@ -5341,7 +5343,8 @@ class inline_executor_t {
     PUSHMI_TEMPLATE(class Out)
       (requires Receiver<Out>)
     void submit(Out out) {
-      ::pushmi::set_value(std::move(out), *this);
+      ::pushmi::set_value(out, *this);
+      ::pushmi::set_done(out);
     }
 };
 
@@ -5480,6 +5483,7 @@ class trampoline {
           // dynamic recursion - optimization to balance queueing and
           // stack usage and value interleaving on the same thread.
           ::pushmi::set_value(awhat, any_executor_ref<E>(that));
+          ::pushmi::set_done(awhat);
         }
       } catch(...) {
         --depth(*owner());
@@ -5538,6 +5542,7 @@ class trampoline {
       while (go) {
         repeat(pending_store) = false;
         ::pushmi::set_value(awhat, any_executor_ref<E>(that));
+        ::pushmi::set_done(awhat);
         go = repeat(pending_store);
       }
     } else {
@@ -5553,6 +5558,7 @@ class trampoline {
       auto what = std::move(pending(pending_store).front());
       pending(pending_store).pop_front();
       ::pushmi::set_value(what, any_executor_ref<error_type>{that});
+      ::pushmi::set_done(what);
     }
   }
 };
@@ -6192,11 +6198,11 @@ public:
       guard.unlock();
       std::this_thread::sleep_until(item.when);
       ::pushmi::set_value(item.what, any_time_executor_ref<E, TP>{subEx});
+      ::pushmi::set_done(item.what);
       guard.lock();
       // allows set_value to queue nested items
       --s->items_;
     }
-    this->dispatching_ = false;
 
     if (this->heap_.empty()) {
       // if this is empty, tell worker to check for the done condition.
@@ -6215,15 +6221,6 @@ public:
           } catch(...) {
             // we already have an error, ignore this one.
           }
-        }
-      } else {
-        // add back to pending_ to get the remaining items dispatched
-        s->pending_.push_back(this->shared_from_this());
-        this->pending_ = true;
-        if (this->heap_.top().when <= s->earliest_) {
-          // this is the earliest, tell worker to reset earliest_
-          ++s->dirty_;
-          s->wake_.notify_one();
         }
       }
     }
@@ -6255,16 +6252,16 @@ public:
     if (!this->dispatching_ || this->pending_) {
       std::abort();
     }
-
-    while (!this->heap_.empty()) {
-      auto what{std::move(this->top().what)};
-      this->heap_.pop();
-      --s->items_;
-      guard.unlock();
-      ::pushmi::set_done(what);
-      guard.lock();
-    }
     this->dispatching_ = false;
+
+    // add back to pending_ to get the remaining items dispatched
+    s->pending_.push_back(this->shared_from_this());
+    this->pending_ = true;
+    if (this->heap_.top().when <= s->earliest_) {
+      // this is the earliest, tell worker to reset earliest_
+      ++s->dirty_;
+      s->wake_.notify_one();
+    }
   }
 };
 
@@ -8327,16 +8324,9 @@ private:
     template<class V>
     void value(V&& v) {
       std::exception_ptr e;
-      try{
-        using executor_t = remove_cvref_t<V>;
-        auto n = nested_executor_impl<executor_t>::make(state_, (V&&) v);
-        ::pushmi::set_value(out_, any_executor_ref<>{n});
-      }
-      catch(...) {e = std::current_exception();}
-      if(--state_->nested == 0) {
-        state_->signaled.notify_all();
-      }
-      if (e) {std::rethrow_exception(e);}
+      using executor_t = remove_cvref_t<V>;
+      auto n = nested_executor_impl<executor_t>::make(state_, (V&&) v);
+      ::pushmi::set_value(out_, any_executor_ref<>{n});
     }
     template<class E>
     void error(E&& e) noexcept {
@@ -8373,9 +8363,8 @@ private:
     void operator()(Out out, Value&& v) const {
       ++state_->nested;
       ::pushmi::set_value(out, nested_executor_impl_fn{}(state_, (Value&&) v));
-      std::unique_lock<std::mutex> guard{state_->lock};
-      state_->done = true;
       if (--state_->nested == 0){
+        std::unique_lock<std::mutex> guard{state_->lock};
         state_->signaled.notify_all();
       }
     }
@@ -8383,20 +8372,13 @@ private:
       (requires True<> && ReceiveValue<Out, VN...> &&
         And<not Executor<std::decay_t<VN>>...>)
     void operator()(Out out, VN&&... vn) const {
-      ++state_->nested;
       ::pushmi::set_value(out, (VN&&) vn...);
-      std::unique_lock<std::mutex> guard{state_->lock};
-      state_->done = true;
-      if (--state_->nested == 0){
-        state_->signaled.notify_all();
-      }
     }
   };
   struct on_next_impl {
     PUSHMI_TEMPLATE (class Out, class Value)
       (requires Receiver<Out, is_many<>>)
     void operator()(Out out, Value&& v) const {
-      using V = remove_cvref_t<Value>;
       ::pushmi::set_next(out, (Value&&) v);
     }
   };

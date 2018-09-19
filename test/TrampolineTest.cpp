@@ -50,8 +50,8 @@ SCENARIO( "trampoline executor", "[trampoline][sender]" ) {
           [&](auto e) noexcept { signals += 1000; },
           [&](){ signals += 10; });
 
-      THEN( "the value signal is recorded once" ) {
-        REQUIRE( signals == 100 );
+      THEN( "the value and done signals are each recorded once" ) {
+        REQUIRE( signals == 110 );
       }
     }
 

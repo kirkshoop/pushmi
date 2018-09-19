@@ -186,16 +186,9 @@ private:
     template<class V>
     void value(V&& v) {
       std::exception_ptr e;
-      try{
-        using executor_t = remove_cvref_t<V>;
-        auto n = nested_executor_impl<executor_t>::make(state_, (V&&) v);
-        ::pushmi::set_value(out_, any_executor_ref<>{n});
-      }
-      catch(...) {e = std::current_exception();}
-      if(--state_->nested == 0) {
-        state_->signaled.notify_all();
-      }
-      if (e) {std::rethrow_exception(e);}
+      using executor_t = remove_cvref_t<V>;
+      auto n = nested_executor_impl<executor_t>::make(state_, (V&&) v);
+      ::pushmi::set_value(out_, any_executor_ref<>{n});
     }
     template<class E>
     void error(E&& e) noexcept {
@@ -232,9 +225,8 @@ private:
     void operator()(Out out, Value&& v) const {
       ++state_->nested;
       ::pushmi::set_value(out, nested_executor_impl_fn{}(state_, (Value&&) v));
-      std::unique_lock<std::mutex> guard{state_->lock};
-      state_->done = true;
       if (--state_->nested == 0){
+        std::unique_lock<std::mutex> guard{state_->lock};
         state_->signaled.notify_all();
       }
     }
@@ -242,20 +234,13 @@ private:
       (requires True<> && ReceiveValue<Out, VN...> &&
         And<not Executor<std::decay_t<VN>>...>)
     void operator()(Out out, VN&&... vn) const {
-      ++state_->nested;
       ::pushmi::set_value(out, (VN&&) vn...);
-      std::unique_lock<std::mutex> guard{state_->lock};
-      state_->done = true;
-      if (--state_->nested == 0){
-        state_->signaled.notify_all();
-      }
     }
   };
   struct on_next_impl {
     PUSHMI_TEMPLATE (class Out, class Value)
       (requires Receiver<Out, is_many<>>)
     void operator()(Out out, Value&& v) const {
-      using V = remove_cvref_t<Value>;
       ::pushmi::set_next(out, (Value&&) v);
     }
   };

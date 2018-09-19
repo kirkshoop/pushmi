@@ -127,11 +127,11 @@ public:
       guard.unlock();
       std::this_thread::sleep_until(item.when);
       ::pushmi::set_value(item.what, any_time_executor_ref<E, TP>{subEx});
+      ::pushmi::set_done(item.what);
       guard.lock();
       // allows set_value to queue nested items
       --s->items_;
     }
-    this->dispatching_ = false;
 
     if (this->heap_.empty()) {
       // if this is empty, tell worker to check for the done condition.
@@ -150,15 +150,6 @@ public:
           } catch(...) {
             // we already have an error, ignore this one.
           }
-        }
-      } else {
-        // add back to pending_ to get the remaining items dispatched
-        s->pending_.push_back(this->shared_from_this());
-        this->pending_ = true;
-        if (this->heap_.top().when <= s->earliest_) {
-          // this is the earliest, tell worker to reset earliest_
-          ++s->dirty_;
-          s->wake_.notify_one();
         }
       }
     }
@@ -190,16 +181,16 @@ public:
     if (!this->dispatching_ || this->pending_) {
       std::abort();
     }
-
-    while (!this->heap_.empty()) {
-      auto what{std::move(this->top().what)};
-      this->heap_.pop();
-      --s->items_;
-      guard.unlock();
-      ::pushmi::set_done(what);
-      guard.lock();
-    }
     this->dispatching_ = false;
+
+    // add back to pending_ to get the remaining items dispatched
+    s->pending_.push_back(this->shared_from_this());
+    this->pending_ = true;
+    if (this->heap_.top().when <= s->earliest_) {
+      // this is the earliest, tell worker to reset earliest_
+      ++s->dirty_;
+      s->wake_.notify_one();
+    }
   }
 };
 
