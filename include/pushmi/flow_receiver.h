@@ -310,7 +310,7 @@ PUSHMI_INLINE_VAR constexpr struct make_flow_receiver_fn {
     return flow_receiver<>{};
   }
   PUSHMI_TEMPLATE (class VF)
-    (requires PUSHMI_EXP(lazy::True<> PUSHMI_BROKEN_SUBSUMPTION(PUSHMI_AND not lazy::Receiver<VF> PUSHMI_AND not lazy::Invocable<VF&>)))
+    (requires PUSHMI_EXP(lazy::True<> PUSHMI_AND lazy::Callable<VF> PUSHMI_BROKEN_SUBSUMPTION(PUSHMI_AND not lazy::Receiver<VF>)))
   auto operator()(VF nf) const {
     return flow_receiver<VF, abortEF, ignoreDF, ignoreStrtF>{
       std::move(nf)};
@@ -355,7 +355,7 @@ PUSHMI_INLINE_VAR constexpr struct make_flow_receiver_fn {
         std::move(d)};
   }
   PUSHMI_TEMPLATE(class Data, class DVF)
-    (requires PUSHMI_EXP(lazy::True<> PUSHMI_AND lazy::Receiver<Data> PUSHMI_BROKEN_SUBSUMPTION(PUSHMI_AND not lazy::Invocable<DVF&, Data&>)))
+    (requires PUSHMI_EXP(lazy::True<> PUSHMI_AND lazy::Receiver<Data>))
   auto operator()(Data d, DVF nf) const {
     return flow_receiver<Data, DVF, passDEF, passDDF, passDStrtF>{
       std::move(d), std::move(nf)};
@@ -403,7 +403,7 @@ PUSHMI_INLINE_VAR constexpr struct make_flow_receiver_fn {
 flow_receiver() -> flow_receiver<>;
 
 PUSHMI_TEMPLATE(class VF)
-  (requires PUSHMI_EXP(lazy::True<> PUSHMI_BROKEN_SUBSUMPTION(PUSHMI_AND not lazy::Receiver<VF> PUSHMI_AND not lazy::Invocable<VF&>)))
+  (requires PUSHMI_EXP(lazy::True<> PUSHMI_BROKEN_SUBSUMPTION(PUSHMI_AND not lazy::Receiver<VF>)))
 flow_receiver(VF) ->
   flow_receiver<VF, abortEF, ignoreDF, ignoreStrtF>;
 
@@ -441,7 +441,7 @@ flow_receiver(Data d) ->
   flow_receiver<Data, passDVF, passDEF, passDDF, passDStrtF>;
 
 PUSHMI_TEMPLATE(class Data, class DVF)
-  (requires PUSHMI_EXP(lazy::True<> PUSHMI_AND lazy::Receiver<Data> PUSHMI_BROKEN_SUBSUMPTION(PUSHMI_AND not lazy::Invocable<DVF&, Data&>)))
+  (requires PUSHMI_EXP(lazy::True<> PUSHMI_AND lazy::Receiver<Data>))
 flow_receiver(Data d, DVF nf) ->
   flow_receiver<Data, DVF, passDEF, passDDF, passDStrtF>;
 
