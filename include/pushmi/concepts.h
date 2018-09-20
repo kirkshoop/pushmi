@@ -17,6 +17,17 @@ namespace pushmi {
 
 struct cardinality_category {};
 
+// Trait
+template<class PS>
+struct has_cardinality : category_query<PS, cardinality_category> {};
+template<class PS>
+PUSHMI_INLINE_VAR constexpr bool has_cardinality_v = has_cardinality<PS>::value;
+PUSHMI_CONCEPT_DEF(
+  template (class PS)
+  concept Cardinality,
+    has_cardinality_v<PS>
+);
+
 // flow affects both sender and receiver
 
 struct flow_category {};
@@ -41,46 +52,12 @@ struct blocking_category {};
 
 struct sequence_category {};
 
-// Silent trait and tag
-template<class... TN>
-struct is_silent;
-// Tag
-template<>
-struct is_silent<> { using property_category = cardinality_category; };
-// Trait
-template<class PS>
-struct is_silent<PS> : property_query<PS, is_silent<>> {};
-template<class PS>
-PUSHMI_INLINE_VAR constexpr bool is_silent_v = is_silent<PS>::value;
-PUSHMI_CONCEPT_DEF(
-  template (class PS)
-  concept Silent,
-    is_silent_v<PS>
-);
-
-// None trait and tag
-template<class... TN>
-struct is_none;
-// Tag
-template<>
-struct is_none<> : is_silent<> {};
-// Trait
-template<class PS>
-struct is_none<PS> : property_query<PS, is_none<>> {};
-template<class PS>
-PUSHMI_INLINE_VAR constexpr bool is_none_v = is_none<PS>::value;
-PUSHMI_CONCEPT_DEF(
-  template (class PS)
-  concept None,
-    Silent<PS> && is_none_v<PS>
-);
-
 // Single trait and tag
 template<class... TN>
 struct is_single;
 // Tag
 template<>
-struct is_single<> : is_none<> {};
+struct is_single<> { using property_category = cardinality_category; };
 // Trait
 template<class PS>
 struct is_single<PS> : property_query<PS, is_single<>> {};
@@ -89,7 +66,7 @@ PUSHMI_INLINE_VAR constexpr bool is_single_v = is_single<PS>::value;
 PUSHMI_CONCEPT_DEF(
   template (class PS)
   concept Single,
-    None<PS> && is_single_v<PS>
+    is_single_v<PS>
 );
 
 // Many trait and tag
@@ -97,7 +74,7 @@ template<class... TN>
 struct is_many;
 // Tag
 template<>
-struct is_many<> : is_none<> {}; // many::value() does not terminate, so it is not a refinement of single
+struct is_many<> { using property_category = cardinality_category; }; // many::value() does not terminate, so it is not a refinement of single
 // Trait
 template<class PS>
 struct is_many<PS> : property_query<PS, is_many<>> {};
@@ -106,7 +83,7 @@ PUSHMI_INLINE_VAR constexpr bool is_many_v = is_many<PS>::value;
 PUSHMI_CONCEPT_DEF(
   template (class PS)
   concept Many,
-    None<PS> && is_many_v<PS>
+    is_many_v<PS>
 );
 
 // Flow trait and tag
@@ -332,10 +309,6 @@ PUSHMI_CONCEPT_DEF(
 );
 
 
-
-// silent does not really make sense, but cannot test for
-// None without the error type, use is_none<> to strengthen
-// requirements
 PUSHMI_CONCEPT_DEF(
   template (class D, class... PropertyN)
   (concept Sender)(D, PropertyN...),
@@ -344,7 +317,7 @@ PUSHMI_CONCEPT_DEF(
       requires_<Executor<decltype(::pushmi::executor(d))>>
     ) &&
     SemiMovable<D> &&
-    None<D> &&
+    Cardinality<D> &&
     property_query_v<D, PropertyN...> &&
     is_sender_v<D> &&
     !is_receiver_v<D>
@@ -434,8 +407,7 @@ PUSHMI_CONCEPT_DEF(
     ) &&
     Sender<D> &&
     property_query_v<D, PropertyN...> &&
-    Constrained<D> &&
-    None<D>
+    Constrained<D>
 );
 
 PUSHMI_CONCEPT_DEF(

@@ -6,9 +6,9 @@
 // This source code is licensed under the MIT license found in the
 // LICENSE file in the root directory of this source tree.
 
-#include "../sender.h"
-#include "../single_sender.h"
 #include "../detail/functional.h"
+#include "submit.h"
+#include "extension_operators.h"
 
 namespace pushmi {
 namespace detail {
@@ -16,13 +16,6 @@ namespace detail {
   struct single_empty_impl {
     PUSHMI_TEMPLATE(class Out)
       (requires ReceiveValue<Out, VN...>)
-    void operator()(Out out) {
-      ::pushmi::set_done(out);
-    }
-  };
-  struct empty_impl {
-    PUSHMI_TEMPLATE(class Out)
-      (requires ReceiveValue<Out>)
     void operator()(Out out) {
       ::pushmi::set_done(out);
     }
@@ -36,7 +29,7 @@ auto empty() {
 }
 
 inline auto empty() {
-  return make_sender(detail::empty_impl{});
+  return make_single_sender(detail::single_empty_impl<>{});
 }
 
 } // namespace operators

@@ -8,9 +8,6 @@
 
 #include <cassert>
 #include "extension_operators.h"
-#include "../sender.h"
-#include "../single_sender.h"
-#include "../time_single_sender.h"
 
 namespace pushmi {
 

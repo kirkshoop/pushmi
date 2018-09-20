@@ -19,33 +19,6 @@ template<class F, class Tag, bool IsFlow = false>
 struct transform_on;
 
 template<class F>
-struct transform_on<F, is_none<>> {
-  F f_;
-  transform_on() = default;
-  constexpr explicit transform_on(F f)
-    : f_(std::move(f)) {}
-  struct value_fn {
-    F f_;
-    value_fn() = default;
-    constexpr explicit value_fn(F f)
-      : f_(std::move(f)) {}
-    template<class Out>
-    auto operator()(Out& out) {
-      using Result = ::pushmi::invoke_result_t<F>;
-      static_assert(::pushmi::SemiMovable<Result>,
-        "none of the functions supplied to transform return a SemiMovable value");
-      static_assert(::pushmi::ReceiveValue<Out, Result>,
-        "Result of value transform cannot be delivered to Out");
-      ::pushmi::set_value(out, f_());
-    }
-  };
-  template<class Out>
-  auto operator()(Out out) const {
-    return ::pushmi::make_receiver(std::move(out), value_fn{f_});
-  }
-};
-
-template<class F>
 struct transform_on<F, is_single<>> {
   F f_;
   transform_on() = default;
@@ -143,7 +116,7 @@ private:
     PUSHMI_TEMPLATE (class In)
       (requires Sender<In>)
     auto operator()(In in) const {
-      using Cardinality = property_set_index_t<properties_t<In>, is_silent<>>;
+      using Cardinality = property_set_index_t<properties_t<In>, is_single<>>;
       return ::pushmi::detail::sender_from(
         std::move(in),
         ::pushmi::detail::submit_transform_out<In>(

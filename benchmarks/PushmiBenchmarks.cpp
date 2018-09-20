@@ -21,8 +21,6 @@
 
 using namespace pushmi::aliases;
 
-struct inline_executor_none;
-
 template<class R>
 struct countdown {
   explicit countdown(std::atomic<int>& c)
@@ -62,15 +60,6 @@ using countdownflowsingle = countdown<decltype(mi::make_flow_receiver)>;
 using countdownmany = countdown<decltype(mi::make_receiver)>;
 using countdownflowmany = countdown<decltype(mi::make_flow_receiver)>;
 
-struct countdownnone {
-  countdownnone(std::atomic<int>& c)
-      : counter(&c) {}
-
-  std::atomic<int>* counter;
-
-  void operator()() const;
-};
-
 struct inline_time_executor {
     using properties = mi::property_set<mi::is_time<>, mi::is_executor<>, mi::is_fifo_sequence<>, mi::is_always_blocking<>, mi::is_single<>>;
 
@@ -91,22 +80,6 @@ struct inline_executor {
       ::mi::set_value(out, *this);
     }
 };
-
-struct inline_executor_none {
-    using properties = mi::property_set<mi::is_sender<>, mi::is_fifo_sequence<>, mi::is_always_blocking<>, mi::is_none<>>;
-    auto executor() { return inline_time_executor{}; }
-    template<class Out>
-    void submit(Out out) {
-      ::mi::set_value(out);
-      ::mi::set_done(out);
-    }
-};
-
-void countdownnone::operator()() const {
-  if (--*counter >= 0) {
-    inline_executor_none{} | op::submit(mi::make_receiver(*this));
-  }
-}
 
 template<class CancellationFactory>
 struct inline_executor_flow_single {
@@ -270,19 +243,6 @@ struct inline_executor_many {
 
 #define concept Concept
 #include <nonius/nonius.h++>
-
-NONIUS_BENCHMARK("inline 1'000 none", [](nonius::chronometer meter){
-  std::atomic<int> counter{0};
-  auto ie = inline_executor_none{};
-  using IE = decltype(ie);
-  countdownnone none{counter};
-  meter.measure([&]{
-    counter.store(1'000);
-    ie | op::submit(mi::make_receiver(none));
-    while(counter.load() > 0);
-    return counter.load();
-  });
-})
 
 NONIUS_BENCHMARK("inline 1'000 single", [](nonius::chronometer meter){
   std::atomic<int> counter{0};

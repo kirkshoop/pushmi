@@ -18,7 +18,7 @@ struct subject;
 template<class PS, class... TN>
 struct subject<PS, TN...> {
 
-  using properties = property_set_insert_t<property_set<is_sender<>, is_single<>>, property_set<property_set_index_t<PS, is_silent<>>>>;
+  using properties = property_set_insert_t<property_set<is_sender<>, is_single<>>, property_set<property_set_index_t<PS, is_single<>>>>;
 
   struct subject_shared {
     using receiver_t = any_receiver<std::exception_ptr, TN...>;

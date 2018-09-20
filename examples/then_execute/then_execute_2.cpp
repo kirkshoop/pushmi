@@ -13,8 +13,6 @@
 
 #include <pool.h>
 
-#include <pushmi/sender.h>
-#include <pushmi/single_sender.h>
 #include <pushmi/strand.h>
 #include <pushmi/o/just.h>
 #include <pushmi/o/via.h>

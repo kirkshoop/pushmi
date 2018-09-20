@@ -11,7 +11,6 @@
 #include "../boosters.h"
 #include "../receiver.h"
 #include "../flow_receiver.h"
-#include "../sender.h"
 #include "../single_sender.h"
 #include "../many_sender.h"
 #include "../time_single_sender.h"
@@ -51,8 +50,6 @@ namespace detail {
 template <class Cardinality, bool IsFlow = false>
 struct make_receiver;
 template <>
-struct make_receiver<is_none<>> : construct_deduced<receiver> {};
-template <>
 struct make_receiver<is_single<>> : construct_deduced<receiver> {};
 template <>
 struct make_receiver<is_many<>> : construct_deduced<receiver> {};
@@ -87,7 +84,7 @@ struct receiver_from_impl {
 template <PUSHMI_TYPE_CONSTRAINT(Sender) In>
 using receiver_from_fn =
     receiver_from_impl<
-        property_set_index_t<properties_t<In>, is_silent<>>,
+        property_set_index_t<properties_t<In>, is_single<>>,
         property_query_v<properties_t<In>, is_flow<>>>;
 
 template <class In, class FN>
@@ -156,8 +153,6 @@ auto submit_transform_out(SDSF, TSDSF tsdsf) {
 template <class Cardinality, bool IsConstrained = false, bool IsTime = false, bool IsFlow = false>
 struct make_sender;
 template <>
-struct make_sender<is_none<>> : construct_deduced<sender> {};
-template <>
 struct make_sender<is_single<>> : construct_deduced<single_sender> {};
 template <>
 struct make_sender<is_many<>> : construct_deduced<many_sender> {};
@@ -176,7 +171,7 @@ PUSHMI_INLINE_VAR constexpr struct sender_from_fn {
   auto operator()(In in, FN&&... fn) const {
     using MakeSender =
         make_sender<
-            property_set_index_t<properties_t<In>, is_silent<>>,
+            property_set_index_t<properties_t<In>, is_single<>>,
             property_query_v<properties_t<In>, is_constrained<>>,
             property_query_v<properties_t<In>, is_time<>>,
             property_query_v<properties_t<In>, is_flow<>>>;

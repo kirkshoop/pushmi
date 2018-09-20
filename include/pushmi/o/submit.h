@@ -21,7 +21,7 @@ template <PUSHMI_TYPE_CONSTRAINT(Sender) In, class ...AN>
 using receiver_type_t =
     pushmi::invoke_result_t<
         pushmi::detail::make_receiver<
-          property_set_index_t<properties_t<In>, is_silent<>>,
+          property_set_index_t<properties_t<In>, is_single<>>,
           property_query_v<properties_t<In>, is_flow<>>>,
         AN...>;
 

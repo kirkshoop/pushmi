@@ -179,31 +179,6 @@ void receiver_n_test() {
   auto any1 = pushmi::any_receiver<std::exception_ptr, int>(proxy0);
 }
 
-void sender_test(){
-  auto in0 = pushmi::MAKE(sender)();
-  auto in1 = pushmi::MAKE(sender)(pushmi::ignoreSF{});
-  auto in2 = pushmi::MAKE(sender)(pushmi::ignoreSF{}, pushmi::trampolineEXF{});
-  auto in3 = pushmi::MAKE(sender)([&](auto out){
-    in0.submit(pushmi::MAKE(receiver)(std::move(out), [](auto d, auto e) noexcept {
-      pushmi::set_error(d, e);
-    }));
-  }, [](){ return pushmi::trampoline(); });
-  in3.submit(pushmi::MAKE(receiver)());
-
-  std::promise<void> p0;
-  auto promise0 = pushmi::MAKE(receiver)(std::move(p0));
-  in0 | ep::submit(std::move(promise0));
-
-  auto out0 = pushmi::MAKE(receiver)([](auto e) noexcept {  });
-  auto out1 = pushmi::MAKE(receiver)(out0, [](auto d, auto e) noexcept {});
-  out1.error(std::exception_ptr{});
-  in3.submit(out1);
-
-  auto any0 = pushmi::any_sender<>(in0);
-
-  static_assert(pushmi::Executor<pushmi::executor_t<decltype(in0)>>, "sender has invalid executor");
-}
-
 void single_sender_test(){
   auto in0 = pushmi::MAKE(single_sender)();
   auto in1 = pushmi::MAKE(single_sender)(pushmi::ignoreSF{});

@@ -23,10 +23,6 @@ struct property_set;
 
 // trait & tag types
 template<class...TN>
-struct is_silent;
-template<class...TN>
-struct is_none;
-template<class...TN>
 struct is_single;
 template<class...TN>
 struct is_many;
@@ -40,10 +36,28 @@ struct is_receiver;
 template<class...TN>
 struct is_sender;
 
+template<class... TN>
+struct is_executor;
+
 template<class...TN>
 struct is_time;
 template<class...TN>
 struct is_constrained;
+
+template<class... TN>
+struct is_always_blocking;
+
+template<class... TN>
+struct is_never_blocking;
+
+template<class... TN>
+struct is_maybe_blocking;
+
+template<class... TN>
+struct is_fifo_sequence;
+
+template<class... TN>
+struct is_concurrent_sequence;
 
 // implementation types
 

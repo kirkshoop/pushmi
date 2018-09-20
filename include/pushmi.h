@@ -1171,10 +1171,6 @@ struct property_set;
 
 // trait & tag types
 template<class...TN>
-struct is_silent;
-template<class...TN>
-struct is_none;
-template<class...TN>
 struct is_single;
 template<class...TN>
 struct is_many;
@@ -1188,10 +1184,28 @@ struct is_receiver;
 template<class...TN>
 struct is_sender;
 
+template<class... TN>
+struct is_executor;
+
 template<class...TN>
 struct is_time;
 template<class...TN>
 struct is_constrained;
+
+template<class... TN>
+struct is_always_blocking;
+
+template<class... TN>
+struct is_never_blocking;
+
+template<class... TN>
+struct is_maybe_blocking;
+
+template<class... TN>
+struct is_fifo_sequence;
+
+template<class... TN>
+struct is_concurrent_sequence;
 
 // implementation types
 
@@ -2114,6 +2128,32 @@ template<class PS, class... ExpectedN>
 PUSHMI_INLINE_VAR constexpr bool property_query_v =
   property_query<PS, ExpectedN...>::value;
 
+
+// query for categories on types with properties.
+
+namespace detail {
+template<class CIn, class POut>
+std::true_type category_query_fn(property_set_element<POut, CIn>*);
+template<class C>
+std::false_type category_query_fn(void*);
+
+template<class PS, class... ExpectedN>
+struct category_query_impl : bool_<
+  and_v<decltype(category_query_fn<ExpectedN>(
+      (properties_t<PS>*)nullptr))::value...>> {};
+} //namespace detail
+
+template<class PS, class... ExpectedN>
+struct category_query
+  : std::conditional_t<
+      Properties<PS> && not Or<Property<ExpectedN>...>,
+      detail::category_query_impl<PS, ExpectedN...>,
+      std::false_type> {};
+
+template<class PS, class... ExpectedN>
+PUSHMI_INLINE_VAR constexpr bool category_query_v =
+  category_query<PS, ExpectedN...>::value;
+
 } // namespace pushmi
 // clang-format off
 //#pragma once
@@ -2133,6 +2173,17 @@ namespace pushmi {
 // cardinality affects both sender and receiver
 
 struct cardinality_category {};
+
+// Trait
+template<class PS>
+struct has_cardinality : category_query<PS, cardinality_category> {};
+template<class PS>
+PUSHMI_INLINE_VAR constexpr bool has_cardinality_v = has_cardinality<PS>::value;
+PUSHMI_CONCEPT_DEF(
+  template (class PS)
+  concept Cardinality,
+    has_cardinality_v<PS>
+);
 
 // flow affects both sender and receiver
 
@@ -2158,46 +2209,12 @@ struct blocking_category {};
 
 struct sequence_category {};
 
-// Silent trait and tag
-template<class... TN>
-struct is_silent;
-// Tag
-template<>
-struct is_silent<> { using property_category = cardinality_category; };
-// Trait
-template<class PS>
-struct is_silent<PS> : property_query<PS, is_silent<>> {};
-template<class PS>
-PUSHMI_INLINE_VAR constexpr bool is_silent_v = is_silent<PS>::value;
-PUSHMI_CONCEPT_DEF(
-  template (class PS)
-  concept Silent,
-    is_silent_v<PS>
-);
-
-// None trait and tag
-template<class... TN>
-struct is_none;
-// Tag
-template<>
-struct is_none<> : is_silent<> {};
-// Trait
-template<class PS>
-struct is_none<PS> : property_query<PS, is_none<>> {};
-template<class PS>
-PUSHMI_INLINE_VAR constexpr bool is_none_v = is_none<PS>::value;
-PUSHMI_CONCEPT_DEF(
-  template (class PS)
-  concept None,
-    Silent<PS> && is_none_v<PS>
-);
-
 // Single trait and tag
 template<class... TN>
 struct is_single;
 // Tag
 template<>
-struct is_single<> : is_none<> {};
+struct is_single<> { using property_category = cardinality_category; };
 // Trait
 template<class PS>
 struct is_single<PS> : property_query<PS, is_single<>> {};
@@ -2206,7 +2223,7 @@ PUSHMI_INLINE_VAR constexpr bool is_single_v = is_single<PS>::value;
 PUSHMI_CONCEPT_DEF(
   template (class PS)
   concept Single,
-    None<PS> && is_single_v<PS>
+    is_single_v<PS>
 );
 
 // Many trait and tag
@@ -2214,7 +2231,7 @@ template<class... TN>
 struct is_many;
 // Tag
 template<>
-struct is_many<> : is_none<> {}; // many::value() does not terminate, so it is not a refinement of single
+struct is_many<> { using property_category = cardinality_category; }; // many::value() does not terminate, so it is not a refinement of single
 // Trait
 template<class PS>
 struct is_many<PS> : property_query<PS, is_many<>> {};
@@ -2223,7 +2240,7 @@ PUSHMI_INLINE_VAR constexpr bool is_many_v = is_many<PS>::value;
 PUSHMI_CONCEPT_DEF(
   template (class PS)
   concept Many,
-    None<PS> && is_many_v<PS>
+    is_many_v<PS>
 );
 
 // Flow trait and tag
@@ -2449,10 +2466,6 @@ PUSHMI_CONCEPT_DEF(
 );
 
 
-
-// silent does not really make sense, but cannot test for
-// None without the error type, use is_none<> to strengthen
-// requirements
 PUSHMI_CONCEPT_DEF(
   template (class D, class... PropertyN)
   (concept Sender)(D, PropertyN...),
@@ -2461,7 +2474,7 @@ PUSHMI_CONCEPT_DEF(
       requires_<Executor<decltype(::pushmi::executor(d))>>
     ) &&
     SemiMovable<D> &&
-    None<D> &&
+    Cardinality<D> &&
     property_query_v<D, PropertyN...> &&
     is_sender_v<D> &&
     !is_receiver_v<D>
@@ -2551,8 +2564,7 @@ PUSHMI_CONCEPT_DEF(
     ) &&
     Sender<D> &&
     property_query_v<D, PropertyN...> &&
-    Constrained<D> &&
-    None<D>
+    Constrained<D>
 );
 
 PUSHMI_CONCEPT_DEF(
@@ -3413,7 +3425,7 @@ std::future<T> future_from(In in) {
   return result;
 }
 PUSHMI_TEMPLATE (class In)
-  (requires SenderTo<In, std::promise<void>, is_none<>> && not Sender<In, is_single<>>)
+  (requires SenderTo<In, std::promise<void>, is_single<>>)
 std::future<void> future_from(In in) {
   std::promise<void> p;
   auto result = p.get_future();
@@ -5923,250 +5935,6 @@ public:
 //#include "trampoline.h"
 
 namespace pushmi {
-namespace detail {
-struct erase_sender_t {};
-} // namespace detail
-
-template <class E>
-class sender<detail::erase_sender_t, E> {
-  union data {
-    void* pobj_ = nullptr;
-    char buffer_[sizeof(std::promise<void>)]; // can hold a void promise in-situ
-  } data_{};
-  template <class Wrapped>
-  static constexpr bool insitu() {
-    return sizeof(Wrapped) <= sizeof(data::buffer_) &&
-        std::is_nothrow_move_constructible<Wrapped>::value;
-  }
-  struct vtable {
-    static void s_op(data&, data*) {}
-    static any_executor<E> s_executor(data&) { return {}; }
-    static void s_submit(data&, any_receiver<E>) {}
-    void (*op_)(data&, data*) = vtable::s_op;
-    any_executor<E> (*executor_)(data&) = vtable::s_executor;
-    void (*submit_)(data&, any_receiver<E>) = vtable::s_submit;
-  };
-  static constexpr vtable const noop_ {};
-  vtable const* vptr_ = &noop_;
-  template <class Wrapped>
-  sender(Wrapped obj, std::false_type) : sender() {
-    struct s {
-      static void op(data& src, data* dst) {
-        if (dst)
-          dst->pobj_ = std::exchange(src.pobj_, nullptr);
-        delete static_cast<Wrapped const*>(src.pobj_);
-      }
-      static any_executor<E> executor(data& src) {
-        return any_executor<E>{::pushmi::executor(*static_cast<Wrapped*>(src.pobj_))};
-      }
-      static void submit(data& src, any_receiver<E> out) {
-        ::pushmi::submit(*static_cast<Wrapped*>(src.pobj_), std::move(out));
-      }
-    };
-    static const vtable vtbl{s::op, s::executor, s::submit};
-    data_.pobj_ = new Wrapped(std::move(obj));
-    vptr_ = &vtbl;
-  }
-  template <class Wrapped>
-  sender(Wrapped obj, std::true_type) noexcept : sender() {
-    struct s {
-      static void op(data& src, data* dst) {
-        if (dst)
-          new (dst->buffer_) Wrapped(
-              std::move(*static_cast<Wrapped*>((void*)src.buffer_)));
-        static_cast<Wrapped const*>((void*)src.buffer_)->~Wrapped();
-      }
-      static any_executor<E> executor(data& src) {
-        return any_executor<E>{::pushmi::executor(*static_cast<Wrapped*>((void*)src.buffer_))};
-      }
-      static void submit(data& src, any_receiver<E> out) {
-        ::pushmi::submit(
-            *static_cast<Wrapped*>((void*)src.buffer_), std::move(out));
-      }
-    };
-    static const vtable vtbl{s::op, s::executor, s::submit};
-    new (data_.buffer_) Wrapped(std::move(obj));
-    vptr_ = &vtbl;
-  }
-  template <class T, class U = std::decay_t<T>>
-  using wrapped_t =
-    std::enable_if_t<!std::is_same<U, sender>::value, U>;
- public:
-  using properties = property_set<is_sender<>, is_none<>>;
-
-  sender() = default;
-  sender(sender&& that) noexcept : sender() {
-    that.vptr_->op_(that.data_, &data_);
-    std::swap(that.vptr_, vptr_);
-  }
-  PUSHMI_TEMPLATE(class Wrapped)
-    (requires SenderTo<wrapped_t<Wrapped>, any_receiver<E>, is_none<>>)
-  explicit sender(Wrapped obj) noexcept(insitu<Wrapped>())
-    : sender{std::move(obj), bool_<insitu<Wrapped>()>{}} {}
-  ~sender() {
-    vptr_->op_(data_, nullptr);
-  }
-  sender& operator=(sender&& that) noexcept {
-    this->~sender();
-    new ((void*)this) sender(std::move(that));
-    return *this;
-  }
-  any_executor<E> executor() {
-    return vptr_->executor_(data_);
-  }
-  void submit(any_receiver<E> out) {
-    vptr_->submit_(data_, std::move(out));
-  }
-};
-
-// Class static definitions:
-template <class E>
-constexpr typename sender<detail::erase_sender_t, E>::vtable const
-    sender<detail::erase_sender_t, E>::noop_;
-
-template <class SF, class EXF>
-class sender<SF, EXF> {
-  SF sf_;
-  EXF exf_;
-
- public:
-  using properties = property_set<is_sender<>, is_none<>>;
-
-  constexpr sender() = default;
-  constexpr explicit sender(SF sf) : sf_(std::move(sf)) {}
-  constexpr sender(SF sf, EXF exf) : sf_(std::move(sf)), exf_(std::move(exf)) {}
-
-  auto executor() { return exf_(); }
-  PUSHMI_TEMPLATE(class Out)
-    (requires Receiver<Out> && Invocable<SF&, Out>)
-  void submit(Out out) {
-    sf_(std::move(out));
-  }
-};
-
-template <PUSHMI_TYPE_CONSTRAINT(Sender<is_none<>>) Data, class DSF, class DEXF>
-class sender<Data, DSF, DEXF> {
-  Data data_;
-  DSF sf_;
-  DEXF exf_;
-    static_assert(Sender<Data, is_none<>>, "The Data template parameter "
-    "must satisfy the Sender concept.");
-
- public:
-  using properties = property_set_insert_t<properties_t<Data>, property_set<is_sender<>, is_none<>>>;
-
-  constexpr sender() = default;
-  constexpr explicit sender(Data data)
-      : data_(std::move(data)) {}
-  constexpr sender(Data data, DSF sf)
-      : data_(std::move(data)), sf_(std::move(sf)) {}
-  constexpr sender(Data data, DSF sf, DEXF exf)
-      : data_(std::move(data)), sf_(std::move(sf)), exf_(std::move(exf)) {}
-
-  auto executor() { return exf_(data_); }
-  PUSHMI_TEMPLATE(class Out)
-    (requires Receiver<Out> && Invocable<DSF&, Data&, Out>)
-  void submit(Out out) {
-    sf_(data_, std::move(out));
-  }
-};
-
-template <>
-class sender<>
-    : public sender<ignoreSF, trampolineEXF> {
-public:
-  sender() = default;
-};
-
-////////////////////////////////////////////////////////////////////////////////
-// make_sender
-PUSHMI_INLINE_VAR constexpr struct make_sender_fn {
-  inline auto operator()() const {
-    return sender<ignoreSF, trampolineEXF>{};
-  }
-  PUSHMI_TEMPLATE(class SF)
-    (requires True<> PUSHMI_BROKEN_SUBSUMPTION(&& not Sender<SF>))
-  auto operator()(SF sf) const {
-    return sender<SF, trampolineEXF>{std::move(sf)};
-  }
-  PUSHMI_TEMPLATE(class SF, class EXF)
-    (requires True<> && Invocable<EXF&> PUSHMI_BROKEN_SUBSUMPTION(&& not Sender<SF>))
-  auto operator()(SF sf, EXF exf) const {
-    return sender<SF, EXF>{std::move(sf), std::move(exf)};
-  }
-  PUSHMI_TEMPLATE(class Wrapped)
-    (requires Sender<Wrapped, is_none<>>)
-  auto operator()(Wrapped w) const {
-    return sender<detail::erase_sender_t, std::exception_ptr>{std::move(w)};
-  }
-  PUSHMI_TEMPLATE(class Data, class DSF)
-    (requires Sender<Data, is_none<>>)
-  auto operator()(Data data, DSF sf) const {
-    return sender<Data, DSF, passDEXF>{std::move(data), std::move(sf)};
-  }
-  PUSHMI_TEMPLATE(class Data, class DSF, class DEXF)
-    (requires Sender<Data, is_none<>>)
-  auto operator()(Data data, DSF sf, DEXF exf) const {
-    return sender<Data, DSF, DEXF>{std::move(data), std::move(sf), std::move(exf)};
-  }
-} const make_sender {};
-
-////////////////////////////////////////////////////////////////////////////////
-// deduction guides
-#if __cpp_deduction_guides >= 201703
-sender() -> sender<ignoreSF, trampolineEXF>;
-
-PUSHMI_TEMPLATE(class SF)
-  (requires True<> PUSHMI_BROKEN_SUBSUMPTION(&& not Sender<SF>))
-sender(SF) -> sender<SF, trampolineEXF>;
-
-PUSHMI_TEMPLATE(class SF, class EXF)
-  (requires True<> && Invocable<EXF&> PUSHMI_BROKEN_SUBSUMPTION(&& not Sender<SF>))
-sender(SF, EXF) -> sender<SF, EXF>;
-
-PUSHMI_TEMPLATE(class Wrapped)
-  (requires Sender<Wrapped, is_none<>>)
-sender(Wrapped) ->
-    sender<detail::erase_sender_t, std::exception_ptr>;
-
-PUSHMI_TEMPLATE(class Data, class DSF)
-  (requires Sender<Data, is_none<>>)
-sender(Data, DSF) -> sender<Data, DSF, passDEXF>;
-
-PUSHMI_TEMPLATE(class Data, class DSF, class DEXF)
-  (requires Sender<Data, is_none<>>)
-sender(Data, DSF, DEXF) -> sender<Data, DSF, DEXF>;
-#endif
-
-template <class E = std::exception_ptr>
-using any_sender = sender<detail::erase_sender_t, E>;
-
-template<>
-struct construct_deduced<sender> : make_sender_fn {};
-
-// template <SenderTo<any_receiver<std::exception_ptr>, is_none<>> Wrapped>
-// auto erase_cast(Wrapped w) {
-//   return sender<detail::erase_sender_t, std::exception_ptr>{std::move(w)};
-// }
-//
-// template <class E, SenderTo<any_receiver<E>, is_none<>> Wrapped>
-//   requires Same<is_none<>, properties_t<Wrapped>>
-// auto erase_cast(Wrapped w) {
-//   return sender<detail::erase_sender_t, E>{std::move(w)};
-// }
-
-} // namespace pushmi
-//#pragma once
-// Copyright (c) 2018-present, Facebook, Inc.
-//
-// This source code is licensed under the MIT license found in the
-// LICENSE file in the root directory of this source tree.
-
-//#include "receiver.h"
-//#include "executor.h"
-//#include "trampoline.h"
-
-namespace pushmi {
 
 template <class E, class... VN>
 class any_single_sender {
@@ -7099,7 +6867,6 @@ struct construct_deduced<flow_many_sender>
 //#include "../boosters.h"
 //#include "../receiver.h"
 //#include "../flow_receiver.h"
-//#include "../sender.h"
 //#include "../single_sender.h"
 //#include "../many_sender.h"
 //#include "../time_single_sender.h"
@@ -7139,8 +6906,6 @@ namespace detail {
 template <class Cardinality, bool IsFlow = false>
 struct make_receiver;
 template <>
-struct make_receiver<is_none<>> : construct_deduced<receiver> {};
-template <>
 struct make_receiver<is_single<>> : construct_deduced<receiver> {};
 template <>
 struct make_receiver<is_many<>> : construct_deduced<receiver> {};
@@ -7175,7 +6940,7 @@ struct receiver_from_impl {
 template <PUSHMI_TYPE_CONSTRAINT(Sender) In>
 using receiver_from_fn =
     receiver_from_impl<
-        property_set_index_t<properties_t<In>, is_silent<>>,
+        property_set_index_t<properties_t<In>, is_single<>>,
         property_query_v<properties_t<In>, is_flow<>>>;
 
 template <class In, class FN>
@@ -7244,8 +7009,6 @@ auto submit_transform_out(SDSF, TSDSF tsdsf) {
 template <class Cardinality, bool IsConstrained = false, bool IsTime = false, bool IsFlow = false>
 struct make_sender;
 template <>
-struct make_sender<is_none<>> : construct_deduced<sender> {};
-template <>
 struct make_sender<is_single<>> : construct_deduced<single_sender> {};
 template <>
 struct make_sender<is_many<>> : construct_deduced<many_sender> {};
@@ -7264,7 +7027,7 @@ PUSHMI_INLINE_VAR constexpr struct sender_from_fn {
   auto operator()(In in, FN&&... fn) const {
     using MakeSender =
         make_sender<
-            property_set_index_t<properties_t<In>, is_silent<>>,
+            property_set_index_t<properties_t<In>, is_single<>>,
             property_query_v<properties_t<In>, is_constrained<>>,
             property_query_v<properties_t<In>, is_time<>>,
             property_query_v<properties_t<In>, is_flow<>>>;
@@ -7483,7 +7246,7 @@ template <PUSHMI_TYPE_CONSTRAINT(Sender) In, class ...AN>
 using receiver_type_t =
     pushmi::invoke_result_t<
         pushmi::detail::make_receiver<
-          property_set_index_t<properties_t<In>, is_silent<>>,
+          property_set_index_t<properties_t<In>, is_single<>>,
           property_query_v<properties_t<In>, is_flow<>>>,
         AN...>;
 
@@ -7839,7 +7602,7 @@ struct subject;
 template<class PS, class... TN>
 struct subject<PS, TN...> {
 
-  using properties = property_set_insert_t<property_set<is_sender<>, is_single<>>, property_set<property_set_index_t<PS, is_silent<>>>>;
+  using properties = property_set_insert_t<property_set<is_sender<>, is_single<>>, property_set<property_set_index_t<PS, is_single<>>>>;
 
   struct subject_shared {
     using receiver_t = any_receiver<std::exception_ptr, TN...>;
@@ -7961,7 +7724,7 @@ private:
     PUSHMI_TEMPLATE(class In)
       (requires Sender<In> && Flow<In> && Many<In>)
     In operator()(In in) {
-      auto out{::pushmi::detail::receiver_from_fn<subset<is_sender<>, property_set_index_t<properties_t<In>, is_silent<>>>>()(std::move(args_))};
+      auto out{::pushmi::detail::receiver_from_fn<subset<is_sender<>, property_set_index_t<properties_t<In>, is_single<>>>>()(std::move(args_))};
       using Out = decltype(out);
       ::pushmi::submit(in, ::pushmi::detail::receiver_from_fn<In>()(Pull<In, Out>{std::move(out)}));
       return in;
@@ -7969,7 +7732,7 @@ private:
     PUSHMI_TEMPLATE(class In)
       (requires Sender<In> && Constrained<In> && Flow<In> && Many<In>)
     In operator()(In in) {
-      auto out{::pushmi::detail::receiver_from_fn<subset<is_sender<>, property_set_index_t<properties_t<In>, is_silent<>>>>()(std::move(args_))};
+      auto out{::pushmi::detail::receiver_from_fn<subset<is_sender<>, property_set_index_t<properties_t<In>, is_single<>>>>()(std::move(args_))};
       using Out = decltype(out);
       ::pushmi::submit(in, ::pushmi::top(in), ::pushmi::detail::receiver_from_fn<In>()(Pull<In, Out>{std::move(out)}));
       return in;
@@ -7997,9 +7760,9 @@ PUSHMI_INLINE_VAR constexpr detail::for_each_fn for_each{};
 // This source code is licensed under the MIT license found in the
 // LICENSE file in the root directory of this source tree.
 
-//#include "../sender.h"
-//#include "../single_sender.h"
 //#include "../detail/functional.h"
+//#include "submit.h"
+//#include "extension_operators.h"
 
 namespace pushmi {
 namespace detail {
@@ -8007,13 +7770,6 @@ namespace detail {
   struct single_empty_impl {
     PUSHMI_TEMPLATE(class Out)
       (requires ReceiveValue<Out, VN...>)
-    void operator()(Out out) {
-      ::pushmi::set_done(out);
-    }
-  };
-  struct empty_impl {
-    PUSHMI_TEMPLATE(class Out)
-      (requires ReceiveValue<Out>)
     void operator()(Out out) {
       ::pushmi::set_done(out);
     }
@@ -8027,7 +7783,7 @@ auto empty() {
 }
 
 inline auto empty() {
-  return make_sender(detail::empty_impl{});
+  return make_single_sender(detail::single_empty_impl<>{});
 }
 
 } // namespace operators
@@ -8251,26 +8007,16 @@ public:
 // This source code is licensed under the MIT license found in the
 // LICENSE file in the root directory of this source tree.
 
-//#include "../sender.h"
 //#include "submit.h"
 //#include "extension_operators.h"
 
 namespace pushmi {
 namespace detail {
-  template <class E>
-  struct error_impl {
-    E e_;
-    PUSHMI_TEMPLATE(class Out)
-      (requires ReceiveError<Out, E>)
-    void operator()(Out out) {
-      ::pushmi::set_error(out, std::move(e_));
-    }
-  };
-  template <class V, class E>
+  template <class E, class... VN>
   struct single_error_impl {
     E e_;
     PUSHMI_TEMPLATE(class Out)
-      (requires ReceiveError<Out, E> && ReceiveValue<Out, V>)
+      (requires ReceiveError<Out, E> && ReceiveValue<Out, VN...>)
     void operator()(Out out) {
       ::pushmi::set_error(out, std::move(e_));
     }
@@ -8282,13 +8028,13 @@ namespace operators {
 PUSHMI_TEMPLATE(class E)
   (requires SemiMovable<E>)
 auto error(E e) {
-  return make_sender(detail::error_impl<E>{std::move(e)});
+  return make_single_sender(detail::single_error_impl<E>{std::move(e)});
 }
 
-PUSHMI_TEMPLATE(class V, class E)
-  (requires SemiMovable<V> && SemiMovable<E>)
+PUSHMI_TEMPLATE(class E, class... VN)
+  (requires And<SemiMovable<VN>...> && SemiMovable<E>)
 auto error(E e) {
-  return make_single_sender(detail::single_error_impl<V, E>{std::move(e)});
+  return make_single_sender(detail::single_error_impl<E, VN...>{std::move(e)});
 }
 
 } // namespace operators
@@ -8438,9 +8184,6 @@ PUSHMI_INLINE_VAR constexpr detail::on_fn on{};
 
 //#include <cassert>
 //#include "extension_operators.h"
-//#include "../sender.h"
-//#include "../single_sender.h"
-//#include "../time_single_sender.h"
 
 namespace pushmi {
 
@@ -8568,33 +8311,6 @@ template<class F, class Tag, bool IsFlow = false>
 struct transform_on;
 
 template<class F>
-struct transform_on<F, is_none<>> {
-  F f_;
-  transform_on() = default;
-  constexpr explicit transform_on(F f)
-    : f_(std::move(f)) {}
-  struct value_fn {
-    F f_;
-    value_fn() = default;
-    constexpr explicit value_fn(F f)
-      : f_(std::move(f)) {}
-    template<class Out>
-    auto operator()(Out& out) {
-      using Result = ::pushmi::invoke_result_t<F>;
-      static_assert(::pushmi::SemiMovable<Result>,
-        "none of the functions supplied to transform return a SemiMovable value");
-      static_assert(::pushmi::ReceiveValue<Out, Result>,
-        "Result of value transform cannot be delivered to Out");
-      ::pushmi::set_value(out, f_());
-    }
-  };
-  template<class Out>
-  auto operator()(Out out) const {
-    return ::pushmi::make_receiver(std::move(out), value_fn{f_});
-  }
-};
-
-template<class F>
 struct transform_on<F, is_single<>> {
   F f_;
   transform_on() = default;
@@ -8692,7 +8408,7 @@ private:
     PUSHMI_TEMPLATE (class In)
       (requires Sender<In>)
     auto operator()(In in) const {
-      using Cardinality = property_set_index_t<properties_t<In>, is_silent<>>;
+      using Cardinality = property_set_index_t<properties_t<In>, is_single<>>;
       return ::pushmi::detail::sender_from(
         std::move(in),
         ::pushmi::detail::submit_transform_out<In>(

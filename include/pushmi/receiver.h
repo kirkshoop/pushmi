@@ -458,7 +458,7 @@ std::future<T> future_from(In in) {
   return result;
 }
 PUSHMI_TEMPLATE (class In)
-  (requires SenderTo<In, std::promise<void>, is_none<>> && not Sender<In, is_single<>>)
+  (requires SenderTo<In, std::promise<void>, is_single<>>)
 std::future<void> future_from(In in) {
   std::promise<void> p;
   auto result = p.get_future();
