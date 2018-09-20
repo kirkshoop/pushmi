@@ -24,13 +24,7 @@ namespace detail {
 
 namespace operators {
 
-PUSHMI_TEMPLATE(class E)
-  (requires SemiMovable<E>)
-auto error(E e) {
-  return make_single_sender(detail::single_error_impl<E>{std::move(e)});
-}
-
-PUSHMI_TEMPLATE(class E, class... VN)
+PUSHMI_TEMPLATE(class... VN, class E)
   (requires And<SemiMovable<VN>...> && SemiMovable<E>)
 auto error(E e) {
   return make_single_sender(detail::single_error_impl<E, VN...>{std::move(e)});
