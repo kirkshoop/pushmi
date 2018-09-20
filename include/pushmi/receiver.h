@@ -228,6 +228,8 @@ class receiver<Data, DVF, DEF, DDF> {
   constexpr receiver(Data d, DVF vf, DEF ef = DEF{}, DDF df = DDF{})
       : done_(false), data_(std::move(d)), vf_(vf), ef_(ef), df_(df) {}
 
+  Data& data() { return data_; }
+
   PUSHMI_TEMPLATE(class... VN)
     (requires Invocable<DVF&, Data&, VN...>)
   void value(VN&&... vn) {

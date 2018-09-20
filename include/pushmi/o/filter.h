@@ -16,15 +16,8 @@ private:
   template <class In, class Predicate>
   struct on_value_impl {
     Predicate p_;
-    PUSHMI_TEMPLATE(class Out, class V)
-      (requires Receiver<Out> && Many<In>)
-    void operator()(Out& out, V&& v) const {
-      if (p_(as_const(v))) {
-        ::pushmi::set_next(out, (V&&) v);
-      }
-    }
     PUSHMI_TEMPLATE(class Out, class... VN)
-      (requires Receiver<Out> && not Many<In>)
+      (requires Receiver<Out>)
     void operator()(Out& out, VN&&... vn) const {
       if (p_(as_const(vn)...)) {
         ::pushmi::set_value(out, (VN&&) vn...);

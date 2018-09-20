@@ -10,14 +10,12 @@
 #include "../piping.h"
 #include "../boosters.h"
 #include "../receiver.h"
+#include "../flow_receiver.h"
 #include "../sender.h"
 #include "../single_sender.h"
-#include "../many.h"
 #include "../many_sender.h"
 #include "../time_single_sender.h"
-#include "../flow_single.h"
 #include "../flow_single_sender.h"
-#include "../flow_many.h"
 #include "../flow_many_sender.h"
 #include "../detail/if_constexpr.h"
 #include "../detail/functional.h"
@@ -57,11 +55,11 @@ struct make_receiver<is_none<>> : construct_deduced<receiver> {};
 template <>
 struct make_receiver<is_single<>> : construct_deduced<receiver> {};
 template <>
-struct make_receiver<is_many<>> : construct_deduced<many> {};
+struct make_receiver<is_many<>> : construct_deduced<receiver> {};
 template <>
-struct make_receiver<is_single<>, true> : construct_deduced<flow_single> {};
+struct make_receiver<is_single<>, true> : construct_deduced<flow_receiver> {};
 template <>
-struct make_receiver<is_many<>, true> : construct_deduced<flow_many> {};
+struct make_receiver<is_many<>, true> : construct_deduced<flow_receiver> {};
 
 template <class Cardinality, bool IsFlow>
 struct receiver_from_impl {
@@ -260,24 +258,6 @@ public:
   }
 };
 
-struct set_next_fn {
-private:
-  template <class V>
-  struct impl {
-    V v_;
-    PUSHMI_TEMPLATE(class Out)
-      (requires Receiver<Out, is_many<>>)
-    void operator()(Out out) {
-      ::pushmi::set_next(out, std::move(v_));
-    }
-  };
-public:
-  template <class V>
-  auto operator()(V&& v) const {
-    return impl<std::decay_t<V>>{(V&&) v};
-  }
-};
-
 struct set_starting_fn {
 private:
   template <class Up>
@@ -383,7 +363,6 @@ namespace extension_operators {
 PUSHMI_INLINE_VAR constexpr detail::set_done_fn set_done{};
 PUSHMI_INLINE_VAR constexpr detail::set_error_fn set_error{};
 PUSHMI_INLINE_VAR constexpr detail::set_value_fn set_value{};
-PUSHMI_INLINE_VAR constexpr detail::set_next_fn set_next{};
 PUSHMI_INLINE_VAR constexpr detail::set_starting_fn set_starting{};
 PUSHMI_INLINE_VAR constexpr detail::executor_fn executor{};
 PUSHMI_INLINE_VAR constexpr detail::do_submit_fn submit{};

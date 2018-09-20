@@ -232,16 +232,9 @@ private:
     }
     PUSHMI_TEMPLATE (class Out, class... VN)
       (requires True<> && ReceiveValue<Out, VN...> &&
-        And<not Executor<std::decay_t<VN>>...>)
+        not (sizeof...(VN) == 1 && And<Executor<std::decay_t<VN>>...>) )
     void operator()(Out out, VN&&... vn) const {
       ::pushmi::set_value(out, (VN&&) vn...);
-    }
-  };
-  struct on_next_impl {
-    PUSHMI_TEMPLATE (class Out, class Value)
-      (requires Receiver<Out, is_many<>>)
-    void operator()(Out out, Value&& v) const {
-      ::pushmi::set_next(out, (Value&&) v);
     }
   };
   struct on_error_impl {
@@ -270,17 +263,7 @@ private:
   template <class In>
   struct receiver_impl {
     PUSHMI_TEMPLATE(class... AN)
-      (requires Sender<In> && Many<In>)
-    auto operator()(lock_state* state, std::tuple<AN...> args) const {
-      return ::pushmi::detail::receiver_from_fn<In>()(
-        std::move(args),
-        on_next_impl{},
-        on_error_impl{state},
-        on_done_impl{state}
-      );
-    }
-    PUSHMI_TEMPLATE(class... AN)
-      (requires Sender<In> && not Many<In>)
+      (requires Sender<In>)
     auto operator()(lock_state* state, std::tuple<AN...> args) const {
       return ::pushmi::detail::receiver_from_fn<In>()(
         std::move(args),

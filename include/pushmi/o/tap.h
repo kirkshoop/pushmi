@@ -33,14 +33,6 @@ struct tap_ {
     ::pushmi::set_value(sideEffects, as_const(vn)...);
     ::pushmi::set_value(out, (VN&&) vn...);
   }
-  PUSHMI_TEMPLATE(class V, class UV = std::remove_reference_t<V>)
-    (requires
-      ManyReceiver<SideEffects, const UV> &&
-      ManyReceiver<Out, UV>)
-  void next(V&& v) {
-    ::pushmi::set_next(sideEffects, as_const(v));
-    ::pushmi::set_next(out, (V&&) v);
-  }
   PUSHMI_TEMPLATE(class E)
     (requires
       ReceiveError<SideEffects, const E> &&

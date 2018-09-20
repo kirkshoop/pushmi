@@ -7,7 +7,7 @@
 // LICENSE file in the root directory of this source tree.
 
 #include "../receiver.h"
-#include "../many.h"
+#include "../flow_receiver.h"
 #include "submit.h"
 #include "extension_operators.h"
 
@@ -101,16 +101,16 @@ struct transform_on<F, is_many<>> {
     : f_(std::move(f)) {}
   template<class Out>
   auto operator()(Out out) const {
-    return make_many(std::move(out), on_next(*this));
+    return ::pushmi::make_receiver(std::move(out), on_value(*this));
   }
   template<class Out, class V0, class... VN>
   auto operator()(Out& out, V0&& v0, VN&&... vn) {
     using Result = ::pushmi::invoke_result_t<F, V0, VN...>;
     static_assert(::pushmi::SemiMovable<Result>,
       "none of the functions supplied to transform can convert this value");
-    static_assert(::pushmi::ManyReceiver<Out, Result>,
+    static_assert(::pushmi::ReceiveValue<Out, Result>,
       "Result of value transform cannot be delivered to Out");
-    ::pushmi::set_next(out, f_((V0&&) v0, (VN&&) vn...));
+    ::pushmi::set_value(out, f_((V0&&) v0, (VN&&) vn...));
   }
 };
 
@@ -122,16 +122,16 @@ struct transform_on<F, is_many<>, true> {
     : f_(std::move(f)) {}
   template<class Out>
   auto operator()(Out out) const {
-    return make_flow_many(std::move(out), on_next(*this));
+    return make_flow_receiver(std::move(out), on_value(*this));
   }
   template<class Out, class V0, class... VN>
   auto operator()(Out& out, V0&& v0, VN&&... vn) {
     using Result = ::pushmi::invoke_result_t<F, V0, VN...>;
     static_assert(::pushmi::SemiMovable<Result>,
       "none of the functions supplied to transform can convert this value");
-    static_assert(::pushmi::Flow<Out> && ::pushmi::ManyReceiver<Out, Result>,
+    static_assert(::pushmi::Flow<Out> && ::pushmi::ReceiveValue<Out, Result>,
       "Result of value transform cannot be delivered to Out");
-    ::pushmi::set_next(out, f_((V0&&) v0, (VN&&) vn...));
+    ::pushmi::set_value(out, f_((V0&&) v0, (VN&&) vn...));
   }
 };
 

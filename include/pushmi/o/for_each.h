@@ -20,15 +20,15 @@ private:
     using properties = property_set_insert_t<properties_t<Out>, property_set<is_flow<>>>;
     std::function<void(ptrdiff_t)> pull;
     template<class V>
-    void next(V&& v) {
-      ::pushmi::set_next(static_cast<Out&>(*this), (V&&) v);
+    void value(V&& v) {
+      ::pushmi::set_value(static_cast<Out&>(*this), (V&&) v);
       pull(1);
     }
     PUSHMI_TEMPLATE(class Up)
       (requires Receiver<Up>)
     void starting(Up up){
       pull = [up = std::move(up)](std::ptrdiff_t requested) mutable {
-        ::pushmi::set_next(up, requested);
+        ::pushmi::set_value(up, requested);
       };
       pull(1);
     }

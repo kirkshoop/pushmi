@@ -331,26 +331,6 @@ PUSHMI_CONCEPT_DEF(
     SemiMovable<E>
 );
 
-PUSHMI_CONCEPT_DEF(
-  template (class S, class T, class E = std::exception_ptr)
-  (concept SingleReceiver)(S, T, E),
-    ReceiveError<S, E> &&
-    ReceiveValue<S, T> &&
-    SemiMovable<T> &&
-    SemiMovable<E>
-);
-
-PUSHMI_CONCEPT_DEF(
-  template (class S, class T, class E = std::exception_ptr)
-  (concept ManyReceiver)(S, T, E),
-    requires(S& s, T&& t) (
-      ::pushmi::set_next(s, (T &&) t) // Semantics: called 0-N times.
-    ) &&
-    ReceiveError<S, E> &&
-    SemiMovable<T> &&
-    SemiMovable<E> &&
-    Many<S>
-);
 
 
 // silent does not really make sense, but cannot test for
@@ -398,47 +378,26 @@ PUSHMI_CONCEPT_DEF(
 );
 
 PUSHMI_CONCEPT_DEF(
-  template (
-    class N,
-    class Up,
-    class PE = std::exception_ptr,
-    class E = PE)
-  (concept FlowNoneReceiver)(N, Up, PE, E),
-    requires(N& n, Up&& up) (
-      ::pushmi::set_starting(n, (Up &&) up)
+  template (class R, class... VN)
+  (concept FlowReceiveValue)(R, VN...),
+    Flow<R> &&
+    ReceiveValue<R, VN...>
+);
+
+PUSHMI_CONCEPT_DEF(
+  template (class R, class E = std::exception_ptr)
+  (concept FlowReceiveError)(R, E),
+    Flow<R> &&
+    ReceiveError<R, E>
+);
+
+PUSHMI_CONCEPT_DEF(
+  template (class R, class Up)
+  (concept FlowUpTo)(R, Up),
+    requires(R& r, Up&& up) (
+      ::pushmi::set_starting(r, (Up &&) up)
     ) &&
-    FlowReceiver<N> &&
-    Receiver<Up> &&
-    SemiMovable<PE> &&
-    SemiMovable<E> &&
-    ReceiveError<Up, PE> &&
-    ReceiveError<N, E>
-);
-
-PUSHMI_CONCEPT_DEF(
-  template (
-      class S,
-      class Up,
-      class T,
-      class PE = std::exception_ptr,
-      class E = PE)
-  (concept FlowSingleReceiver)(S, Up, T, PE, E),
-    SingleReceiver<S, T, E> &&
-    FlowNoneReceiver<S, Up, PE, E>
-);
-
-PUSHMI_CONCEPT_DEF(
-  template (
-      class S,
-      class Up,
-      class T,
-      class PT = std::ptrdiff_t,
-      class PE = std::exception_ptr,
-      class E = PE)
-  (concept FlowManyReceiver)(S, Up, T, PT, PE, E),
-    ManyReceiver<S, T, E> &&
-    ManyReceiver<Up, PT, PE> &&
-    FlowNoneReceiver<S, Up, PE, E>
+    Flow<R>
 );
 
 PUSHMI_CONCEPT_DEF(

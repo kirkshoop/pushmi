@@ -127,7 +127,7 @@ SCENARIO( "from() can be used with transform and submit", "[from][sender]" ) {
     auto m = op::from(arr);
     using M = decltype(m);
 
-    REQUIRE( v::SenderTo<M, v::any_many<int>, v::is_many<>> );
+    REQUIRE( v::SenderTo<M, v::any_receiver<std::exception_ptr, int>, v::is_many<>> );
 
     WHEN( "transform and submit are applied" ) {
       int signals = 0;

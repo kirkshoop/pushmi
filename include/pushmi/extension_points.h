@@ -31,11 +31,6 @@ PUSHMI_TEMPLATE (class S, class... VN)
 void set_value(S& s, VN&&... vn) noexcept(noexcept(s.value((VN&&) vn...))) {
   s.value((VN&&) vn...);
 }
-PUSHMI_TEMPLATE (class S, class V)
-  (requires requires (std::declval<S&>().next(std::declval<V&&>())))
-void set_next(S& s, V&& v) noexcept(noexcept(s.next((V&&) v))) {
-  s.next((V&&) v);
-}
 
 PUSHMI_TEMPLATE (class S, class Up)
   (requires requires (std::declval<S&>().starting(std::declval<Up&&>())))
@@ -92,11 +87,6 @@ PUSHMI_TEMPLATE (class S, class... VN)
   (requires requires (std::declval<S&>()->value(std::declval<VN&&>()...)))
 void set_value(S& s, VN&&... vn) noexcept(noexcept(s->value((VN&&) vn...))) {
   s->value((VN&&) vn...);
-}
-PUSHMI_TEMPLATE (class S, class V)
-  (requires requires (std::declval<S&>()->next(std::declval<V&&>())))
-void set_next(S& s, V&& v) noexcept(noexcept(s->next((V&&) v))) {
-  s->next((V&&) v);
 }
 
 PUSHMI_TEMPLATE (class S, class Up)
@@ -180,12 +170,6 @@ void set_value(std::reference_wrapper<S> s, VN&&... vn) noexcept(
   noexcept(set_value(s.get(), (VN&&) vn...))) {
   set_value(s.get(), (VN&&) vn...);
 }
-PUSHMI_TEMPLATE (class S, class V)
-  (requires requires ( set_next(std::declval<S&>(), std::declval<V&&>()) ))
-void set_next(std::reference_wrapper<S> s, V&& v) noexcept(
-  noexcept(set_next(s.get(), (V&&) v))) {
-  set_next(s.get(), (V&&) v);
-}
 PUSHMI_TEMPLATE (class S, class Up)
   (requires requires ( set_starting(std::declval<S&>(), std::declval<Up&&>()) ))
 void set_starting(std::reference_wrapper<S> s, Up&& up) noexcept(
@@ -259,21 +243,6 @@ struct set_value_fn {
       noexcept(noexcept(set_value(s, (VN&&) vn...))) {
     try {
       set_value(s, (VN&&) vn...);
-    } catch (...) {
-      set_error(s, std::current_exception());
-    }
-  }
-};
-struct set_next_fn {
-  PUSHMI_TEMPLATE (class S, class V)
-    (requires requires (
-      set_next(std::declval<S&>(), std::declval<V&&>()),
-      set_error(std::declval<S&>(), std::current_exception())
-    ))
-  void operator()(S&& s, V&& v) const
-      noexcept(noexcept(set_next(s, (V&&) v))) {
-    try {
-      set_next(s, (V&&) v);
     } catch (...) {
       set_error(s, std::current_exception());
     }
@@ -353,7 +322,6 @@ struct get_top_fn {
 PUSHMI_INLINE_VAR constexpr __adl::set_done_fn set_done{};
 PUSHMI_INLINE_VAR constexpr __adl::set_error_fn set_error{};
 PUSHMI_INLINE_VAR constexpr __adl::set_value_fn set_value{};
-PUSHMI_INLINE_VAR constexpr __adl::set_next_fn set_next{};
 PUSHMI_INLINE_VAR constexpr __adl::set_starting_fn set_starting{};
 PUSHMI_INLINE_VAR constexpr __adl::get_executor_fn executor{};
 PUSHMI_INLINE_VAR constexpr __adl::do_submit_fn submit{};

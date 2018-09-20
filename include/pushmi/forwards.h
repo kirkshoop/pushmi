@@ -51,16 +51,10 @@ template <PUSHMI_TYPE_CONSTRAINT(SemiMovable)... TN>
 class receiver;
 
 template <PUSHMI_TYPE_CONSTRAINT(SemiMovable)... TN>
-class none;
+class flow_receiver;
 
 template <PUSHMI_TYPE_CONSTRAINT(SemiMovable)... TN>
 class sender;
-
-template <PUSHMI_TYPE_CONSTRAINT(SemiMovable)... TN>
-class single;
-
-template <PUSHMI_TYPE_CONSTRAINT(SemiMovable)... TN>
-class many;
 
 template <PUSHMI_TYPE_CONSTRAINT(SemiMovable)... TN>
 class single_sender;
@@ -75,13 +69,7 @@ template <PUSHMI_TYPE_CONSTRAINT(SemiMovable)... TN>
 class time_single_sender;
 
 template <PUSHMI_TYPE_CONSTRAINT(SemiMovable)... TN>
-class flow_single;
-
-template <PUSHMI_TYPE_CONSTRAINT(SemiMovable)... TN>
 class flow_single_sender;
-
-template <PUSHMI_TYPE_CONSTRAINT(SemiMovable)... TN>
-class flow_many;
 
 template <PUSHMI_TYPE_CONSTRAINT(SemiMovable)... TN>
 class flow_many_sender;
@@ -91,10 +79,35 @@ template <
   class... VN>
 class any_receiver;
 
+template <
+  class PE=std::exception_ptr,
+  class PV=std::ptrdiff_t,
+  class E=PE,
+  class... VN>
+class any_flow_receiver;
+
 template<
   class E = std::exception_ptr,
   class... VN>
 struct any_single_sender;
+
+template<
+  class E = std::exception_ptr,
+  class... VN>
+struct any_many_sender;
+
+template <
+  class PE=std::exception_ptr,
+  class E=PE,
+  class... VN>
+class any_flow_single_sender;
+
+template <
+  class PE=std::exception_ptr,
+  class PV=std::ptrdiff_t,
+  class E=PE,
+  class... VN>
+class any_flow_many_sender;
 
 template<
   class E = std::exception_ptr,
