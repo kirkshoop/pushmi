@@ -7548,7 +7548,7 @@ private:
     void operator()(TN&&... tn) const { *result_ = T{(TN&&) tn...}; }
   };
   struct on_error_impl {
-    std::exception_ptr* ep_;
+    pushmi::detail::opt<std::exception_ptr>* ep_;
     template <class E>
     void operator()(E e) const noexcept { *ep_ = std::make_exception_ptr(e); }
     void operator()(std::exception_ptr ep) const noexcept { *ep_ = ep; }
@@ -7559,7 +7559,7 @@ public:
     (requires Sender<In>)
   T operator()(In in) const {
     pushmi::detail::opt<T> result_;
-    std::exception_ptr ep_;
+    pushmi::detail::opt<std::exception_ptr> ep_;
     auto out = ::pushmi::make_receiver(
       on_value_impl{&result_},
       on_error_impl{&ep_}
@@ -7568,7 +7568,7 @@ public:
     static_assert(SenderTo<In, Out>,
         "'In' does not deliver value compatible with 'T' to 'Out'");
     std::conditional_t<AlwaysBlocking<In>, submit_fn, blocking_submit_fn>{}(std::move(out))(std::move(in));
-    if (!!ep_) { std::rethrow_exception(ep_); }
+    if (!!ep_) { std::rethrow_exception(*ep_); }
     return std::move(*result_);
   }
 };
