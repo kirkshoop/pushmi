@@ -6025,7 +6025,7 @@ class any_single_sender {
     return *this;
   }
   any_executor<E> executor() {
-    vptr_->executor_(data_);
+    return vptr_->executor_(data_);
   }
   void submit(any_receiver<E, VN...> out) {
     vptr_->submit_(data_, std::move(out));
