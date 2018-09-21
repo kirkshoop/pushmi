@@ -341,7 +341,7 @@ public:
     using Out = decltype(out);
     static_assert(SenderTo<In, Out>,
         "'In' does not deliver value compatible with 'T' to 'Out'");
-    std::conditional_t<AlwaysBlocking<In>, submit_fn, blocking_submit_fn>{}(std::move(out))(in);
+    std::conditional_t<AlwaysBlocking<In>, submit_fn, blocking_submit_fn>{}(std::move(out))(std::move(in));
     if (!!ep_) { std::rethrow_exception(ep_); }
     return std::move(*result_);
   }
