@@ -20,9 +20,9 @@ private:
   template <class F>
   struct impl {
     F f_;
-    PUSHMI_TEMPLATE(class Out)
+    PUSHMI_TEMPLATE(class Data, class Out)
       (requires Receiver<Out>)
-    void operator()(Out out) {
+    void operator()(Data&, Out out) {
       auto sender = f_();
       PUSHMI_IF_CONSTEXPR( ((bool)TimeSender<decltype(sender)>) (
         ::pushmi::submit(sender, ::pushmi::now(id(sender)), std::move(out));
@@ -35,7 +35,10 @@ public:
   PUSHMI_TEMPLATE(class F)
     (requires Invocable<F&>)
   auto operator()(F f) const {
-    return make_single_sender(impl<F>{std::move(f)});
+    struct sender_base : single_sender<> {
+      using properties = properties_t<invoke_result_t<F&>>;
+    };
+    return make_single_sender(sender_base{}, impl<F>{std::move(f)});
   }
 } defer {};
 

@@ -12,11 +12,14 @@
 
 namespace pushmi {
 namespace detail {
+  struct single_empty_sender_base : single_sender<> {
+    using properties = property_set<is_sender<>, is_single<>, is_always_blocking<>>;
+  };
   template <class... VN>
   struct single_empty_impl {
     PUSHMI_TEMPLATE(class Out)
       (requires ReceiveValue<Out, VN...>)
-    void operator()(Out out) {
+    void operator()(single_empty_sender_base&, Out out) {
       ::pushmi::set_done(out);
     }
   };
@@ -25,11 +28,11 @@ namespace detail {
 namespace operators {
 template <class... VN>
 auto empty() {
-  return make_single_sender(detail::single_empty_impl<VN...>{});
+  return make_single_sender(detail::single_empty_sender_base{}, detail::single_empty_impl<VN...>{});
 }
 
 inline auto empty() {
-  return make_single_sender(detail::single_empty_impl<>{});
+  return make_single_sender(detail::single_empty_sender_base{}, detail::single_empty_impl<>{});
 }
 
 } // namespace operators

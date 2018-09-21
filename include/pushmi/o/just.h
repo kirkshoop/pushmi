@@ -16,12 +16,15 @@ namespace operators {
 
 PUSHMI_INLINE_VAR constexpr struct just_fn {
 private:
+  struct sender_base : single_sender<> {
+    using properties = property_set<is_sender<>, is_single<>, is_always_blocking<>>;
+  };
   template <class... VN>
   struct impl {
     std::tuple<VN...> vn_;
     PUSHMI_TEMPLATE (class Out)
       (requires ReceiveValue<Out, VN...>)
-    void operator()(Out out) {
+    void operator()(sender_base&, Out out) {
       ::pushmi::apply(::pushmi::set_value, std::tuple_cat(std::tuple<Out&>{out}, std::move(vn_)));
       ::pushmi::set_done(std::move(out));
     }
@@ -30,7 +33,7 @@ public:
   PUSHMI_TEMPLATE(class... VN)
     (requires And<SemiMovable<VN>...>)
   auto operator()(VN... vn) const {
-    return make_single_sender(impl<VN...>{std::tuple<VN...>{std::move(vn)...}});
+    return make_single_sender(sender_base{}, impl<VN...>{std::tuple<VN...>{std::move(vn)...}});
   }
 } just {};
 } // namespace operators

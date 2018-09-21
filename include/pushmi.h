@@ -7514,7 +7514,9 @@ private:
     std::tuple<AN...> args_;
 
     PUSHMI_TEMPLATE(class In)
-      (requires Sender<In> && Invocable<submit_impl<In>&, In&, pushmi::invoke_result_t<receiver_impl<In>, lock_state*, std::tuple<AN...>&&>>)
+      (requires Sender<In> &&
+        Invocable<submit_impl<In>&, In&, pushmi::invoke_result_t<receiver_impl<In>, lock_state*, std::tuple<AN...>&&>> &&
+        not AlwaysBlocking<In>)
     In operator()(In in) {
       lock_state state{};
 
@@ -7564,7 +7566,7 @@ public:
     using Out = decltype(out);
     static_assert(SenderTo<In, Out>,
         "'In' does not deliver value compatible with 'T' to 'Out'");
-    blocking_submit_fn{}(std::move(out))(in);
+    std::conditional_t<AlwaysBlocking<In>, submit_fn, blocking_submit_fn>{}(std::move(out))(in);
     if (!!ep_) { std::rethrow_exception(ep_); }
     return std::move(*result_);
   }
@@ -7766,11 +7768,14 @@ PUSHMI_INLINE_VAR constexpr detail::for_each_fn for_each{};
 
 namespace pushmi {
 namespace detail {
+  struct single_empty_sender_base : single_sender<> {
+    using properties = property_set<is_sender<>, is_single<>, is_always_blocking<>>;
+  };
   template <class... VN>
   struct single_empty_impl {
     PUSHMI_TEMPLATE(class Out)
       (requires ReceiveValue<Out, VN...>)
-    void operator()(Out out) {
+    void operator()(single_empty_sender_base&, Out out) {
       ::pushmi::set_done(out);
     }
   };
@@ -7779,11 +7784,11 @@ namespace detail {
 namespace operators {
 template <class... VN>
 auto empty() {
-  return make_single_sender(detail::single_empty_impl<VN...>{});
+  return make_single_sender(detail::single_empty_sender_base{}, detail::single_empty_impl<VN...>{});
 }
 
 inline auto empty() {
-  return make_single_sender(detail::single_empty_impl<>{});
+  return make_single_sender(detail::single_empty_sender_base{}, detail::single_empty_impl<>{});
 }
 
 } // namespace operators
@@ -7979,12 +7984,15 @@ namespace operators {
 
 PUSHMI_INLINE_VAR constexpr struct just_fn {
 private:
+  struct sender_base : single_sender<> {
+    using properties = property_set<is_sender<>, is_single<>, is_always_blocking<>>;
+  };
   template <class... VN>
   struct impl {
     std::tuple<VN...> vn_;
     PUSHMI_TEMPLATE (class Out)
       (requires ReceiveValue<Out, VN...>)
-    void operator()(Out out) {
+    void operator()(sender_base&, Out out) {
       ::pushmi::apply(::pushmi::set_value, std::tuple_cat(std::tuple<Out&>{out}, std::move(vn_)));
       ::pushmi::set_done(std::move(out));
     }
@@ -7993,7 +8001,7 @@ public:
   PUSHMI_TEMPLATE(class... VN)
     (requires And<SemiMovable<VN>...>)
   auto operator()(VN... vn) const {
-    return make_single_sender(impl<VN...>{std::tuple<VN...>{std::move(vn)...}});
+    return make_single_sender(sender_base{}, impl<VN...>{std::tuple<VN...>{std::move(vn)...}});
   }
 } just {};
 } // namespace operators
@@ -8012,12 +8020,15 @@ public:
 
 namespace pushmi {
 namespace detail {
+  struct single_error_sender_base : single_sender<> {
+    using properties = property_set<is_sender<>, is_single<>, is_always_blocking<>>;
+  };
   template <class E, class... VN>
   struct single_error_impl {
     E e_;
     PUSHMI_TEMPLATE(class Out)
       (requires ReceiveError<Out, E> && ReceiveValue<Out, VN...>)
-    void operator()(Out out) {
+    void operator()(single_error_sender_base&, Out out) {
       ::pushmi::set_error(out, std::move(e_));
     }
   };
@@ -8028,7 +8039,7 @@ namespace operators {
 PUSHMI_TEMPLATE(class... VN, class E)
   (requires And<SemiMovable<VN>...> && SemiMovable<E>)
 auto error(E e) {
-  return make_single_sender(detail::single_error_impl<E, VN...>{std::move(e)});
+  return make_single_sender(detail::single_error_sender_base{}, detail::single_error_impl<E, VN...>{std::move(e)});
 }
 
 } // namespace operators
@@ -8055,9 +8066,9 @@ private:
   template <class F>
   struct impl {
     F f_;
-    PUSHMI_TEMPLATE(class Out)
+    PUSHMI_TEMPLATE(class Data, class Out)
       (requires Receiver<Out>)
-    void operator()(Out out) {
+    void operator()(Data&, Out out) {
       auto sender = f_();
       PUSHMI_IF_CONSTEXPR( ((bool)TimeSender<decltype(sender)>) (
         ::pushmi::submit(sender, ::pushmi::now(id(sender)), std::move(out));
@@ -8070,7 +8081,10 @@ public:
   PUSHMI_TEMPLATE(class F)
     (requires Invocable<F&>)
   auto operator()(F f) const {
-    return make_single_sender(impl<F>{std::move(f)});
+    struct sender_base : single_sender<> {
+      using properties = properties_t<invoke_result_t<F&>>;
+    };
+    return make_single_sender(sender_base{}, impl<F>{std::move(f)});
   }
 } defer {};
 

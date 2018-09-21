@@ -11,12 +11,15 @@
 
 namespace pushmi {
 namespace detail {
+  struct single_error_sender_base : single_sender<> {
+    using properties = property_set<is_sender<>, is_single<>, is_always_blocking<>>;
+  };
   template <class E, class... VN>
   struct single_error_impl {
     E e_;
     PUSHMI_TEMPLATE(class Out)
       (requires ReceiveError<Out, E> && ReceiveValue<Out, VN...>)
-    void operator()(Out out) {
+    void operator()(single_error_sender_base&, Out out) {
       ::pushmi::set_error(out, std::move(e_));
     }
   };
@@ -27,7 +30,7 @@ namespace operators {
 PUSHMI_TEMPLATE(class... VN, class E)
   (requires And<SemiMovable<VN>...> && SemiMovable<E>)
 auto error(E e) {
-  return make_single_sender(detail::single_error_impl<E, VN...>{std::move(e)});
+  return make_single_sender(detail::single_error_sender_base{}, detail::single_error_impl<E, VN...>{std::move(e)});
 }
 
 } // namespace operators

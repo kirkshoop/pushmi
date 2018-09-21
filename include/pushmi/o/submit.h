@@ -289,7 +289,9 @@ private:
     std::tuple<AN...> args_;
 
     PUSHMI_TEMPLATE(class In)
-      (requires Sender<In> && Invocable<submit_impl<In>&, In&, pushmi::invoke_result_t<receiver_impl<In>, lock_state*, std::tuple<AN...>&&>>)
+      (requires Sender<In> &&
+        Invocable<submit_impl<In>&, In&, pushmi::invoke_result_t<receiver_impl<In>, lock_state*, std::tuple<AN...>&&>> &&
+        not AlwaysBlocking<In>)
     In operator()(In in) {
       lock_state state{};
 
@@ -339,7 +341,7 @@ public:
     using Out = decltype(out);
     static_assert(SenderTo<In, Out>,
         "'In' does not deliver value compatible with 'T' to 'Out'");
-    blocking_submit_fn{}(std::move(out))(in);
+    std::conditional_t<AlwaysBlocking<In>, submit_fn, blocking_submit_fn>{}(std::move(out))(in);
     if (!!ep_) { std::rethrow_exception(ep_); }
     return std::move(*result_);
   }
