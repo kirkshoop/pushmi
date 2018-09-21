@@ -4043,6 +4043,7 @@ using not_any_executor =
 template <class E>
 struct any_executor : detail::any_executor_base<E> {
   constexpr any_executor() = default;
+  using properties = property_set<is_sender<>, is_executor<>, is_single<>>;
   using detail::any_executor_base<E>::any_executor_base;
 };
 
@@ -8073,11 +8074,7 @@ private:
       (requires Receiver<Out>)
     void operator()(Data&, Out out) {
       auto sender = f_();
-      PUSHMI_IF_CONSTEXPR( ((bool)TimeSender<decltype(sender)>) (
-        ::pushmi::submit(sender, ::pushmi::now(id(sender)), std::move(out));
-      ) else (
-        ::pushmi::submit(sender, std::move(out));
-      ));
+      ::pushmi::submit(sender, std::move(out));
     }
   };
 public:

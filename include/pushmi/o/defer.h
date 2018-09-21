@@ -24,11 +24,7 @@ private:
       (requires Receiver<Out>)
     void operator()(Data&, Out out) {
       auto sender = f_();
-      PUSHMI_IF_CONSTEXPR( ((bool)TimeSender<decltype(sender)>) (
-        ::pushmi::submit(sender, ::pushmi::now(id(sender)), std::move(out));
-      ) else (
-        ::pushmi::submit(sender, std::move(out));
-      ));
+      ::pushmi::submit(sender, std::move(out));
     }
   };
 public:

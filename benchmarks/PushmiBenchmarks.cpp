@@ -2,6 +2,7 @@
 #include <vector>
 
 #include "pushmi/o/just.h"
+#include "pushmi/o/defer.h"
 #include "pushmi/o/on.h"
 #include "pushmi/o/transform.h"
 #include "pushmi/o/tap.h"
@@ -244,14 +245,23 @@ struct inline_executor_many {
 #define concept Concept
 #include <nonius/nonius.h++>
 
-NONIUS_BENCHMARK("ready 1'000 single get", [](nonius::chronometer meter){
+NONIUS_BENCHMARK("ready 1'000 single get (submit)", [](nonius::chronometer meter){
   int counter{0};
-  auto ie = inline_executor{};
-  using IE = decltype(ie);
   meter.measure([&]{
     counter = 1'000;
     while (--counter >=0) {
       auto fortyTwo = op::just(42) | op::get<int>;
+    }
+    return counter;
+  });
+})
+
+NONIUS_BENCHMARK("ready 1'000 single get (blocking_submit)", [](nonius::chronometer meter){
+  int counter{0};
+  meter.measure([&]{
+    counter = 1'000;
+    while (--counter >=0) {
+      auto fortyTwo = mi::make_single_sender([](auto out){ mi::set_value(out, 42); mi::set_done(out);}) | op::get<int>;
     }
     return counter;
   });
@@ -384,6 +394,19 @@ NONIUS_BENCHMARK("inline 1'000 flow_many ignore cancellation", [](nonius::chrono
     ie | op::submit(mi::make_flow_receiver(flowmany));
     while(counter.load() > 0);
     return counter.load();
+  });
+})
+
+NONIUS_BENCHMARK("trampoline 1'000 single get (blocking_submit)", [](nonius::chronometer meter){
+  int counter{0};
+  auto tr = mi::trampoline();
+  using TR = decltype(tr);
+  meter.measure([&]{
+    counter = 1'000;
+    while (--counter >=0) {
+      auto fortyTwo = tr | op::transform([](auto){return 42;}) | op::get<int>;
+    }
+    return counter;
   });
 })
 

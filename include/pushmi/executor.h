@@ -119,6 +119,7 @@ using not_any_executor =
 template <class E>
 struct any_executor : detail::any_executor_base<E> {
   constexpr any_executor() = default;
+  using properties = property_set<is_sender<>, is_executor<>, is_single<>>;
   using detail::any_executor_base<E>::any_executor_base;
 };
 
