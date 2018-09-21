@@ -244,6 +244,19 @@ struct inline_executor_many {
 #define concept Concept
 #include <nonius/nonius.h++>
 
+NONIUS_BENCHMARK("ready 1'000 single get", [](nonius::chronometer meter){
+  int counter{0};
+  auto ie = inline_executor{};
+  using IE = decltype(ie);
+  meter.measure([&]{
+    counter = 1'000;
+    while (--counter >=0) {
+      auto fortyTwo = op::just(42) | op::get<int>;
+    }
+    return counter;
+  });
+})
+
 NONIUS_BENCHMARK("inline 1'000 single", [](nonius::chronometer meter){
   std::atomic<int> counter{0};
   auto ie = inline_executor{};

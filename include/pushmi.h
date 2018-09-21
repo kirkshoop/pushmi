@@ -4625,7 +4625,7 @@ class trampoline {
         } else {
           // dynamic recursion - optimization to balance queueing and
           // stack usage and value interleaving on the same thread.
-          ::pushmi::set_value(awhat, any_executor_ref<E>(that));
+          ::pushmi::set_value(awhat, that);
           ::pushmi::set_done(awhat);
         }
       } catch(...) {
@@ -4684,7 +4684,7 @@ class trampoline {
       bool go = true;
       while (go) {
         repeat(pending_store) = false;
-        ::pushmi::set_value(awhat, any_executor_ref<E>(that));
+        ::pushmi::set_value(awhat, that);
         ::pushmi::set_done(awhat);
         go = repeat(pending_store);
       }
@@ -7768,8 +7768,8 @@ PUSHMI_INLINE_VAR constexpr detail::for_each_fn for_each{};
 
 namespace pushmi {
 namespace detail {
-  struct single_empty_sender_base : single_sender<> {
-    using properties = property_set<is_sender<>, is_single<>, is_always_blocking<>>;
+  struct single_empty_sender_base : single_sender<ignoreSF, inlineEXF> {
+    using properties = property_set<is_sender<>, is_single<>, is_always_blocking<>, is_fifo_sequence<>>;
   };
   template <class... VN>
   struct single_empty_impl {
@@ -7819,13 +7819,16 @@ namespace operators {
 
 PUSHMI_INLINE_VAR constexpr struct from_fn {
 private:
+  struct sender_base : many_sender<ignoreSF, inlineEXF> {
+    using properties = property_set<is_sender<>, is_many<>, is_always_blocking<>, is_fifo_sequence<>>;
+  };
   template <class I, class S>
   struct out_impl {
     I begin_;
     S end_;
     PUSHMI_TEMPLATE(class Out)
       (requires ReceiveValue<Out, typename std::iterator_traits<I>::value_type>)
-    void operator()(Out out) const {
+    void operator()(sender_base&, Out out) const {
       auto c = begin_;
       for (; c != end_; ++c) {
         ::pushmi::set_value(out, *c);
@@ -7840,7 +7843,7 @@ public:
           typename std::iterator_traits<I>::iterator_category,
           std::forward_iterator_tag>)
   auto operator()(I begin, S end) const {
-    return make_many_sender(out_impl<I, S>{begin, end});
+    return make_many_sender(sender_base{}, out_impl<I, S>{begin, end});
   }
 
   PUSHMI_TEMPLATE(class R)
@@ -7984,8 +7987,8 @@ namespace operators {
 
 PUSHMI_INLINE_VAR constexpr struct just_fn {
 private:
-  struct sender_base : single_sender<> {
-    using properties = property_set<is_sender<>, is_single<>, is_always_blocking<>>;
+  struct sender_base : single_sender<ignoreSF, inlineEXF> {
+    using properties = property_set<is_sender<>, is_single<>, is_always_blocking<>, is_fifo_sequence<>>;
   };
   template <class... VN>
   struct impl {
@@ -8020,8 +8023,8 @@ public:
 
 namespace pushmi {
 namespace detail {
-  struct single_error_sender_base : single_sender<> {
-    using properties = property_set<is_sender<>, is_single<>, is_always_blocking<>>;
+  struct single_error_sender_base : single_sender<ignoreSF, inlineEXF> {
+    using properties = property_set<is_sender<>, is_single<>, is_always_blocking<>, is_fifo_sequence<>>;
   };
   template <class E, class... VN>
   struct single_error_impl {

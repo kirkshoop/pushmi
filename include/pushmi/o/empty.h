@@ -12,8 +12,8 @@
 
 namespace pushmi {
 namespace detail {
-  struct single_empty_sender_base : single_sender<> {
-    using properties = property_set<is_sender<>, is_single<>, is_always_blocking<>>;
+  struct single_empty_sender_base : single_sender<ignoreSF, inlineEXF> {
+    using properties = property_set<is_sender<>, is_single<>, is_always_blocking<>, is_fifo_sequence<>>;
   };
   template <class... VN>
   struct single_empty_impl {

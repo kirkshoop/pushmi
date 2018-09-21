@@ -11,8 +11,8 @@
 
 namespace pushmi {
 namespace detail {
-  struct single_error_sender_base : single_sender<> {
-    using properties = property_set<is_sender<>, is_single<>, is_always_blocking<>>;
+  struct single_error_sender_base : single_sender<ignoreSF, inlineEXF> {
+    using properties = property_set<is_sender<>, is_single<>, is_always_blocking<>, is_fifo_sequence<>>;
   };
   template <class E, class... VN>
   struct single_error_impl {
