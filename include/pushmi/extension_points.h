@@ -125,6 +125,25 @@ void submit(SD& sd, TP tp, Out out)
 }
 
 //
+// support a nullary function as a receiver
+//
+
+PUSHMI_TEMPLATE (class S)
+  (requires Invocable<S&>)
+void set_done(S& s) noexcept {
+}
+PUSHMI_TEMPLATE (class S, class E)
+  (requires Invocable<S&>)
+void set_error(S& s, E&& e) noexcept {
+  std::abort();
+}
+PUSHMI_TEMPLATE (class S)
+  (requires Invocable<S&>)
+void set_value(S& s) noexcept(noexcept(s())) {
+  s();
+}
+
+//
 // add support for std::promise externally
 //
 

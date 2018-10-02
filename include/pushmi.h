@@ -718,6 +718,7 @@ PUSHMI_PP_IGNORE_CXX2A_COMPAT_END
 //#include <type_traits>
 
 //#include "detail/concept_def.h"
+//#include "detail/functional.h"
 
 #define PUSHMI_NOEXCEPT_AUTO(...) \
   noexcept(noexcept(static_cast<decltype((__VA_ARGS__))>(__VA_ARGS__)))\
@@ -1700,6 +1701,25 @@ PUSHMI_TEMPLATE (class SD, class TP, class Out)
 void submit(SD& sd, TP tp, Out out)
   noexcept(noexcept(sd->submit(std::move(tp), std::move(out)))) {
   sd->submit(std::move(tp), std::move(out));
+}
+
+//
+// support a nullary function as a receiver
+//
+
+PUSHMI_TEMPLATE (class S)
+  (requires Invocable<S&>)
+void set_done(S& s) noexcept {
+}
+PUSHMI_TEMPLATE (class S, class E)
+  (requires Invocable<S&>)
+void set_error(S& s, E&& e) noexcept {
+  std::abort();
+}
+PUSHMI_TEMPLATE (class S)
+  (requires Invocable<S&>)
+void set_value(S& s) noexcept(noexcept(s())) {
+  s();
 }
 
 //
