@@ -7,7 +7,6 @@
 #include <functional>
 #include <type_traits>
 
-#include "detail/concept_def.h"
 #include "detail/functional.h"
 
 #define PUSHMI_NOEXCEPT_AUTO(...) \

@@ -56,7 +56,7 @@ PUSHMI_CONCEPT_DEF(
 namespace detail {
 template <PUSHMI_TYPE_CONSTRAINT(Property) P, class = property_category_t<P>>
 struct property_set_element {};
-}
+} // namespace detail
 
 template<class... PropertyN>
 struct property_set : detail::property_set_element<PropertyN>... {
@@ -82,7 +82,14 @@ struct property_set_traits_impl : property_traits<std::decay_t<T>> {
 };
 template <class T>
 struct property_set_traits_impl<T,
-    std::enable_if_t<Decayed<T> && not Valid<T, __properties_t>>> {
+    std::enable_if_t<Decayed<T> && not Invocable<T&> && not Valid<T, __properties_t>>> {
+};
+// HACK - need to have concepts emulation for template specializations in order to remove this
+struct __nullary_function{};
+template <class T>
+struct property_set_traits_impl<T,
+    std::enable_if_t<Decayed<T> && Invocable<T&> && not Valid<T, __properties_t>>> :
+    property_traits<__nullary_function> {
 };
 template <class T>
 struct property_set_traits_impl<T,

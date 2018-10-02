@@ -68,9 +68,6 @@ template <PUSHMI_TYPE_CONSTRAINT(SemiMovable)... TN>
 class flow_receiver;
 
 template <PUSHMI_TYPE_CONSTRAINT(SemiMovable)... TN>
-class sender;
-
-template <PUSHMI_TYPE_CONSTRAINT(SemiMovable)... TN>
 class single_sender;
 
 template <PUSHMI_TYPE_CONSTRAINT(SemiMovable)... TN>

@@ -8,6 +8,7 @@
 #include <functional>
 
 #include "traits.h"
+#include "properties.h"
 
 namespace pushmi {
 namespace __adl {
@@ -346,6 +347,11 @@ PUSHMI_INLINE_VAR constexpr __adl::get_executor_fn executor{};
 PUSHMI_INLINE_VAR constexpr __adl::do_submit_fn submit{};
 PUSHMI_INLINE_VAR constexpr __adl::get_top_fn now{};
 PUSHMI_INLINE_VAR constexpr __adl::get_top_fn top{};
+
+template<>
+struct property_set_traits<detail::__nullary_function> {
+  using properties = property_set<is_receiver<>>;
+};
 
 template <class T>
 struct property_set_traits<std::promise<T>> {
