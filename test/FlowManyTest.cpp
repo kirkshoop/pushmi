@@ -142,7 +142,7 @@ class ConcurrentFlowManySender : public Test {
   using TNT = mi::invoke_result_t<decltype(make_time), mi::time_source<>&, NT&>;
 
   void reset() {
-    at_ = mi::now(tnt_) + 100ms;
+    at_ = mi::now(tnt_) + 500ms;
     signals_ = 0;
     terminal_ = 0;
     cancel_ = 0;
@@ -252,7 +252,7 @@ class ConcurrentFlowManySender : public Test {
   std::atomic<int> signals_{0};
   std::atomic<int> terminal_{0};
   std::atomic<int> cancel_{0};
-  std::chrono::system_clock::time_point at_{mi::now(tnt_) + 100ms};
+  std::chrono::system_clock::time_point at_{mi::now(tnt_) + 500ms};
 };
 
 TEST_F(ConcurrentFlowManySender, EarlyCancellation) {
